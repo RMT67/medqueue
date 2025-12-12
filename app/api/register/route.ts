@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import connectDB from "@/lib/db";
-import User from "@/models/User";
+import User from "@/db/models/User";
 
 type UserRole = "admin" | "doctor" | "patient";
 

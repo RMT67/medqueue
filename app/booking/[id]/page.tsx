@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import Swal from "sweetalert2";
+
 import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,6 +24,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 // import { FadeIn, ScaleIn, SlideIn } from "@/components/animations";
 import { FadeIn, ScaleIn } from "@/components/animations";
+import { useParams } from "next/navigation";
 
 // Mock doctor data
 const DOCTOR_DATA = {
@@ -45,6 +48,18 @@ export default function BookingPage({ params }: { params: { id: string } }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [patientComplaint, setPatientComplaint] = useState("");
 
+  // ambil param dari URL
+  const { id } = useParams();
+
+  // cek login, nanti diimplementasi dengan auth context jika login page sudah siap
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+  //       <p>Please log in to book an appointment.</p>
+  //     </div>
+  //   );
+  // }
+
   const doctor = DOCTOR_DATA["1" as keyof typeof DOCTOR_DATA];
   const initials = doctor.name
     .split(" ")
@@ -52,14 +67,51 @@ export default function BookingPage({ params }: { params: { id: string } }) {
     .join("")
     .toUpperCase();
 
-  const handleBooking = () => {
+  const handleValidatedDate = (dateStr: string) => {
+    const selected = new Date(dateStr);
+    const today = new Date(new Date().toDateString());
+    if (selected < today) {
+      return Swal.fire({
+        icon: "error",
+        title: "Invalid Date",
+        text: "Please select a valid date.",
+      });
+    }
+
+    if ((selected.getTime() - today.getTime()) / (1000 * 3600 * 24) > 2) {
+      return Swal.fire({
+        icon: "error",
+        title: "Invalid Date",
+        text: "You can only book up to 1 day in advance.",
+      });
+    }
+    setSelectedDate(dateStr);
+    setStep(2);
+  };
+
+  const handleBooking = async () => {
     console.log("Booking confirmed:", {
       selectedDate,
       timeRange: doctor.timeRange,
       patientComplaint,
     });
     setStep(3);
-    // fetch booking id terbaru dari backend terus tampilkan di step 4, yang ditampilkan ke user booking id & queue number
+
+    // nanti kalo cookies dari login udah siap, tambahin cookies di fetch ini
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/booking`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        // nanti tambahin user ID dari localStorage
+        patientId: "1", // sementara hardcode dulu
+        doctorId: id,
+        scheduleDate: selectedDate,
+        timeRange: doctor.timeRange,
+        complaint: patientComplaint,
+      }),
+    });
   };
 
   return (
@@ -214,6 +266,7 @@ export default function BookingPage({ params }: { params: { id: string } }) {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
+                    // onChange={(e) => handleValidatedDate(e.target.value)}
                     className="w-full h-12 border-2 focus:border-primary text-base"
                   />
                 </div>
@@ -262,7 +315,8 @@ export default function BookingPage({ params }: { params: { id: string } }) {
               </div>
 
               <Button
-                onClick={() => setStep(2)}
+                // onClick={() => setStep(2)}
+                onClick={() => handleValidatedDate(selectedDate)}
                 disabled={!selectedDate}
                 className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium disabled:opacity-50"
               >

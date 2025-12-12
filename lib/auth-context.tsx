@@ -1,39 +1,50 @@
-"use client"
+"use client";
 
-import { createContext, useContext, type ReactNode, useState, useEffect } from "react"
+import {
+  createContext,
+  useContext,
+  type ReactNode,
+  useState,
+  useEffect,
+} from "react";
 
-export type UserRole = "patient" | "doctor" | "admin"
+export type UserRole = "patient" | "doctor" | "admin";
 
 export interface User {
-  _id: string
-  email: string
-  name: string
-  role: UserRole
+  _id: string;
+  email: string;
+  name: string;
+  role: UserRole;
 }
 
 interface AuthContextType {
-  user: User | null
-  isAuthenticated: boolean
-  login: (email: string, password: string, role: UserRole) => Promise<boolean>
-  register: (fullName: string, email: string, password: string, role?: UserRole) => Promise<boolean>
-  logout: () => void
-  isLoading: boolean
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string, role: UserRole) => Promise<boolean>;
+  register: (
+    fullName: string,
+    email: string,
+    password: string,
+    role?: UserRole
+  ) => Promise<boolean>;
+  logout: () => void;
+  isLoading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Restore session on mount
   useEffect(() => {
-    const token = localStorage.getItem("medqueue_token")
-    const savedUser = localStorage.getItem("medqueue_user")
-    
+    const token = localStorage.getItem("medqueue_token");
+    const savedUser = localStorage.getItem("medqueue_user");
+
     if (token && savedUser) {
       try {
-        const userData = JSON.parse(savedUser)
+        const userData = JSON.parse(savedUser);
         // Verify token is still valid by calling /api/auth/me
         fetch("/api/auth/me", {
           headers: {
@@ -42,32 +53,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
           .then((res) => {
             if (res.ok) {
-              return res.json()
+              return res.json();
             }
-            throw new Error("Token invalid")
+            throw new Error("Token invalid");
           })
           .then((data) => {
-            setUser(data.user)
+            setUser(data.user);
           })
           .catch(() => {
-            localStorage.removeItem("medqueue_token")
-            localStorage.removeItem("medqueue_user")
-            setUser(null)
+            localStorage.removeItem("medqueue_token");
+            localStorage.removeItem("medqueue_user");
+            setUser(null);
           })
           .finally(() => {
-            setIsLoading(false)
-          })
+            setIsLoading(false);
+          });
       } catch (e) {
-        localStorage.removeItem("medqueue_token")
-        localStorage.removeItem("medqueue_user")
-        setIsLoading(false)
+        localStorage.removeItem("medqueue_token");
+        localStorage.removeItem("medqueue_user");
+        setIsLoading(false);
       }
     } else {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, []);
 
-  const login = async (email: string, password: string, role: UserRole): Promise<boolean> => {
+  const login = async (
+    email: string,
+    password: string,
+    role: UserRole
+  ): Promise<boolean> => {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -75,27 +90,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password, role }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.message || "Login failed")
+        const data = await response.json();
+        throw new Error(data.message || "Login failed");
       }
 
-      const data = await response.json()
-      const { token, user: userData } = data
+      const data = await response.json();
+      const { token, user: userData } = data;
 
-      localStorage.setItem("medqueue_token", token)
-      localStorage.setItem("medqueue_user", JSON.stringify(userData))
-      setUser(userData)
-      return true
+      localStorage.setItem("medqueue_token", token);
+      localStorage.setItem("medqueue_user", JSON.stringify(userData));
+      setUser(userData);
+      return true;
     } catch (error) {
-      console.error("Login error:", error)
-      return false
+      console.error("Login error:", error);
+      return false;
     }
-  }
+  };
 
-  const register = async (fullName: string, email: string, password: string, role: UserRole = "patient"): Promise<boolean> => {
+  const register = async (
+    fullName: string,
+    email: string,
+    password: string,
+    role: UserRole = "patient"
+  ): Promise<boolean> => {
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -103,44 +123,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ fullName, email, password, role }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.message || "Registration failed")
+        const data = await response.json();
+        throw new Error(data.message || "Registration failed");
       }
 
-      const data = await response.json()
-      const { token, user: userData } = data
+      const data = await response.json();
+      const { token, user: userData } = data;
 
-      localStorage.setItem("medqueue_token", token)
-      localStorage.setItem("medqueue_user", JSON.stringify(userData))
-      setUser(userData)
-      return true
+      localStorage.setItem("medqueue_token", token);
+      localStorage.setItem("medqueue_user", JSON.stringify(userData));
+      setUser(userData);
+      return true;
     } catch (error) {
-      console.error("Registration error:", error)
-      return false
+      console.error("Registration error:", error);
+      return false;
     }
-  }
+  };
 
   const logout = () => {
-    setUser(null)
-    localStorage.removeItem("medqueue_token")
-    localStorage.removeItem("medqueue_user")
-  }
+    setUser(null);
+    localStorage.removeItem("medqueue_token");
+    localStorage.removeItem("medqueue_user");
+  };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, isLoading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        login,
+        register,
+        logout,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context
+  return context;
 }
-
