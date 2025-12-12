@@ -8,21 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
-
-interface Doctor {
-  id: string;
-  name: string;
-  specialization: string;
-  clinic: string;
-  status: string;
-  todayPatients: number;
-  currentQueue: number;
-  currentlyServing: string | null;
-  avgWaitTime: number;
-  completedToday: number;
-  image: string;
-  timeStatus: "onTime" | number;
-}
+import { DoctorAdmin } from "@/types/docterTypes";
 
 interface OverviewTabProps {
   stats: {
@@ -31,7 +17,7 @@ interface OverviewTabProps {
     activeDoctors: number;
     completedVisits: number;
   };
-  doctors: Doctor[];
+  doctors: DoctorAdmin[];
 }
 
 export function OverviewTab({ stats, doctors }: OverviewTabProps) {
@@ -122,7 +108,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
 
               return (
                 <Card
-                  key={doctor.id}
+                  key={doctor._id.toString()}
                   className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm hover:shadow-2xl transition-all"
                 >
                   {/* Doctor Header */}
