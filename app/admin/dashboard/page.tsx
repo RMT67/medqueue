@@ -2,25 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Users,
-  Clock,
-  Activity,
-  Plus,
-  Edit2,
-  Trash2,
-  Shield,
-  CheckCircle2,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-} from "lucide-react";
+import { Users, Activity, Plus, Shield, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import {
+  OverviewTab,
+  DoctorsTab,
+  ScheduleTab,
+} from "@/components/adminDashboard";
 
 // Mock data
 const STATS = {
@@ -30,7 +22,22 @@ const STATS = {
   completedVisits: 342,
 };
 
-const DOCTORS = [
+interface Doctor {
+  id: string;
+  name: string;
+  specialization: string;
+  clinic: string;
+  status: string;
+  todayPatients: number;
+  currentQueue: number;
+  currentlyServing: string | null;
+  avgWaitTime: number;
+  completedToday: number;
+  image: string;
+  timeStatus: "onTime" | number;
+}
+
+const DOCTORS: Doctor[] = [
   {
     id: "1",
     name: "Dr. Sarah Johnson",
@@ -184,451 +191,19 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         {activeTab === "overview" && (
-          <div className="space-y-8">
-            {/* Stats Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-              <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Total Patients Today
-                  </p>
-                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                    <Users className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <p className="text-3xl lg:text-4xl font-bold text-foreground">
-                  {STATS.totalPatients}
-                </p>
-              </Card>
-
-              <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Avg Wait Time
-                  </p>
-                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-accent to-secondary flex items-center justify-center shadow-md">
-                    <Clock className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <p className="text-3xl lg:text-4xl font-bold text-foreground">
-                  {STATS.avgWaitTime}
-                </p>
-              </Card>
-
-              <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Active Doctors
-                  </p>
-                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-secondary to-primary flex items-center justify-center shadow-md">
-                    <Activity className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <p className="text-3xl lg:text-4xl font-bold text-foreground">
-                  {STATS.activeDoctors}
-                </p>
-              </Card>
-
-              <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Completed Visits
-                  </p>
-                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-green-500 to-green-600 flex items-center justify-center shadow-md">
-                    <CheckCircle2 className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <p className="text-3xl lg:text-4xl font-bold text-foreground">
-                  {STATS.completedVisits}
-                </p>
-              </Card>
-            </div>
-
-            {/* Active Doctors with Schedule */}
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">
-                  Active Doctors & Queue Status
-                </h3>
-              </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                {DOCTORS.filter((doctor) => doctor.status === "online").map(
-                  (doctor) => {
-                    const initials = doctor.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase();
-
-                    const isOnTime = doctor.timeStatus === "onTime";
-                    const lateMinutes =
-                      typeof doctor.timeStatus === "number"
-                        ? doctor.timeStatus
-                        : 0;
-
-                    return (
-                      <Card
-                        key={doctor.id}
-                        className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm hover:shadow-2xl transition-all"
-                      >
-                        {/* Doctor Header */}
-                        <div className="flex items-center gap-4 mb-5">
-                          {/* Doctor Photo */}
-                          <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-primary/20 shrink-0 shadow-md">
-                            {doctor.image ? (
-                              <>
-                                <Image
-                                  src={doctor.image}
-                                  alt={doctor.name}
-                                  fill
-                                  unoptimized
-                                  className="object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      const fallback = parent.querySelector(
-                                        ".image-fallback"
-                                      ) as HTMLElement;
-                                      if (fallback)
-                                        fallback.style.display = "flex";
-                                    }
-                                  }}
-                                />
-                                <div className="image-fallback hidden w-full h-full items-center justify-center bg-linear-to-br from-primary to-accent text-white font-bold text-xl">
-                                  {initials}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-primary to-accent text-white font-bold text-xl">
-                                {initials}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Doctor Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="mb-2">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-foreground text-lg mb-1 truncate">
-                                  {doctor.name}
-                                </h4>
-                                <p className="text-sm text-muted-foreground font-medium mb-1">
-                                  {doctor.specialization}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {doctor.clinic}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Time Status */}
-                            <div
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 ${
-                                isOnTime
-                                  ? "bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-                                  : "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-                              }`}
-                            >
-                              {isOnTime ? (
-                                <>
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                  <span>Tepat Waktu</span>
-                                </>
-                              ) : (
-                                <>
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  <span>Telat {lateMinutes} menit</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Queue Information */}
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                Queue
-                              </p>
-                              <p className="text-2xl font-bold text-primary">
-                                {doctor.currentQueue}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                patients waiting
-                              </p>
-                            </div>
-                            <div className="p-3 bg-primary/10 rounded-lg border-2 border-primary/20">
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                Serving
-                              </p>
-                              <p className="text-2xl font-bold text-primary">
-                                {doctor.currentlyServing || "N/A"}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                current patient
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                Avg Wait
-                              </p>
-                              <p className="text-xl font-bold text-foreground">
-                                {doctor.avgWaitTime} min
-                              </p>
-                            </div>
-                            <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                Completed
-                              </p>
-                              <p className="text-xl font-bold text-foreground">
-                                {doctor.completedToday}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                today
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="pt-3 border-t border-border">
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                Total Today
-                              </p>
-                              <p className="text-lg font-bold text-foreground">
-                                {doctor.todayPatients} patients
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  }
-                )}
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <Card className="p-6 lg:p-8 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-accent to-secondary flex items-center justify-center shadow-md">
-                  <Activity className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">
-                  Recent Activity
-                </h3>
-              </div>
-              <div className="space-y-3">
-                {[
-                  "Dr. Sarah Johnson started session at 09:15",
-                  "New patient booking for Dr. Michael Chen",
-                  "Dr. Priya Patel went offline",
-                  "Patient A-042 completed consultation",
-                  "System alert: High queue at Central Clinic",
-                ].map((activity, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 py-3 px-4 bg-muted/50 rounded-lg border-2 border-border hover:bg-muted hover:border-primary/30 transition-all"
-                  >
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
-                    <p className="text-sm text-foreground font-medium">
-                      {activity}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+          <OverviewTab stats={STATS} doctors={DOCTORS} />
         )}
 
         {/* Doctors Tab */}
         {activeTab === "doctors" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
-                  Manage Doctors
-                </h2>
-              </div>
-              <Button
-                onClick={() => setShowAddDoctorModal(true)}
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all h-11"
-              >
-                <Plus className="w-5 h-5" />
-                Add Doctor
-              </Button>
-            </div>
-
-            <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm overflow-x-auto">
-              <div className="min-w-full">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b-2 border-primary/20 bg-linear-to-r from-primary/5 to-accent/5">
-                      <th className="text-left py-4 px-4 font-bold text-foreground uppercase tracking-wide text-xs">
-                        Name
-                      </th>
-                      <th className="text-left py-4 px-4 font-bold text-foreground uppercase tracking-wide text-xs">
-                        Specialization
-                      </th>
-                      <th className="text-left py-4 px-4 font-bold text-foreground uppercase tracking-wide text-xs">
-                        Clinic
-                      </th>
-                      <th className="text-left py-4 px-4 font-bold text-foreground uppercase tracking-wide text-xs">
-                        Status
-                      </th>
-                      <th className="text-left py-4 px-4 font-bold text-foreground uppercase tracking-wide text-xs">
-                        Today&apos;s Patients
-                      </th>
-                      <th className="text-left py-4 px-4 font-bold text-foreground uppercase tracking-wide text-xs">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DOCTORS.map((doctor) => (
-                      <tr
-                        key={doctor.id}
-                        className="border-b border-border hover:bg-muted/50 transition-colors"
-                      >
-                        <td className="py-4 px-4">
-                          <p className="font-bold text-foreground">
-                            {doctor.name}
-                          </p>
-                        </td>
-                        <td className="py-4 px-4 text-muted-foreground font-medium">
-                          {doctor.specialization}
-                        </td>
-                        <td className="py-4 px-4 text-muted-foreground font-medium">
-                          {doctor.clinic}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 ${
-                              doctor.status === "online"
-                                ? "bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-300 border-green-200 dark:border-green-800"
-                                : "bg-gray-50 text-gray-700 dark:bg-gray-950/50 dark:text-gray-300 border-gray-200 dark:border-gray-800"
-                            }`}
-                          >
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                doctor.status === "online"
-                                  ? "bg-green-500"
-                                  : "bg-gray-400"
-                              }`}
-                            />
-                            {doctor.status}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="font-bold text-foreground">
-                            {doctor.todayPatients}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex gap-2">
-                            <button
-                              className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20"
-                              title="Edit Doctor"
-                            >
-                              <Edit2 className="w-4 h-4 text-primary" />
-                            </button>
-                            <button
-                              className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-800"
-                              title="Delete Doctor"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
+          <DoctorsTab
+            doctors={DOCTORS}
+            onAddDoctor={() => setShowAddDoctorModal(true)}
+          />
         )}
 
         {/* Schedule Tab */}
-        {activeTab === "schedule" && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                <Calendar className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
-                Doctor Schedules
-              </h2>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {DOCTORS.map((doctor) => (
-                <Card
-                  key={doctor.id}
-                  className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm hover:shadow-2xl transition-all"
-                >
-                  <div className="flex justify-between items-start mb-5 pb-5 border-b-2 border-border">
-                    <div>
-                      <h3 className="font-bold text-foreground text-xl mb-1">
-                        {doctor.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground font-medium">
-                        {doctor.specialization}
-                      </p>
-                    </div>
-                    <button
-                      className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20 hover:scale-105"
-                      title="Edit Schedule"
-                    >
-                      <Edit2 className="w-5 h-5 text-primary" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="p-4 bg-linear-to-br from-primary/5 to-accent/5 rounded-xl border-2 border-primary/20">
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5" /> Monday - Friday
-                      </p>
-                      <p className="text-sm font-bold text-foreground">
-                        09:00 - 17:00
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        1 hour lunch break at 12:00
-                      </p>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-xl border-2 border-border">
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                        Saturday
-                      </p>
-                      <p className="text-sm font-bold text-foreground">
-                        09:00 - 13:00
-                      </p>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-xl border-2 border-border">
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                        Sunday
-                      </p>
-                      <p className="text-sm font-bold text-muted-foreground">
-                        Closed
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === "schedule" && <ScheduleTab doctors={DOCTORS} />}
       </main>
 
       {/* Add Doctor Modal */}
