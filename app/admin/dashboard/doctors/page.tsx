@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Shield, Plus, Users, Activity, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { DoctorsTab } from "@/components/adminDashboard";
-import { DoctorAdmin } from "@/types";
+import { DoctorAdmin } from "@/types/docterTypes";
 
 const DOCTORS: DoctorAdmin[] = [
   {

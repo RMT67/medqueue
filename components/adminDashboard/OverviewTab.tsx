@@ -8,7 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
-import { DoctorAdmin } from "@/types";
+import { DoctorAdmin } from "@/types/docterTypes";
 
 interface OverviewTabProps {
   stats: {

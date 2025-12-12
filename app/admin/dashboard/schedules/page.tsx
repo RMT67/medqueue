@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Shield, Users, Activity, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ScheduleTab } from "@/components/adminDashboard";
-import { DoctorAdmin } from "@/types";
+import { DoctorAdmin } from "@/types/docterTypes";
 
 const DOCTORS: DoctorAdmin[] = [
   {

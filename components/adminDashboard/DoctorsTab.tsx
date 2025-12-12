@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Plus, Edit2, Trash2 } from "lucide-react";
-import { DoctorAdmin } from "@/types";
+import { DoctorAdmin } from "@/types/docterTypes";
 
 interface DoctorsTabProps {
   doctors: DoctorAdmin[];

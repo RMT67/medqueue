@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Users, Activity, Shield, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { OverviewTab } from "@/components/adminDashboard";
-import { DoctorAdmin } from "@/types";
+import { DoctorAdmin } from "@/types/docterTypes";
 
 // Mock data
 const STATS = {

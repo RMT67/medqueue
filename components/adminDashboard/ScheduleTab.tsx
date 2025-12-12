@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Calendar, Edit2 } from "lucide-react";
-import { DoctorAdmin } from "@/types";
+import { DoctorAdmin } from "@/types/docterTypes";
 
 interface ScheduleTabProps {
   doctors: DoctorAdmin[];

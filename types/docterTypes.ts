@@ -14,3 +14,19 @@ export type DoctorAdmin = {
   image: string;
   timeStatus: "onTime" | number;
 };
+
+export type Doctor = {
+  _id: ObjectId;
+  userId: string;
+  name: string;
+  specialization: string;
+  clinic: string;
+  image: string;
+  consultationFee: number;
+  averageRating: number;
+  totalReviews: number;
+  isActive: true;
+  defaultSchedule: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
