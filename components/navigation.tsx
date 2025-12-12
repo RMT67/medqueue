@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LogOut, Menu, X, Stethoscope, User } from "lucide-react";
@@ -62,6 +63,17 @@ export function Navigation({
 
   const links = getLinks();
   const displayName = userName || authUser?.name || "User";
+  const userPhotoUrl = authUser?.photoUrl;
+  
+  // Get initials for fallback avatar
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-card/80 backdrop-blur-md border-b border-border/50 shadow-sm">
@@ -116,8 +128,19 @@ export function Navigation({
                   href="/profile/edit"
                   className="flex items-center gap-3 group"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shadow-md group-hover:scale-105 transition-transform">
-                    {displayName?.charAt(0).toUpperCase() || "U"}
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shadow-md group-hover:scale-105 transition-transform overflow-hidden">
+                    {userPhotoUrl ? (
+                      <Image
+                        src={userPhotoUrl}
+                        alt={displayName}
+                        width={36}
+                        height={36}
+                        className="w-full h-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      getInitials(displayName) || "U"
+                    )}
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-semibold text-foreground leading-tight">
@@ -204,8 +227,19 @@ export function Navigation({
                 <>
                   <div className="border-t border-border my-2 pt-4">
                     <div className="flex items-center gap-3 px-4 py-2">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
-                        {displayName?.charAt(0).toUpperCase() || "U"}
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground overflow-hidden">
+                        {userPhotoUrl ? (
+                          <Image
+                            src={userPhotoUrl}
+                            alt={displayName}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          getInitials(displayName) || "U"
+                        )}
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-foreground">
@@ -265,3 +299,4 @@ export function Navigation({
     </nav>
   );
 }
+
