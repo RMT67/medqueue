@@ -7,6 +7,7 @@ export interface ApiFetchOptions<TBody> {
   method?: HttpMethod;
   body?: TBody;
   token?: string;
+  skipAuth?: boolean; // Set to true to skip auto-injecting token
 }
 
 interface ApiErrorShape {
@@ -14,17 +15,49 @@ interface ApiErrorShape {
   error?: string;
 }
 
+/**
+ * Helper function to get auth token from localStorage
+ */
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("medqueue_token");
+}
+
+/**
+ * API fetch helper that automatically injects Authorization header from localStorage
+ * 
+ * @param path - API endpoint path (e.g., "/api/auth/me")
+ * @param options - Fetch options
+ * @returns Promise with typed response
+ * 
+ * @example
+ * // Auto-injects token from localStorage
+ * const user = await apiFetch<User>("/api/auth/me");
+ * 
+ * // Skip auth (for public endpoints)
+ * const data = await apiFetch<Data>("/api/public", { skipAuth: true });
+ * 
+ * // Manual token override
+ * const data = await apiFetch<Data>("/api/endpoint", { token: "custom-token" });
+ */
 export async function apiFetch<TResponse, TBody = unknown>(
   path: string,
   options: ApiFetchOptions<TBody> = {}
 ): Promise<TResponse> {
-  const { method = "GET", body, token } = options;
+  const { method = "GET", body, token, skipAuth = false } = options;
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
 
-  if (token) {
+  // Auto-inject token from localStorage if not skipped and no manual token provided
+  if (!skipAuth) {
+    const authToken = token || getAuthToken();
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+  } else if (token) {
+    // Manual token override even when skipAuth is true
     headers.Authorization = `Bearer ${token}`;
   }
 
