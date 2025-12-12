@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 
-export type Doctor = {
+export type DoctorAdmin = {
   _id: ObjectId;
   name: string;
   specialization: string;

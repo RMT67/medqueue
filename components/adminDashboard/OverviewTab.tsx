@@ -8,7 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
-import { Doctor } from "@/types";
+import { DoctorAdmin } from "@/types";
 
 interface OverviewTabProps {
   stats: {
@@ -17,7 +17,7 @@ interface OverviewTabProps {
     activeDoctors: number;
     completedVisits: number;
   };
-  doctors: Doctor[];
+  doctors: DoctorAdmin[];
 }
 
 export function OverviewTab({ stats, doctors }: OverviewTabProps) {

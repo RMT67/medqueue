@@ -1,10 +1,10 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Plus, Edit2, Trash2 } from "lucide-react";
-import { Doctor } from "@/types";
+import { DoctorAdmin } from "@/types";
 
 interface DoctorsTabProps {
-  doctors: Doctor[];
+  doctors: DoctorAdmin[];
   onAddDoctor: () => void;
 }
 

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Users, Activity, Shield, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { OverviewTab } from "@/components/adminDashboard";
-import { Doctor } from "@/types";
+import { DoctorAdmin } from "@/types";
 
 // Mock data
 const STATS = {
@@ -17,9 +17,9 @@ const STATS = {
   completedVisits: 342,
 };
 
-const DOCTORS: Doctor[] = [
+const DOCTORS: DoctorAdmin[] = [
   {
-    _id: "675a3d4e8f1c2a3b4c5d6e7f" as unknown as Doctor["_id"],
+    _id: "675a3d4e8f1c2a3b4c5d6e7f" as unknown as DoctorAdmin["_id"],
     name: "Dr. Sarah Johnson",
     specialization: "General Practitioner",
     clinic: "Central Health Clinic",
@@ -34,7 +34,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: "onTime", // "onTime" | number (late minutes)
   },
   {
-    _id: "675a3d4e8f1c2a3b4c5d6e80" as unknown as Doctor["_id"],
+    _id: "675a3d4e8f1c2a3b4c5d6e80" as unknown as DoctorAdmin["_id"],
     name: "Dr. Michael Chen",
     specialization: "Cardiologist",
     clinic: "Heart Care Medical Center",
@@ -49,7 +49,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: 5, // 5 minutes late
   },
   {
-    _id: "675a3d4e8f1c2a3b4c5d6e81" as unknown as Doctor["_id"],
+    _id: "675a3d4e8f1c2a3b4c5d6e81" as unknown as DoctorAdmin["_id"],
     name: "Dr. Priya Patel",
     specialization: "Pediatrician",
     clinic: "Kids Wellness Clinic",
@@ -64,7 +64,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: "onTime",
   },
   {
-    _id: "675a3d4e8f1c2a3b4c5d6e82" as unknown as Doctor["_id"],
+    _id: "675a3d4e8f1c2a3b4c5d6e82" as unknown as DoctorAdmin["_id"],
     name: "Dr. James Wilson",
     specialization: "Dermatologist",
     clinic: "Skin Care Specialists",
