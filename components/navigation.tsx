@@ -1,62 +1,67 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { LogOut, Menu, X, Stethoscope, User } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useAuth } from "@/lib/auth-context"
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { LogOut, Menu, X, Stethoscope, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 
 interface NavigationProps {
-  isAuthenticated?: boolean
-  userRole?: "patient" | "doctor" | "admin"
-  userName?: string
-  onLogout?: () => void
+  isAuthenticated?: boolean;
+  userRole?: "patient" | "doctor" | "admin";
+  userName?: string;
+  onLogout?: () => void;
 }
 
-export function Navigation({ isAuthenticated, userRole, userName, onLogout }: NavigationProps) {
-  const router = useRouter()
-  const { logout: authLogout, user: authUser } = useAuth()
+export function Navigation({
+  isAuthenticated,
+  userRole,
+  userName,
+  onLogout,
+}: NavigationProps) {
+  const router = useRouter();
+  const { logout: authLogout, user: authUser } = useAuth();
 
   const handleLogout = () => {
     if (onLogout) {
-      onLogout()
+      onLogout();
     } else {
-      authLogout()
-      router.push("/")
+      authLogout();
+      router.push("/");
     }
-  }
-  const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  };
+  const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isActive = (path: string) => pathname === path
+  const isActive = (path: string) => pathname === path;
 
   const publicLinks = [
     { href: "/", label: "Home" },
     { href: "/doctors", label: "Find Doctor" },
-  ]
+  ];
 
   const patientLinks = [
     { href: "/doctors", label: "Find Doctor" },
     { href: "/my-queue", label: "My Queue" },
-  ]
+  ];
 
-  const doctorLinks = [{ href: "/doctor/dashboard", label: "Dashboard" }]
+  const doctorLinks = [{ href: "/doctor/dashboard", label: "Dashboard" }];
 
-  const adminLinks = [{ href: "/admin/dashboard", label: "Admin" }]
+  const adminLinks = [{ href: "/admin/dashboard", label: "Admin" }];
 
   const getLinks = () => {
-    if (!isAuthenticated && !authUser) return publicLinks
-    const role = userRole || authUser?.role
-    if (role === "patient") return patientLinks
-    if (role === "doctor") return doctorLinks
-    if (role === "admin") return adminLinks
-    return []
-  }
+    if (!isAuthenticated && !authUser) return publicLinks;
+    const role = userRole || authUser?.role;
+    if (role === "patient") return patientLinks;
+    if (role === "doctor") return doctorLinks;
+    if (role === "admin") return adminLinks;
+    return [];
+  };
 
-  const links = getLinks()
-  const displayName = userName || authUser?.name || "User"
+  const links = getLinks();
+  const displayName = userName || authUser?.name || "User";
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-card/80 backdrop-blur-md border-b border-border/50 shadow-sm">
@@ -68,8 +73,12 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
               <Stethoscope className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-lg text-foreground leading-tight">MedQueue.ai</span>
-              <span className="text-[10px] text-muted-foreground leading-tight">Healthcare Solutions</span>
+              <span className="font-bold text-lg text-foreground leading-tight">
+                MedQueue.ai
+              </span>
+              <span className="text-[10px] text-muted-foreground leading-tight">
+                Healthcare Solutions
+              </span>
             </div>
           </Link>
 
@@ -83,7 +92,7 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
                   "relative px-4 py-2 text-sm font-medium transition-all duration-200 rounded-lg",
                   isActive(link.href)
                     ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
                 {link.label}
@@ -103,13 +112,20 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
                 className="gap-3 px-3 py-1.5 h-auto hover:bg-muted/50"
                 title="Edit Profile"
               >
-                <Link href="/profile/edit" className="flex items-center gap-3 group">
+                <Link
+                  href="/profile/edit"
+                  className="flex items-center gap-3 group"
+                >
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shadow-md group-hover:scale-105 transition-transform">
                     {displayName?.charAt(0).toUpperCase() || "U"}
                   </div>
                   <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{displayName}</p>
-                    <p className="text-xs text-muted-foreground capitalize leading-tight">{userRole || authUser?.role}</p>
+                    <p className="text-sm font-semibold text-foreground leading-tight">
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize leading-tight">
+                      {userRole || authUser?.role}
+                    </p>
                   </div>
                 </Link>
               </Button>
@@ -131,12 +147,19 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
           {!isAuthenticated && !authUser && (
             <div className="hidden md:flex items-center gap-3 ml-6">
               <Link href="/login/patient">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   Sign In
                 </Button>
               </Link>
               <Link href="/doctors">
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
                   Get Started
                 </Button>
               </Link>
@@ -149,7 +172,11 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
             className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
           </button>
         </div>
 
@@ -166,7 +193,7 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
                     "px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                     isActive(link.href)
                       ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   {link.label}
@@ -181,8 +208,12 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
                         {displayName?.charAt(0).toUpperCase() || "U"}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">{displayName}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{userRole || authUser?.role}</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {displayName}
+                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {userRole || authUser?.role}
+                        </p>
                       </div>
                     </div>
                     <Link
@@ -196,8 +227,8 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
                     {(isAuthenticated || authUser) && (
                       <button
                         onClick={() => {
-                          handleLogout()
-                          setMobileMenuOpen(false)
+                          handleLogout();
+                          setMobileMenuOpen(false);
                         }}
                         className="w-full mt-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors flex items-center gap-2"
                       >
@@ -232,8 +263,5 @@ export function Navigation({ isAuthenticated, userRole, userName, onLogout }: Na
         )}
       </div>
     </nav>
-  )
+  );
 }
-
-
-
