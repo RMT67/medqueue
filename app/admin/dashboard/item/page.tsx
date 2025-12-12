@@ -2,10 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Plus,
   Search,
@@ -17,21 +13,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-// Dummy data untuk obat-obatan
-interface Medicine {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  stock: number;
-  minStock: number;
-  price: number;
-  unit: string;
-  imageUrl: string;
-  manufacturer: string;
-  expiryDate: string;
-}
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
+import { Medicine } from "@/types/medicineType";
+
+// Dummy data untuk obat-obatan
 const DUMMY_MEDICINES: Medicine[] = [
   {
     id: "MED-001",
