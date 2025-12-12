@@ -43,6 +43,7 @@ export function Navigation({
   ];
 
   const patientLinks = [
+    { href: "/patient/dashboard", label: "Dashboard" },
     { href: "/doctors", label: "Find Doctor" },
     { href: "/my-queue", label: "My Queue" },
   ];
