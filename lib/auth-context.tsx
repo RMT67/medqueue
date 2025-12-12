@@ -26,14 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Restore session on mount
+  // Restore session on mount - verify token via /api/auth/me
   useEffect(() => {
     const token = localStorage.getItem("medqueue_token")
     const savedUser = localStorage.getItem("medqueue_user")
-    
+
     if (token && savedUser) {
       try {
-        const userData = JSON.parse(savedUser)
         // Verify token is still valid by calling /api/auth/me
         fetch("/api/auth/me", {
           headers: {
@@ -44,12 +43,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (res.ok) {
               return res.json()
             }
+            // Token invalid or expired
             throw new Error("Token invalid")
           })
           .then((data) => {
+            // Update user state with verified user data
             setUser(data.user)
+            // Update localStorage with fresh user data
+            localStorage.setItem("medqueue_user", JSON.stringify(data.user))
           })
           .catch(() => {
+            // Token invalid/expired - clear everything
             localStorage.removeItem("medqueue_token")
             localStorage.removeItem("medqueue_user")
             setUser(null)
@@ -58,11 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsLoading(false)
           })
       } catch (e) {
+        // Error parsing or other issues - clear everything
         localStorage.removeItem("medqueue_token")
         localStorage.removeItem("medqueue_user")
+        setUser(null)
         setIsLoading(false)
       }
     } else {
+      // No token or user data - not authenticated
       setIsLoading(false)
     }
   }, [])
@@ -85,8 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json()
       const { token, user: userData } = data
 
+      // Save to localStorage with fixed keys
       localStorage.setItem("medqueue_token", token)
       localStorage.setItem("medqueue_user", JSON.stringify(userData))
+      
+      // Update state
       setUser(userData)
       return true
     } catch (error) {
@@ -113,8 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json()
       const { token, user: userData } = data
 
+      // Save to localStorage with fixed keys
       localStorage.setItem("medqueue_token", token)
       localStorage.setItem("medqueue_user", JSON.stringify(userData))
+      
+      // Update state
       setUser(userData)
       return true
     } catch (error) {
@@ -124,13 +137,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    setUser(null)
+    // Remove from localStorage
     localStorage.removeItem("medqueue_token")
     localStorage.removeItem("medqueue_user")
+    
+    // Clear state
+    setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      login, 
+      register, 
+      logout, 
+      isLoading 
+    }}>
       {children}
     </AuthContext.Provider>
   )
@@ -143,4 +166,6 @@ export function useAuth() {
   }
   return context
 }
+
+
 
