@@ -1,15 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Swal from "sweetalert2";
-
-import { Navigation } from "@/components/navigation";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Check,
   Calendar,
@@ -21,10 +15,16 @@ import {
   // CreditCard,
   FileText,
 } from "lucide-react";
+
+import { Navigation } from "@/components/navigation";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import { useAuth } from "@/lib/auth-context";
 // import { FadeIn, ScaleIn, SlideIn } from "@/components/animations";
 import { FadeIn, ScaleIn } from "@/components/animations";
-import { useParams } from "next/navigation";
 
 // Mock doctor data
 const DOCTOR_DATA = {
@@ -41,25 +41,115 @@ const DOCTOR_DATA = {
   },
 };
 
-export default function BookingPage({ params }: { params: { id: string } }) {
-  // params nanti untuk mengambil doctor ID dari URL
-  const { user, logout } = useAuth();
+interface BookingDisplayType {
+  bookingNumber?: string;
+  queueNumber?: string;
+  message?: string;
+}
+
+export default function BookingPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { user, logout, isLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState("");
   const [patientComplaint, setPatientComplaint] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [bookingData, setBookingData] = useState<BookingDisplayType | null>(
+    null
+  );
 
-  // ambil param dari URL
-  const { id } = useParams();
+  const { id } = use(params);
 
-  // cek login, nanti diimplementasi dengan auth context jika login page sudah siap
-  // if (!user) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-  //       <p>Please log in to book an appointment.</p>
-  //     </div>
-  //   );
-  // }
+  // Debug: Track bookingData changes
+  useEffect(() => {
+    console.log("📊 bookingData state updated:", bookingData);
+  }, [bookingData]);
 
+  if (isLoading) {
+    return (
+      // loading spinner
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <ScaleIn>
+          <div className="w-16 h-16 border-4 border-t-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </ScaleIn>
+      </div>
+    );
+  }
+
+  // check login status
+  if (!user && !isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='100' height='100' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 100 0 L 0 0 0 100' fill='none' stroke='%23000000' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grid)'/%3E%3C/svg%3E")`,
+            }}
+          />
+        </div>
+
+        <ScaleIn delay={0}>
+          <Card className="relative max-w-md w-full p-8 lg:p-10 border-2 shadow-2xl bg-card/80 backdrop-blur-sm text-center space-y-6">
+            {/* Icon */}
+            <div className="w-20 h-20 bg-linear-to-br from-primary to-accent rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-10 h-10 text-white"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                />
+              </svg>
+            </div>
+
+            {/* Title & Description */}
+            <div className="space-y-2">
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
+                Authentication Required
+              </h2>
+              <p className="text-muted-foreground text-sm lg:text-base">
+                Please log in to your account to book an appointment with our
+                doctors.
+              </p>
+            </div>
+
+            {/* Login Button */}
+            <Link href="/login/patient" className="block">
+              <Button className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium text-base">
+                Log In to Continue
+              </Button>
+            </Link>
+
+            {/* Additional Info */}
+            {/* <div className="pt-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link
+                  href="/register"
+                  className="text-primary font-semibold hover:underline"
+                >
+                  Register here
+                </Link>
+              </p>
+            </div> */}
+          </Card>
+        </ScaleIn>
+      </div>
+    );
+  }
+
+  // dummy doctor data
   const doctor = DOCTOR_DATA["1" as keyof typeof DOCTOR_DATA];
   const initials = doctor.name
     .split(" ")
@@ -67,7 +157,10 @@ export default function BookingPage({ params }: { params: { id: string } }) {
     .join("")
     .toUpperCase();
 
-  const handleValidatedDate = (dateStr: string) => {
+  const handleValidatedDateAndComplaint = (
+    dateStr: string,
+    complaint: string
+  ) => {
     const selected = new Date(dateStr);
     const today = new Date(new Date().toDateString());
     if (selected < today) {
@@ -85,33 +178,86 @@ export default function BookingPage({ params }: { params: { id: string } }) {
         text: "You can only book up to 1 day in advance.",
       });
     }
+
+    if (!complaint) {
+      return Swal.fire({
+        icon: "error",
+        title: "Missing Complaint",
+        text: "Please enter your symptoms or concern before proceeding.",
+      });
+    }
     setSelectedDate(dateStr);
     setStep(2);
   };
 
   const handleBooking = async () => {
-    console.log("Booking confirmed:", {
-      selectedDate,
-      timeRange: doctor.timeRange,
-      patientComplaint,
-    });
-    setStep(3);
+    try {
+      setLoading(true);
+      // console.log("Booking confirmed:", {
+      //   selectedDate,
+      //   timeRange: doctor.timeRange,
+      //   patientComplaint,
+      // });
 
-    // nanti kalo cookies dari login udah siap, tambahin cookies di fetch ini
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/booking`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // nanti tambahin user ID dari localStorage
-        patientId: "1", // sementara hardcode dulu
-        doctorId: id,
-        scheduleDate: selectedDate,
-        timeRange: doctor.timeRange,
-        complaint: patientComplaint,
-      }),
-    });
+      // call API to create booking
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/booking`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: user?._id || "10" /* dummy patient ID */,
+          doctorId: id,
+          scheduleDate: selectedDate,
+          timeRange: doctor.timeRange,
+          complaint: patientComplaint,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        // console.error("❌ Booking error response:", errorData);
+
+        return Swal.fire({
+          icon: "error",
+          title: "Booking Failed",
+          text:
+            errorData.message ||
+            "There was an error creating your booking. Please try again.",
+        }).then((result) => {
+          setLoading(false);
+          setStep(2);
+          if (result.isConfirmed) {
+            window.location.reload();
+          }
+        });
+      } else {
+        const data = (await res.json()) as BookingDisplayType;
+        console.log("🚀 ~ handleBooking ~ full response:", data);
+
+        // Check jika data ada di dalam property 'data' atau 'booking'
+        // console.log(
+        //   "🚀 ~ handleBooking ~ bookingResult type:",
+        //   typeof bookingResult
+        // );
+        // console.log(
+        //   "🚀 ~ handleBooking ~ bookingResult keys:",
+        //   Object.keys(bookingResult || {})
+        // );
+
+        setBookingData(data);
+        setLoading(false);
+        setStep(3);
+      }
+    } catch (error) {
+      console.error("❌ Booking catch error:", error);
+      setLoading(false);
+      Swal.fire({
+        icon: "error",
+        title: "Connection Error",
+        text: "Unable to connect to the server. Please check your connection.",
+      });
+    }
   };
 
   return (
@@ -266,7 +412,6 @@ export default function BookingPage({ params }: { params: { id: string } }) {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    // onChange={(e) => handleValidatedDate(e.target.value)}
                     className="w-full h-12 border-2 focus:border-primary text-base"
                   />
                 </div>
@@ -316,7 +461,12 @@ export default function BookingPage({ params }: { params: { id: string } }) {
 
               <Button
                 // onClick={() => setStep(2)}
-                onClick={() => handleValidatedDate(selectedDate)}
+                onClick={() =>
+                  handleValidatedDateAndComplaint(
+                    selectedDate,
+                    patientComplaint
+                  )
+                }
                 disabled={!selectedDate}
                 className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium disabled:opacity-50"
               >
@@ -453,9 +603,13 @@ export default function BookingPage({ params }: { params: { id: string } }) {
                 </Button>
                 <Button
                   onClick={() => handleBooking()}
-                  className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium"
+                  className={
+                    loading
+                      ? "flex-1 h-12 bg-primary/70 text-primary-foreground shadow-lg font-medium cursor-not-allowed"
+                      : "flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium"
+                  }
                 >
-                  Confirm Booking
+                  {loading ? "Processing..." : "Confirm Booking"}
                 </Button>
               </div>
             </Card>
@@ -569,14 +723,26 @@ export default function BookingPage({ params }: { params: { id: string } }) {
                 </p>
               </div>
 
+              {/* Debug info - remove this later */}
+              {/* {process.env.NODE_ENV === "development" && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-left text-xs">
+                  <p className="font-bold mb-2">Debug Info:</p>
+                  <p>bookingData: {bookingData ? "EXISTS" : "NULL"}</p>
+                  <p>bookingNumber: {bookingData?.bookingNumber || "NULL"}</p>
+                  <p>queueNumber: {bookingData?.queueNumber || "NULL"}</p>
+                  <pre className="mt-2 overflow-auto">
+                    {JSON.stringify(bookingData, null, 2)}
+                  </pre>
+                </div>
+              )} */}
+
               <div className="bg-linear-to-br from-muted/50 to-muted/30 rounded-xl p-6 border-2 border-border text-left space-y-4">
                 <div className="pb-4 border-b-2 border-border">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     Booking ID
                   </p>
                   <p className="text-xl font-mono font-bold text-primary">
-                    {/* hardcode, harusnya nanti ambil dari database */}
-                    MQ-2024-001283
+                    {bookingData?.bookingNumber || "Loading..."}
                   </p>
                 </div>
                 <div className="pb-4 border-b-2 border-border">
@@ -584,8 +750,7 @@ export default function BookingPage({ params }: { params: { id: string } }) {
                     Queue Number
                   </p>
                   <p className="text-xl font-mono font-bold text-primary">
-                    {/* hardcode, harusnya nanti ambil dari database */}
-                    A-0234
+                    {bookingData?.queueNumber || "Loading..."}
                   </p>
                 </div>
                 <div>

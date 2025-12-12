@@ -1,36 +1,52 @@
+import { ObjectId } from "mongodb";
 import { db } from "../config/mongodb";
 
-interface BookingBody {
-  patientId: string;
-  doctorId: string;
-  scheduledDate: Date;
-  timeRange: string;
-  complaint: string;
-  cancelReason?: string;
-  notes?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  status?: "pending" | "confirmed" | "cancelled" | "completed";
-  queueId?: string;
-}
+import { BookingType } from "@/types/bookingType";
 
 export default class BookingModel {
   static collection() {
     return db.collection("bookings");
   }
 
-  static async create(bookingData: BookingBody) {
-    // status: "pending" | "confirmed" | "cancelled" | "completed"; default "pending"
+  static async create(bookingData: BookingType) {
+    // get last booking number
+    const lastBooking = await this.collection()
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .toArray();
+    const year = new Date().getFullYear().toString().slice(-2);
+    let bookingNumber;
+    if (lastBooking.length === 0) {
+      bookingNumber = `MQ-${year}-0001`;
+    } else {
+      const lastNumber = parseInt(
+        lastBooking[0].bookingNumber!.split("-")[2],
+        10
+      );
+      const newNumber = lastNumber + 1;
+      bookingNumber = `MQ-${year}-${newNumber.toString().padStart(4, "0")}`;
+    }
+
+    // convert patientId & doctorId to ObjectId
+    bookingData.patientId = new ObjectId(bookingData.patientId);
+    // bookingData.doctorId = new ObjectId(bookingData.doctorId); // uncomment if doctorId is ObjectId
 
     bookingData = {
       ...bookingData,
-      queueId: "0", // placeholder, ganti dengan logika ambil queueId terbaru
+      bookingNumber,
+      queueId: "1", // placeholder, ganti dengan logika ambil queueId terbaru
       cancelReason: bookingData.cancelReason || "",
       notes: bookingData.notes || "",
       createdAt: new Date(),
       updatedAt: new Date(),
-      status: "pending",
+      status: "confirmed",
     };
-    const result = await this.collection().insertOne(bookingData);
+    try {
+      await this.collection().insertOne(bookingData);
+      return bookingData;
+    } catch (err) {
+      throw err;
+    }
   }
 }

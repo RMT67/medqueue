@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore session on mount - verify token via /api/auth/me
   useEffect(() => {
+    setIsLoading(true);
     const token = localStorage.getItem("medqueue_token");
     const savedUser = localStorage.getItem("medqueue_user");
 
