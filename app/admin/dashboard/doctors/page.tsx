@@ -9,76 +9,58 @@ import { Input } from "@/components/ui/input";
 import { Shield, Plus, Users, Activity, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { DoctorsTab } from "@/components/adminDashboard";
-import { DoctorAdmin } from "@/types/docterTypes";
+import { DoctorAdmin, Doctor } from "@/types/docterTypes";
 
-const DOCTORS: DoctorAdmin[] = [
-  {
-    _id: "675a3d4e8f1c2a3b4c5d6e7f" as unknown as DoctorAdmin["_id"],
-    name: "Dr. Sarah Johnson",
-    specialization: "General Practitioner",
-    clinic: "Central Health Clinic",
-    status: "online",
-    todayPatients: 12,
-    currentQueue: 5,
-    currentlyServing: "A-021",
-    avgWaitTime: 12,
-    completedToday: 7,
-    image:
-      "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    timeStatus: "onTime",
-  },
-  {
-    _id: "675a3d4e8f1c2a3b4c5d6e80" as unknown as DoctorAdmin["_id"],
-    name: "Dr. Michael Chen",
-    specialization: "Cardiologist",
-    clinic: "Heart Care Medical Center",
-    status: "online",
-    todayPatients: 8,
-    currentQueue: 3,
-    currentlyServing: "B-015",
-    avgWaitTime: 18,
-    completedToday: 5,
-    image:
-      "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    timeStatus: 5,
-  },
-  {
-    _id: "675a3d4e8f1c2a3b4c5d6e81" as unknown as DoctorAdmin["_id"],
-    name: "Dr. Priya Patel",
-    specialization: "Pediatrician",
-    clinic: "Kids Wellness Clinic",
-    status: "offline",
+// Fungsi untuk mapping Doctor ke DoctorAdmin
+const mapDoctorToAdmin = (doctor: Doctor): DoctorAdmin => {
+  return {
+    _id: doctor._id,
+    name: doctor.name,
+    specialization: doctor.specialization,
+    clinic: doctor.clinic,
+    status: doctor.isActive ? "online" : "offline",
     todayPatients: 0,
     currentQueue: 0,
     currentlyServing: null,
     avgWaitTime: 0,
     completedToday: 0,
-    image:
-      "https://images.unsplash.com/photo-1551836022-d5d88e9218df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    image: doctor.image,
     timeStatus: "onTime",
-  },
-  {
-    _id: "675a3d4e8f1c2a3b4c5d6e82" as unknown as DoctorAdmin["_id"],
-    name: "Dr. James Wilson",
-    specialization: "Dermatologist",
-    clinic: "Skin Care Specialists",
-    status: "online",
-    todayPatients: 6,
-    currentQueue: 2,
-    currentlyServing: "C-008",
-    avgWaitTime: 10,
-    completedToday: 4,
-    image:
-      "https://images.unsplash.com/photo-1582750433449-648ed127bb54?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    timeStatus: "onTime",
-  },
-];
+  };
+};
 
 export default function DoctorsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout, isLoading } = useAuth();
   const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
+  const [doctors, setDoctors] = useState<DoctorAdmin[]>([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setIsLoadingDoctors(true);
+        const response = await fetch("/api/doctor");
+        if (!response.ok) {
+          throw new Error("Failed to fetch doctors");
+        }
+        const data = await response.json();
+        const mappedDoctors = (data.doctors || []).map((doctor: Doctor) =>
+          mapDoctorToAdmin(doctor)
+        );
+        setDoctors(mappedDoctors);
+      } catch (error) {
+        console.error("Error fetching doctors:", error);
+      } finally {
+        setIsLoadingDoctors(false);
+      }
+    };
+
+    if (user?.role === "admin") {
+      fetchDoctors();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "admin")) {
@@ -86,8 +68,15 @@ export default function DoctorsPage() {
     }
   }, [user, isLoading, router]);
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (isLoading || isLoadingDoctors) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -178,7 +167,7 @@ export default function DoctorsPage() {
         </div>
 
         <DoctorsTab
-          doctors={DOCTORS}
+          doctors={doctors}
           onAddDoctor={() => setShowAddDoctorModal(true)}
         />
       </main>
