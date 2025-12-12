@@ -7,25 +7,11 @@ import { Card } from "@/components/ui/card";
 import { Shield, Users, Activity, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ScheduleTab } from "@/components/adminDashboard";
-
-interface Doctor {
-  id: string;
-  name: string;
-  specialization: string;
-  clinic: string;
-  status: string;
-  todayPatients: number;
-  currentQueue: number;
-  currentlyServing: string | null;
-  avgWaitTime: number;
-  completedToday: number;
-  image: string;
-  timeStatus: "onTime" | number;
-}
+import { Doctor } from "@/types";
 
 const DOCTORS: Doctor[] = [
   {
-    id: "1",
+    _id: "675a3d4e8f1c2a3b4c5d6e7f" as unknown as Doctor["_id"],
     name: "Dr. Sarah Johnson",
     specialization: "General Practitioner",
     clinic: "Central Health Clinic",
@@ -40,7 +26,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: "onTime",
   },
   {
-    id: "2",
+    _id: "675a3d4e8f1c2a3b4c5d6e80" as unknown as Doctor["_id"],
     name: "Dr. Michael Chen",
     specialization: "Cardiologist",
     clinic: "Heart Care Medical Center",
@@ -55,7 +41,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: 5,
   },
   {
-    id: "3",
+    _id: "675a3d4e8f1c2a3b4c5d6e81" as unknown as Doctor["_id"],
     name: "Dr. Priya Patel",
     specialization: "Pediatrician",
     clinic: "Kids Wellness Clinic",
@@ -70,7 +56,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: "onTime",
   },
   {
-    id: "4",
+    _id: "675a3d4e8f1c2a3b4c5d6e82" as unknown as Doctor["_id"],
     name: "Dr. James Wilson",
     specialization: "Dermatologist",
     clinic: "Skin Care Specialists",

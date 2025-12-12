@@ -1,20 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Calendar, Edit2 } from "lucide-react";
-
-interface Doctor {
-  id: string;
-  name: string;
-  specialization: string;
-  clinic: string;
-  status: string;
-  todayPatients: number;
-  currentQueue: number;
-  currentlyServing: string | null;
-  avgWaitTime: number;
-  completedToday: number;
-  image: string;
-  timeStatus: "onTime" | number;
-}
+import { Doctor } from "@/types";
 
 interface ScheduleTabProps {
   doctors: Doctor[];
@@ -35,7 +21,7 @@ export function ScheduleTab({ doctors }: ScheduleTabProps) {
       <div className="grid md:grid-cols-2 gap-6">
         {doctors.map((doctor) => (
           <Card
-            key={doctor.id}
+            key={doctor._id.toString()}
             className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm hover:shadow-2xl transition-all"
           >
             <div className="flex justify-between items-start mb-5 pb-5 border-b-2 border-border">

@@ -1,21 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Plus, Edit2, Trash2 } from "lucide-react";
-
-interface Doctor {
-  id: string;
-  name: string;
-  specialization: string;
-  clinic: string;
-  status: string;
-  todayPatients: number;
-  currentQueue: number;
-  currentlyServing: string | null;
-  avgWaitTime: number;
-  completedToday: number;
-  image: string;
-  timeStatus: "onTime" | number;
-}
+import { Doctor } from "@/types";
 
 interface DoctorsTabProps {
   doctors: Doctor[];
@@ -71,7 +57,7 @@ export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
             <tbody>
               {doctors.map((doctor) => (
                 <tr
-                  key={doctor.id}
+                  key={doctor._id.toString()}
                   className="border-b border-border hover:bg-muted/50 transition-colors"
                 >
                   <td className="py-4 px-4">
