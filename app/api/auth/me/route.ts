@@ -40,6 +40,7 @@ export async function GET(req: Request) {
           name: user.fullName,
           email: user.email,
           role: user.role,
+          photoUrl: user.photoUrl || null,
         },
       });
     } catch (jwtError) {

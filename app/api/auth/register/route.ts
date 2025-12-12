@@ -75,6 +75,7 @@ export async function POST(req: Request) {
         name: user.fullName,
         email: user.email,
         role: user.role as UserRole,
+        photoUrl: user.photoUrl || null,
       },
     });
   } catch (error) {
