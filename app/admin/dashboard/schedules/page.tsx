@@ -4,17 +4,9 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { Card } from "@/components/ui/card";
-import { Users, Activity, Shield, Calendar } from "lucide-react";
+import { Shield, Users, Activity, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { OverviewTab } from "@/components/adminDashboard";
-
-// Mock data
-const STATS = {
-  totalPatients: 128,
-  avgWaitTime: "12 min",
-  activeDoctors: 8,
-  completedVisits: 342,
-};
+import { ScheduleTab } from "@/components/adminDashboard";
 
 interface Doctor {
   id: string;
@@ -45,7 +37,7 @@ const DOCTORS: Doctor[] = [
     completedToday: 7,
     image:
       "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    timeStatus: "onTime", // "onTime" | number (late minutes)
+    timeStatus: "onTime",
   },
   {
     id: "2",
@@ -60,7 +52,7 @@ const DOCTORS: Doctor[] = [
     completedToday: 5,
     image:
       "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    timeStatus: 5, // 5 minutes late
+    timeStatus: 5,
   },
   {
     id: "3",
@@ -94,7 +86,7 @@ const DOCTORS: Doctor[] = [
   },
 ];
 
-export default function AdminDashboard() {
+export default function SchedulePage() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout, isLoading } = useAuth();
@@ -124,7 +116,6 @@ export default function AdminDashboard() {
 
       {/* Hero Header */}
       <section className="relative bg-linear-to-br from-primary/10 via-accent/5 to-secondary/5 py-8 lg:py-10 border-b border-border overflow-hidden">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div
             className="absolute inset-0"
@@ -139,10 +130,10 @@ export default function AdminDashboard() {
             <div>
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 flex items-center gap-3">
                 <Shield className="w-7 h-7 md:w-8 md:h-8 text-primary" />
-                Admin <span className="text-primary">Dashboard</span>
+                Doctor <span className="text-primary">Schedules</span>
               </h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                Manage clinics, doctors, and patient support
+                Manage doctor schedules and availability
               </p>
             </div>
           </div>
@@ -177,10 +168,7 @@ export default function AdminDashboard() {
                 ] as const
               ).map((tab) => {
                 const Icon = tab.icon;
-                const isActive =
-                  pathname === tab.path ||
-                  (tab.path === "/admin/dashboard" &&
-                    pathname === "/admin/dashboard");
+                const isActive = pathname === tab.path;
                 return (
                   <button
                     key={tab.key}
@@ -200,7 +188,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <OverviewTab stats={STATS} doctors={DOCTORS} />
+        <ScheduleTab doctors={DOCTORS} />
       </main>
     </div>
   );
