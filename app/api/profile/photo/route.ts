@@ -5,14 +5,25 @@ import { verifyToken } from "@/lib/auth-helper";
 import { v2 as cloudinary } from "cloudinary";
 
 // Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
 
 export async function POST(req: Request) {
   try {
+    // Validate Cloudinary config
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error("Cloudinary configuration missing");
+      return NextResponse.json(
+        { message: "Server configuration error. Please contact administrator." },
+        { status: 500 }
+      );
+    }
+
     await connectDB();
 
     const authHeader = req.headers.get("authorization");
@@ -55,20 +66,36 @@ export async function POST(req: Request) {
 
       // Upload to Cloudinary
       const folder = process.env.CLOUDINARY_FOLDER || "medqueue";
-      const uploadResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload(
-          dataURI,
-          {
-            folder: folder,
-            resource_type: "image",
-            overwrite: true,
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+      let uploadResult: { secure_url: string; public_id: string };
+      
+      try {
+        uploadResult = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload(
+            dataURI,
+            {
+              folder: folder,
+              resource_type: "image",
+              overwrite: true,
+            },
+            (error, result) => {
+              if (error) {
+                console.error("Cloudinary upload error:", error);
+                reject(error);
+              } else if (!result) {
+                reject(new Error("Cloudinary upload returned no result"));
+              } else {
+                resolve(result);
+              }
+            }
+          );
+        }) as { secure_url: string; public_id: string };
+      } catch (cloudinaryError) {
+        console.error("Cloudinary upload failed:", cloudinaryError);
+        return NextResponse.json(
+          { message: "Failed to upload image. Please try again." },
+          { status: 500 }
         );
-      }) as { secure_url: string; public_id: string };
+      }
 
       // Update user photoUrl in database
       const user = await User.findByIdAndUpdate(
@@ -107,8 +134,9 @@ export async function POST(req: Request) {
     }
   } catch (error) {
     console.error("Error in /api/profile/photo POST:", error);
+    const errorMessage = error instanceof Error ? error.message : "Server error.";
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Server error." },
+      { message: errorMessage },
       { status: 500 }
     );
   }
