@@ -2,16 +2,24 @@ import MedicineModel from "@/db/models/Medicine";
 import { NextResponse } from "next/server";
 
 interface MedicineFormType {
+  code: string;
   name: string;
   category: string;
   description: string;
   stock: number;
   minStock: number;
   price: number;
+  currency: string;
   unit: string;
+  packaging: {
+    unitPerPack: number;
+    packUnit: string;
+    packPrice: number;
+  };
   imageUrl: string;
   manufacturer: string;
   expiryDate: string;
+  isActive: boolean;
 }
 
 export async function GET(request: Request) {

@@ -122,16 +122,24 @@ export default function ItemPage() {
     null
   );
   const [formData, setFormData] = useState({
+    code: "",
     name: "",
     category: "",
     description: "",
     stock: 0,
     minStock: 0,
     price: 0,
+    currency: "IDR",
     unit: "Tablet",
+    packaging: {
+      unitPerPack: 10,
+      packUnit: "Box",
+      packPrice: 0,
+    },
     imageUrl: "",
     manufacturer: "",
     expiryDate: "",
+    isActive: true,
   });
 
   useEffect(() => {
@@ -156,16 +164,24 @@ export default function ItemPage() {
   const handleAdd = () => {
     setModalMode("add");
     setFormData({
+      code: "",
       name: "",
       category: "",
       description: "",
       stock: 0,
       minStock: 0,
       price: 0,
+      currency: "IDR",
       unit: "Tablet",
+      packaging: {
+        unitPerPack: 10,
+        packUnit: "Box",
+        packPrice: 0,
+      },
       imageUrl: "",
       manufacturer: "",
       expiryDate: "",
+      isActive: true,
     });
     setShowModal(true);
   };
@@ -230,7 +246,6 @@ export default function ItemPage() {
         });
       } else {
         const result = await res.json();
-        // console.log("🚀 ~ handleSubmit ~ result:", result);
         Swal.fire({
           icon: "success",
           title: "Success",
@@ -239,11 +254,37 @@ export default function ItemPage() {
         setMedicines([...medicines, result.data]);
       }
     } else {
-      setMedicines(
-        medicines.map((med) =>
-          med._id === selectedMedicine?._id ? { ...med, ...formData } : med
-        )
+      // Edit mode - call PUT API
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/item/${selectedMedicine?._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
+        }
       );
+
+      if (!res.ok) {
+        return Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to update medicine",
+        });
+      } else {
+        const result = await res.json();
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: result.message,
+        });
+        setMedicines(
+          medicines.map((med) =>
+            med._id === selectedMedicine?._id ? result.data : med
+          )
+        );
+      }
     }
 
     setShowModal(false);
@@ -329,10 +370,10 @@ export default function ItemPage() {
                     Total Value
                   </p>
                   <p className="text-2xl font-bold text-foreground">
-                    $
+                    Rp
                     {medicines
                       .reduce((acc, med) => acc + med.price * med.stock, 0)
-                      .toFixed(2)}
+                      .toLocaleString("id-ID")}
                   </p>
                 </div>
               </div>
@@ -408,7 +449,7 @@ export default function ItemPage() {
                   {medicines.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center p-8 text-muted-foreground"
                       >
                         No medicines found
@@ -443,7 +484,7 @@ export default function ItemPage() {
                               {medicine.name}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {medicine._id}
+                              {medicine.code}
                             </p>
                           </div>
                         </td>
@@ -476,8 +517,15 @@ export default function ItemPage() {
                             </p>
                           )}
                         </td>
-                        <td className="p-4 font-semibold text-foreground">
-                          ${medicine.price.toFixed(2)}
+                        <td className="p-4">
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              Rp {medicine.price.toLocaleString("id-ID")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Pack: Rp {medicine.packaging.packPrice.toLocaleString("id-ID")}
+                            </p>
+                          </div>
                         </td>
                         <td className="p-4 text-sm text-muted-foreground">
                           {new Date(medicine.expiryDate).toLocaleDateString()}
@@ -567,6 +615,22 @@ export default function ItemPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-foreground">
+                        Medicine Code <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.code}
+                        onChange={(e) =>
+                          setFormData({ ...formData, code: e.target.value })
+                        }
+                        className="h-11 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                        placeholder="e.g., MED-PARA-500"
+                        required
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <label className="block text-sm font-semibold text-foreground">
                         Medicine Name <span className="text-red-500">*</span>
@@ -688,11 +752,11 @@ export default function ItemPage() {
 
                     <div className="space-y-2">
                       <label className="block text-sm font-semibold text-foreground">
-                        Price ($) <span className="text-red-500">*</span>
+                        Unit Price (Rp) <span className="text-red-500">*</span>
                       </label>
                       <Input
                         type="number"
-                        step="0.01"
+                        step="1"
                         value={formData.price}
                         onChange={(e) =>
                           setFormData({
@@ -701,7 +765,88 @@ export default function ItemPage() {
                           })
                         }
                         className="h-11 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                        placeholder="0.00"
+                        placeholder="0"
+                        min="0"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Packaging Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-border">
+                    <Package className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold text-foreground">
+                      Packaging Information
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-foreground">
+                        Unit Per Pack <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="number"
+                        value={formData.packaging.unitPerPack}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            packaging: {
+                              ...formData.packaging,
+                              unitPerPack: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="h-11 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                        placeholder="10"
+                        min="1"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-foreground">
+                        Pack Unit <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.packaging.packUnit}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            packaging: {
+                              ...formData.packaging,
+                              packUnit: e.target.value,
+                            },
+                          })
+                        }
+                        className="h-11 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                        placeholder="Box, Bottle, etc."
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-foreground">
+                        Pack Price (Rp) <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="number"
+                        step="1"
+                        value={formData.packaging.packPrice}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            packaging: {
+                              ...formData.packaging,
+                              packPrice: parseFloat(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="h-11 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                        placeholder="0"
                         min="0"
                         required
                       />

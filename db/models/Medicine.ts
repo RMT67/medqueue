@@ -1,17 +1,6 @@
+import { ObjectId } from "mongodb";
 import { db } from "../config/mongodb";
-
-interface MedicineFormType {
-  name: string;
-  category: string;
-  description: string;
-  stock: number;
-  minStock: number;
-  price: number;
-  unit: string;
-  imageUrl: string;
-  manufacturer: string;
-  expiryDate: string;
-}
+import { MedicineFormType } from "@/types/medicineType";
 
 export default class MedicineModel {
   static collection() {
@@ -24,6 +13,7 @@ export default class MedicineModel {
       return await this.collection()
         .find({
           $or: [
+            { code: { $regex: regex } },
             { name: { $regex: regex } },
             { category: { $regex: regex } },
             { manufacturer: { $regex: regex } },
@@ -41,5 +31,25 @@ export default class MedicineModel {
       _id: insertedId,
     });
     return insertedMedicine;
+  }
+
+  static async getById(id: string) {
+    return await this.collection().findOne({ _id: new ObjectId(id) });
+  }
+
+  static async update(id: string, medicineData: Partial<MedicineFormType>) {
+    const result = await this.collection().updateOne(
+      { _id: new ObjectId(id) },
+      { $set: medicineData }
+    );
+    if (result.modifiedCount === 0) {
+      return null;
+    }
+    return await this.getById(id);
+  }
+
+  static async delete(id: string) {
+    const result = await this.collection().deleteOne({ _id: new ObjectId(id) });
+    return result.deletedCount > 0;
   }
 }
