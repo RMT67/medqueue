@@ -146,7 +146,7 @@ export default function ItemPage() {
   useEffect(() => {
     const fetchMedicines = async (searchQuery: string) => {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/item?search=${searchQuery}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/item?search=${searchQuery}`
       );
       if (!res.ok) {
         return Swal.fire({

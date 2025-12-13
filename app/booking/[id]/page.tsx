@@ -26,21 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 // import { FadeIn, ScaleIn, SlideIn } from "@/components/animations";
 import { FadeIn, ScaleIn } from "@/components/animations";
 import { BookingDisplayType } from "@/types/bookingType";
-
-// Mock doctor data
-const DOCTOR_DATA = {
-  "1": {
-    name: "Dr. Sarah Johnson",
-    specialization: "General Practitioner",
-    clinic: "Central Health Clinic",
-    consultationFee: 50,
-    image:
-      "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    rating: 4.8,
-    reviews: 156,
-    timeRange: "09:00 - 12:00",
-  },
-};
+import { Doctor } from "@/types/docterTypes";
 
 export default function BookingPage({
   params,
@@ -55,20 +41,95 @@ export default function BookingPage({
   const [bookingData, setBookingData] = useState<BookingDisplayType | null>(
     null
   );
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [doctorLoading, setDoctorLoading] = useState(true);
 
   const { id } = use(params);
+
+  // Fetch doctor data from API
+  useEffect(() => {
+    const fetchDoctor = async () => {
+      try {
+        setDoctorLoading(true);
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/doctor/${id}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch doctor data");
+        }
+
+        const data = await response.json();
+        setDoctor(data.doctor);
+      } catch (error) {
+        console.error("Error fetching doctor:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to load doctor information. Please try again.",
+        });
+      } finally {
+        setDoctorLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchDoctor();
+    }
+  }, [id]);
 
   // Debug: Track bookingData changes
   useEffect(() => {
     console.log("📊 bookingData state updated:", bookingData);
   }, [bookingData]);
 
-  if (isLoading) {
+  if (isLoading || doctorLoading) {
     return (
       // loading spinner
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <ScaleIn>
           <div className="w-16 h-16 border-4 border-t-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </ScaleIn>
+      </div>
+    );
+  }
+
+  // check if doctor data is available
+  if (!doctor && !doctorLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+        <ScaleIn delay={0}>
+          <Card className="relative max-w-md w-full p-8 lg:p-10 border-2 shadow-2xl bg-card/80 backdrop-blur-sm text-center space-y-6">
+            <div className="w-20 h-20 bg-linear-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-10 h-10 text-white"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
+                Doctor Not Found
+              </h2>
+              <p className="text-muted-foreground text-sm lg:text-base">
+                The doctor you are looking for is not available.
+              </p>
+            </div>
+            <Link href="/doctors" className="block">
+              <Button className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium text-base">
+                Back to Doctors List
+              </Button>
+            </Link>
+          </Card>
         </ScaleIn>
       </div>
     );
@@ -144,13 +205,19 @@ export default function BookingPage({
     );
   }
 
-  // dummy doctor data
-  const doctor = DOCTOR_DATA["1" as keyof typeof DOCTOR_DATA];
-  const initials = doctor.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
+  // Get doctor's time range from defaultSchedule or use a fallback
+  const timeRange = doctor?.defaultSchedule || "09:00 - 17:00";
+  const initials =
+    doctor?.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase() || "";
+
+  // Return early if no doctor - this ensures doctor is not null below
+  if (!doctor) {
+    return null;
+  }
 
   const handleValidatedDateAndComplaint = (
     dateStr: string,
@@ -190,7 +257,7 @@ export default function BookingPage({
       setLoading(true);
       // console.log("Booking confirmed:", {
       //   selectedDate,
-      //   timeRange: doctor.timeRange,
+      //   timeRange: timeRange,
       //   patientComplaint,
       // });
 
@@ -204,7 +271,7 @@ export default function BookingPage({
           patientId: user?._id || "10" /* dummy patient ID */,
           doctorId: id,
           scheduleDate: selectedDate,
-          timeRange: doctor.timeRange,
+          timeRange: timeRange,
           complaint: patientComplaint,
         }),
       });
@@ -425,7 +492,7 @@ export default function BookingPage({
                           Time Range
                         </p>
                         <p className="text-lg font-bold text-primary">
-                          {doctor.timeRange}
+                          {timeRange}
                         </p>
                       </div>
                     </div>
@@ -553,7 +620,7 @@ export default function BookingPage({
                         Date & Time
                       </p>
                       <p className="text-sm font-semibold text-foreground">
-                        {selectedDate} ({doctor.timeRange})
+                        {selectedDate} ({timeRange})
                       </p>
                     </div>
                   </div>
@@ -756,7 +823,7 @@ export default function BookingPage({
                     {doctor?.name}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {selectedDate} ({doctor.timeRange})
+                    {selectedDate} ({timeRange})
                   </p>
                 </div>
               </div>
