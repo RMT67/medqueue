@@ -1,7 +1,5 @@
-import { ObjectId } from "mongodb";
-
 export type DoctorAdmin = {
-  _id: ObjectId;
+  _id: string;
   name: string;
   specialization: string;
   clinic: string;
@@ -16,7 +14,7 @@ export type DoctorAdmin = {
 };
 
 export type Doctor = {
-  _id: ObjectId;
+  _id: string;
   userId: string;
   name: string;
   specialization: string;
@@ -25,8 +23,8 @@ export type Doctor = {
   consultationFee: number;
   averageRating: number;
   totalReviews: number;
-  isActive: true;
-  defaultSchedule: string;
-  createdAt: Date;
-  updatedAt: Date;
+  isActive: boolean;
+  defaultSchedule?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
