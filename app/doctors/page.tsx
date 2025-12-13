@@ -9,96 +9,65 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { DoctorCard } from "@/components/doctor-card"
 import { DoctorCardGrid } from "@/components/doctor-card-grid"
-import { Search, Filter, Stethoscope, Users, Star, X, TrendingUp, UserSearch, List, Grid3x3 } from "lucide-react"
+import { Search, Filter, Stethoscope, Users, Star, X, TrendingUp, UserSearch, List, Grid3x3, Loader2, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { FadeIn, ScaleIn, StaggerChildren } from "@/components/animations"
-
-// Mock data
-const DOCTORS = [
-  {
-    id: "1",
-    name: "Dr. Sarah Johnson",
-    specialization: "General Practitioner",
-    clinic: "Central Health Clinic",
-    schedule: "08:00 - 12:00",
-    rating: 4.8,
-    reviews: 156,
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "2",
-    name: "Dr. Michael Chen",
-    specialization: "Cardiologist",
-    clinic: "Heart Care Medical Center",
-    schedule: "09:00 - 15:00",
-    rating: 4.9,
-    reviews: 203,
-    image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "3",
-    name: "Dr. Priya Patel",
-    specialization: "Pediatrician",
-    clinic: "Kids Wellness Clinic",
-    schedule: "10:00 - 14:00",
-    rating: 4.7,
-    reviews: 128,
-    image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "4",
-    name: "Dr. James Wilson",
-    specialization: "Dermatologist",
-    clinic: "Skin Care Specialists",
-    schedule: "11:00 - 16:00",
-    rating: 4.6,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "5",
-    name: "Dr. Emma Rodriguez",
-    specialization: "Orthopedist",
-    clinic: "Bone & Joint Center",
-    schedule: "08:00 - 13:00",
-    rating: 4.8,
-    reviews: 142,
-    image: "https://images.unsplash.com/photo-1607990281513-1c032ebab258?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "6",
-    name: "Dr. Ahmed Hassan",
-    specialization: "Neurologist",
-    clinic: "Brain Health Institute",
-    schedule: "12:00 - 17:00",
-    rating: 4.9,
-    reviews: 175,
-    image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-]
-
-const SPECIALIZATIONS = [
-  "All Specializations",
-  "General Practitioner",
-  "Cardiologist",
-  "Pediatrician",
-  "Dermatologist",
-  "Orthopedist",
-  "Neurologist",
-]
+import { apiFetch } from "@/lib/api"
+import { Doctor } from "@/types/docterTypes"
 
 export default function DoctorsPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [specialization, setSpecialization] = useState("All Specializations")
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
 
-  const filteredDoctors = DOCTORS.filter((doctor) => {
+  // Fetch doctors from API
+  useEffect(() => {
+    async function fetchDoctors() {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await apiFetch<{ doctors: Doctor[] }, void>("/api/doctor", {
+          method: "GET",
+          skipAuth: true,
+        })
+        setDoctors(response.doctors || [])
+      } catch (err) {
+        console.error("Error fetching doctors:", err)
+        setError(err instanceof Error ? err.message : "Failed to fetch doctors")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDoctors()
+  }, [])
+
+  // Derive specializations from fetched data
+  const specializations = ["All Specializations", ...Array.from(new Set(doctors.map((d) => d.specialization).filter(Boolean)))]
+
+  // Map Doctor type to card props format
+  const mappedDoctors = doctors.map((doctor) => ({
+    id: doctor._id.toString(),
+    name: doctor.name,
+    specialization: doctor.specialization,
+    clinic: doctor.clinic,
+    schedule: doctor.defaultSchedule,
+    rating: doctor.averageRating,
+    reviews: doctor.totalReviews,
+    image: doctor.image,
+  }))
+
+  const filteredDoctors = mappedDoctors.filter((doctor) => {
     const matchesSearch =
       doctor.name.toLowerCase().includes(search.toLowerCase()) ||
-      doctor.clinic.toLowerCase().includes(search.toLowerCase())
+      doctor.clinic.toLowerCase().includes(search.toLowerCase()) ||
+      doctor.specialization.toLowerCase().includes(search.toLowerCase())
     const matchesSpecialization = specialization === "All Specializations" || doctor.specialization === specialization
 
     return matchesSearch && matchesSpecialization
@@ -152,7 +121,7 @@ export default function DoctorsPage() {
                     <Users className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <div className="text-xl font-bold text-foreground">{DOCTORS.length}+</div>
+                    <div className="text-xl font-bold text-foreground">{loading ? "..." : doctors.length}+</div>
                     <div className="text-xs text-muted-foreground font-medium">Doctors</div>
                   </div>
                 </div>
@@ -163,7 +132,11 @@ export default function DoctorsPage() {
                     <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                   </div>
                   <div>
-                    <div className="text-xl font-bold text-foreground">4.8</div>
+                    <div className="text-xl font-bold text-foreground">
+                      {loading ? "..." : doctors.length > 0 
+                        ? (doctors.reduce((acc, d) => acc + d.averageRating, 0) / doctors.length).toFixed(1)
+                        : "0.0"}
+                    </div>
                     <div className="text-xs text-muted-foreground font-medium">Avg Rating</div>
                   </div>
                 </div>
@@ -190,6 +163,7 @@ export default function DoctorsPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-12 pr-4 h-12 text-base border border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl transition-all"
+                  disabled={loading}
                 />
               </div>
               <div className="flex gap-3 flex-shrink-0">
@@ -198,6 +172,7 @@ export default function DoctorsPage() {
                   variant={showFilters || specialization !== "All Specializations" ? "default" : "outline"}
                   size="lg"
                   className="gap-2 px-6 h-12 whitespace-nowrap font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                  disabled={loading}
                 >
                   <Filter className="w-5 h-5" />
                   <span className="hidden sm:inline">Filters</span>
@@ -213,6 +188,7 @@ export default function DoctorsPage() {
                     onClick={clearFilters}
                     size="lg"
                     className="gap-2 px-4 h-12 whitespace-nowrap border-2 border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 font-medium"
+                    disabled={loading}
                   >
                     <X className="w-5 h-5" />
                     <span className="hidden sm:inline">Clear</span>
@@ -279,7 +255,7 @@ export default function DoctorsPage() {
                     Specialization
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
-                    {SPECIALIZATIONS.map((spec) => (
+                    {specializations.map((spec) => (
                       <button
                         key={spec}
                         onClick={() => {
@@ -328,7 +304,7 @@ export default function DoctorsPage() {
                   Specialization
                 </h4>
                 <div className="space-y-2.5">
-                  {SPECIALIZATIONS.map((spec) => (
+                  {specializations.map((spec) => (
                     <button
                       key={spec}
                       onClick={() => setSpecialization(spec)}
@@ -351,46 +327,120 @@ export default function DoctorsPage() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">
-                  {filteredDoctors.length} {filteredDoctors.length === 1 ? "Doctor" : "Doctors"} Found
+                  {loading ? "Loading..." : `${filteredDoctors.length} ${filteredDoctors.length === 1 ? "Doctor" : "Doctors"} Found`}
                 </h2>
-                {hasActiveFilters ? (
+                {!loading && hasActiveFilters ? (
                   <p className="text-sm text-muted-foreground flex items-center gap-2.5 font-medium">
                     <TrendingUp className="w-4 h-4" />
                     Based on your search criteria
                   </p>
-                ) : (
+                ) : !loading ? (
                   <p className="text-sm text-muted-foreground font-medium">All available doctors in our network</p>
-                )}
+                ) : null}
               </div>
 
               {/* View Toggle */}
-              <div className="flex items-center gap-2 bg-card/80 backdrop-blur-sm p-1.5 rounded-xl border border-border/50 shadow-sm">
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`p-2.5 rounded-lg transition-all duration-300 ${
-                    viewMode === "list"
-                      ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                  title="List View"
-                >
-                  <List className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`p-2.5 rounded-lg transition-all duration-300 ${
-                    viewMode === "grid"
-                      ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                  title="Grid View"
-                >
-                  <Grid3x3 className="w-5 h-5" />
-                </button>
-              </div>
+              {!loading && (
+                <div className="flex items-center gap-2 bg-card/80 backdrop-blur-sm p-1.5 rounded-xl border border-border/50 shadow-sm">
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={`p-2.5 rounded-lg transition-all duration-300 ${
+                      viewMode === "list"
+                        ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                    title="List View"
+                  >
+                    <List className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={`p-2.5 rounded-lg transition-all duration-300 ${
+                      viewMode === "grid"
+                        ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                    title="Grid View"
+                  >
+                    <Grid3x3 className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
 
-            {filteredDoctors.length > 0 ? (
+            {/* Loading State */}
+            {loading && (
+              <FadeIn direction="up" delay={0}>
+                <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+                  <div className="max-w-md mx-auto">
+                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                      <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                    </div>
+                    <h3 className="text-3xl font-bold text-foreground mb-4">Loading Doctors...</h3>
+                    <p className="text-muted-foreground leading-relaxed text-base">
+                      Please wait while we fetch the latest doctor information.
+                    </p>
+                  </div>
+                </Card>
+              </FadeIn>
+            )}
+
+            {/* Error State */}
+            {error && !loading && (
+              <FadeIn direction="up" delay={0}>
+                <Card className="border border-destructive/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+                  <div className="max-w-md mx-auto">
+                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-destructive/10 to-destructive/5 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-destructive/10">
+                      <AlertCircle className="w-12 h-12 text-destructive" />
+                    </div>
+                    <h3 className="text-3xl font-bold text-foreground mb-4">Failed to Load Doctors</h3>
+                    <p className="text-muted-foreground mb-8 leading-relaxed text-base">
+                      {error}
+                    </p>
+                    <Button
+                      onClick={() => window.location.reload()}
+                      size="lg"
+                      className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                    >
+                      <AlertCircle className="w-5 h-5" />
+                      Retry
+                    </Button>
+                  </div>
+                </Card>
+              </FadeIn>
+            )}
+
+            {/* Empty State */}
+            {!loading && !error && filteredDoctors.length === 0 && (
+              <FadeIn direction="up" delay={0}>
+              <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+                <div className="max-w-md mx-auto">
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                    <Search className="w-12 h-12 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-foreground mb-4">No doctors found</h3>
+                  <p className="text-muted-foreground mb-8 leading-relaxed text-base">
+                    {doctors.length === 0
+                      ? "No doctors available at the moment. Please check back later."
+                      : "We couldn't find any doctors matching your criteria. Try adjusting your filters or search terms to see more results."}
+                  </p>
+                  {hasActiveFilters && (
+                    <Button 
+                      onClick={clearFilters} 
+                      size="lg" 
+                      className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                    >
+                      <X className="w-5 h-5" />
+                      Clear All Filters
+                    </Button>
+                  )}
+                </div>
+              </Card>
+              </FadeIn>
+            )}
+
+            {/* Doctor List/Grid */}
+            {!loading && !error && filteredDoctors.length > 0 && (
               viewMode === "list" ? (
                 <StaggerChildren staggerDelay={50}>
                   <div className="space-y-4">
@@ -420,28 +470,6 @@ export default function DoctorsPage() {
                   </div>
                 </StaggerChildren>
               )
-            ) : (
-              <FadeIn direction="up" delay={0}>
-              <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
-                <div className="max-w-md mx-auto">
-                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
-                    <Search className="w-12 h-12 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-foreground mb-4">No doctors found</h3>
-                  <p className="text-muted-foreground mb-8 leading-relaxed text-base">
-                    We couldn't find any doctors matching your criteria. Try adjusting your filters or search terms to see more results.
-                  </p>
-                  <Button 
-                    onClick={clearFilters} 
-                    size="lg" 
-                    className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-                  >
-                    <X className="w-5 h-5" />
-                    Clear All Filters
-                  </Button>
-                </div>
-              </Card>
-              </FadeIn>
             )}
           </div>
         </div>
@@ -449,4 +477,3 @@ export default function DoctorsPage() {
     </div>
   )
 }
-
