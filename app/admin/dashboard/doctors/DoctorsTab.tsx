@@ -6,15 +6,10 @@ import Link from "next/link";
 
 interface DoctorsTabProps {
   doctors: DoctorAdmin[];
-  onAddDoctor: () => void;
   onDeleteDoctor: (doctorId: string) => void;
 }
 
-export function DoctorsTab({
-  doctors,
-  onAddDoctor,
-  onDeleteDoctor,
-}: DoctorsTabProps) {
+export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -26,13 +21,12 @@ export function DoctorsTab({
             Manage Doctors
           </h2>
         </div>
-        <Button
-          onClick={onAddDoctor}
-          className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all h-11"
-        >
-          <Plus className="w-5 h-5" />
-          Add Doctor
-        </Button>
+        <Link href="/admin/dashboard/doctors/addDoctor">
+          <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all h-11">
+            <Plus className="w-5 h-5" />
+            Add Doctor
+          </Button>
+        </Link>
       </div>
 
       <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm overflow-x-auto">
