@@ -47,7 +47,7 @@ export function AdminTabs() {
               {
                 key: "items",
                 label: "List Item",
-                path: "/admin/dashboard/items",
+                path: "/admin/dashboard/item",
                 icon: Package,
               },
             ] as const
