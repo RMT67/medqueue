@@ -1,16 +1,18 @@
 import { ObjectId } from "mongodb";
-import { db } from "../config/mongodb";
+import { getDb } from "../config/mongodb";
 
 import { BookingType } from "@/types/bookingType";
 
 export default class BookingModel {
-  static collection() {
+  static async collection() {
+    const db = await getDb();
     return db.collection("bookings");
   }
 
   static async create(bookingData: BookingType) {
     // get last booking number
-    const lastBooking = await this.collection()
+    const collection = await this.collection();
+    const lastBooking = await collection
       .find({})
       .sort({ createdAt: -1 })
       .limit(1)
@@ -43,7 +45,8 @@ export default class BookingModel {
       status: "confirmed",
     };
     try {
-      await this.collection().insertOne(bookingData);
+      const collection = await this.collection();
+      await collection.insertOne(bookingData);
       return bookingData;
     } catch (err) {
       throw err;

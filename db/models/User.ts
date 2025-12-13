@@ -7,6 +7,10 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, enum: ["admin", "doctor", "patient"], default: "patient", required: true },
   photoUrl: { type: String, default: null },
   phoneNumber: { type: String, default: null },
+  dateOfBirth: { type: Date, default: null },
+  gender: { type: String, enum: ["male", "female"], default: null },
+  address: { type: String, default: null },
+  isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
