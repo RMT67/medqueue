@@ -46,7 +46,7 @@ export function AdminTabs() {
               },
               {
                 key: "items",
-                label: "List Item",
+                label: "Medicine Inventory",
                 path: "/admin/dashboard/item",
                 icon: Package,
               },
