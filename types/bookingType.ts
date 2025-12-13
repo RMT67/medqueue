@@ -15,3 +15,9 @@ export interface BookingType {
   queueId?: string;
   bookingNumber?: string;
 }
+
+export interface BookingDisplayType {
+  bookingNumber?: string;
+  queueNumber?: string;
+  message?: string;
+}
