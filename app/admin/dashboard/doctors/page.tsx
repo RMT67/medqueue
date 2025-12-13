@@ -8,12 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import {
-  DoctorsTab,
-  AdminHeader,
-  AdminTabs,
-} from "@/components/adminDashboard";
+import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { DoctorAdmin, Doctor } from "@/types/docterTypes";
+import { DoctorsTab } from "./DoctorsTab";
 
 // Fungsi untuk mapping Doctor ke DoctorAdmin
 const mapDoctorToAdmin = (doctor: Doctor): DoctorAdmin => {
