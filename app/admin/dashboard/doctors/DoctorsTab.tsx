@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Plus, Edit2, Trash2 } from "lucide-react";
 import { DoctorAdmin } from "@/types/docterTypes";
+import Link from "next/link";
 
 interface DoctorsTabProps {
   doctors: DoctorAdmin[];
@@ -94,12 +95,17 @@ export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex gap-2">
-                      <button
+                      <Link
+                        href={`/admin/dashboard/doctors/${doctor._id}`}
                         className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20"
-                        title="Edit Doctor"
                       >
-                        <Edit2 className="w-4 h-4 text-primary" />
-                      </button>
+                        <button
+                          className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20"
+                          title="Edit Doctor"
+                        >
+                          <Edit2 className="w-4 h-4 text-primary" />
+                        </button>
+                      </Link>
                       <button
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-800"
                         title="Delete Doctor"
