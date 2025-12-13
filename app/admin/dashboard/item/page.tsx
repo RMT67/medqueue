@@ -23,6 +23,7 @@ import Swal from "sweetalert2";
 import { useAuth } from "@/lib/auth-context";
 import { Navigation } from "@/components/navigation";
 import { ScaleIn } from "@/components/animations";
+import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 
 // Dummy data untuk obat-obatan
 // const DUMMY_MEDICINES: Medicine[] = [
@@ -311,6 +312,11 @@ export default function ItemPage() {
         onLogout={logout}
       />
 
+      <AdminHeader
+        title='Medicine <span class="text-primary">Inventory</span>'
+        subtitle="Manage your clinic's medicine stock and inventory"
+      />
+
       <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         {/* Background Pattern */}
         <div className="fixed inset-0 opacity-5 pointer-events-none">
@@ -323,6 +329,8 @@ export default function ItemPage() {
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 py-8 lg:px-8 lg:py-12 space-y-6">
+          <AdminTabs />
+
           {/* Header */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
@@ -523,7 +531,10 @@ export default function ItemPage() {
                               Rp {medicine.price.toLocaleString("id-ID")}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Pack: Rp {medicine.packaging.packPrice.toLocaleString("id-ID")}
+                              Pack: Rp{" "}
+                              {medicine.packaging.packPrice.toLocaleString(
+                                "id-ID"
+                              )}
                             </p>
                           </div>
                         </td>
