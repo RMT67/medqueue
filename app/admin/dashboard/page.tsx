@@ -4,12 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/lib/auth-context";
-import {
-  OverviewTab,
-  AdminHeader,
-  AdminTabs,
-} from "@/components/adminDashboard";
+import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { DoctorAdmin } from "@/types/docterTypes";
+import { OverviewTab } from "./OverviewTab";
 
 // Mock data
 const STATS = {
