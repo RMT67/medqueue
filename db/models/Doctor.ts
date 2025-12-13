@@ -1,17 +1,20 @@
 import { ObjectId } from "mongodb";
-import { db } from "../config/mongodb";
+import { getDb } from "../config/mongodb";
 
 import { Doctor } from "@/types/docterTypes";
 
 export default class DoctorModel {
-  static collection() {
+  static async collection() {
+    const db = await getDb();
     return db.collection("doctors");
   }
   static async getAllDoctors(): Promise<Doctor[]> {
-    return this.collection().find({}).toArray() as Promise<Doctor[]>;
+    const collection = await this.collection();
+    return collection.find({}).toArray() as Promise<Doctor[]>;
   }
   static async getDoctorById(doctorId: string): Promise<Doctor | null> {
-    return this.collection().findOne({
+    const collection = await this.collection();
+    return collection.findOne({
       _id: new ObjectId(doctorId),
     }) as Promise<Doctor | null>;
   }
@@ -22,7 +25,8 @@ export default class DoctorModel {
       updatedAt: new Date(),
     };
     try {
-      await this.collection().insertOne(doctorData);
+      const collection = await this.collection();
+      await collection.insertOne(doctorData);
       return doctorData;
     } catch (err) {
       throw err;
@@ -34,7 +38,8 @@ export default class DoctorModel {
       updatedAt: new Date(),
     };
     try {
-      await this.collection().updateOne(
+      const collection = await this.collection();
+      await collection.updateOne(
         { _id: new ObjectId(doctorId) },
         { $set: updateData }
       );
@@ -45,7 +50,8 @@ export default class DoctorModel {
   }
   static async delete(doctorId: string) {
     try {
-      await this.collection().deleteOne({ _id: new ObjectId(doctorId) });
+      const collection = await this.collection();
+      await collection.deleteOne({ _id: new ObjectId(doctorId) });
       return true;
     } catch (err) {
       throw err;

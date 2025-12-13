@@ -8,18 +8,11 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { User, Mail, Phone, Camera, Save, ArrowLeft, Upload } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { User, Mail, Phone, Camera, Save, ArrowLeft, Calendar, MapPin, UserCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { apiFetch } from "@/lib/api"
-
-interface ProfileUser {
-  _id: string
-  fullName: string
-  email: string
-  role: "patient" | "doctor" | "admin"
-  photoUrl: string | null
-  phoneNumber: string | null
-}
+import { ProfileUser } from "@/types/userTypes"
 
 export default function EditProfilePage() {
   const router = useRouter()
@@ -29,6 +22,9 @@ export default function EditProfilePage() {
   const [formData, setFormData] = useState({
     fullName: "",
     phoneNumber: "",
+    dateOfBirth: "",
+    gender: "" as "male" | "female" | "",
+    address: "",
   })
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -45,6 +41,9 @@ export default function EditProfilePage() {
         setFormData({
           fullName: data.user.fullName,
           phoneNumber: data.user.phoneNumber || "",
+          dateOfBirth: data.user.dateOfBirth || "",
+          gender: data.user.gender || "",
+          address: data.user.address || "",
         })
         setProfileImage(data.user.photoUrl)
         setError(null)
@@ -61,9 +60,13 @@ export default function EditProfilePage() {
     }
   }, [authUser])
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    
+    // Jika tidak ada file, return
+    if (!file) {
+      return
+    }
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
@@ -71,53 +74,57 @@ export default function EditProfilePage() {
       return
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Image size should be less than 2MB")
-      return
-    }
-
+    // Set uploading state
     setIsUploading(true)
     setError(null)
+    setSuccessMessage(null)
+
+    // Create preview immediately
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setProfileImage(reader.result as string)
+    }
+    reader.readAsDataURL(file)
 
     try {
       const token = localStorage.getItem("medqueue_token")
       if (!token) {
-        throw new Error("Not authenticated")
+        throw new Error("No authentication token found")
       }
 
-      const formData = new FormData()
-      formData.append("photo", file)
+      // Create FormData and append file
+      const formDataToSend = new FormData()
+      formDataToSend.append("file", file)
 
+      // Upload to /api/profile/photo
       const response = await fetch("/api/profile/photo", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: formDataToSend,
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.message || "Upload failed")
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to upload photo")
       }
 
-      const data = await response.json()
-      
-      // Update preview
-      setProfileImage(data.photoUrl)
+      const data = await response.json() as { user: ProfileUser }
 
-      // Update localStorage medqueue_user
+      // Update preview avatar dengan photoUrl dari response
+      setProfileImage(data.user.photoUrl)
+
+      // Update localStorage "medqueue_user" agar navbar/avatar ikut berubah
       const savedUser = localStorage.getItem("medqueue_user")
       if (savedUser) {
         try {
           const userData = JSON.parse(savedUser)
           const updatedUser = {
             ...userData,
-            name: data.user.fullName, // Ensure name = fullName
+            name: data.user.fullName,
             fullName: data.user.fullName,
             photoUrl: data.user.photoUrl,
-            phoneNumber: data.user.phoneNumber,
           }
           localStorage.setItem("medqueue_user", JSON.stringify(updatedUser))
           
@@ -130,9 +137,16 @@ export default function EditProfilePage() {
 
       setSuccessMessage("Photo uploaded successfully!")
       setTimeout(() => setSuccessMessage(null), 3000)
+
+      // Reset file input untuk allow re-select same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     } catch (err) {
-      console.error("Upload error:", err)
+      console.error("Upload photo error:", err)
       setError(err instanceof Error ? err.message : "Failed to upload photo")
+      // Reset preview jika error
+      setProfileImage(null)
     } finally {
       setIsUploading(false)
     }
@@ -145,13 +159,46 @@ export default function EditProfilePage() {
     setSuccessMessage(null)
 
     try {
+      const updateData: Record<string, unknown> = {
+        fullName: formData.fullName.trim(),
+      }
+
+      // Phone number
+      if (formData.phoneNumber.trim()) {
+        updateData.phoneNumber = formData.phoneNumber.trim()
+      } else {
+        updateData.phoneNumber = null
+      }
+
+      // Date of birth
+      if (formData.dateOfBirth && formData.dateOfBirth.trim()) {
+        updateData.dateOfBirth = formData.dateOfBirth
+      } else {
+        updateData.dateOfBirth = null
+      }
+
+      // Gender
+      if (formData.gender && (formData.gender === "male" || formData.gender === "female")) {
+        updateData.gender = formData.gender
+      } else {
+        updateData.gender = null
+      }
+
+      // Address
+      if (formData.address.trim()) {
+        updateData.address = formData.address.trim()
+      } else {
+        updateData.address = null
+      }
+
+      console.log("Sending update data:", updateData)
+
       const data = await apiFetch<{ user: ProfileUser }>("/api/profile", {
         method: "PATCH",
-        body: {
-          fullName: formData.fullName.trim(),
-          phoneNumber: formData.phoneNumber.trim() || null,
-        },
+        body: updateData,
       })
+
+      console.log("Update response:", data)
 
       // Update localStorage medqueue_user
       const savedUser = localStorage.getItem("medqueue_user")
@@ -160,7 +207,7 @@ export default function EditProfilePage() {
           const userData = JSON.parse(savedUser)
           const updatedUser = {
             ...userData,
-            name: data.user.fullName, // Ensure name = fullName
+            name: data.user.fullName,
             fullName: data.user.fullName,
             photoUrl: data.user.photoUrl,
             phoneNumber: data.user.phoneNumber,
@@ -269,50 +316,46 @@ export default function EditProfilePage() {
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center shadow-lg hover:shadow-xl transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUploading ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Camera className="w-5 h-5" />
-                    )}
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    disabled={isUploading}
-                  />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Upload a profile photo. JPG, PNG or GIF. Max size 2MB.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="border-2 hover:bg-muted transition-colors gap-2"
-                  >
-                    {isUploading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        Choose Photo
-                      </>
-                    )}
-                  </Button>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-primary" />
+                      Upload Photo (Image File)
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      disabled={isUploading}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="w-full border-2 hover:bg-muted transition-colors gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUploading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-4 h-4" />
+                          Choose Photo
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isUploading 
+                        ? "Uploading your photo..." 
+                        : "Select an image file to upload automatically"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -324,7 +367,7 @@ export default function EditProfilePage() {
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                     <User className="w-4 h-4 text-primary" />
-                    Full Name
+                    Full Name *
                   </label>
                   <Input
                     type="text"
@@ -365,6 +408,52 @@ export default function EditProfilePage() {
                     disabled={isSaving}
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    Date of Birth
+                  </label>
+                  <Input
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                    className="h-12 border-2 focus:border-primary transition-colors"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                    <UserCircle className="w-4 h-4 text-primary" />
+                    Gender
+                  </label>
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as "male" | "female" | "" })}
+                    className="flex h-12 w-full rounded-md border-2 border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-primary focus-visible:ring-primary/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                    disabled={isSaving}
+                  >
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-primary" />
+                    Address
+                  </label>
+                  <Textarea
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Enter your address"
+                    className="min-h-24 border-2 focus:border-primary transition-colors"
+                    disabled={isSaving}
+                  />
+                </div>
+
               </div>
             </Card>
 
@@ -403,4 +492,3 @@ export default function EditProfilePage() {
     </ProtectedRoute>
   )
 }
-

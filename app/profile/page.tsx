@@ -7,19 +7,11 @@ import { Navigation } from "@/components/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { User, Mail, Phone, Edit, ArrowLeft } from "lucide-react"
+import { User, Mail, Phone, Edit, ArrowLeft, Calendar, UserCircle, MapPin } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { apiFetch } from "@/lib/api"
 import Link from "next/link"
-
-interface ProfileUser {
-  _id: string
-  fullName: string
-  email: string
-  role: "patient" | "doctor" | "admin"
-  photoUrl: string | null
-  phoneNumber: string | null
-}
+import { ProfileUser } from "@/types/userTypes"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -86,6 +78,16 @@ export default function ProfilePage() {
     .join("")
     .toUpperCase()
     .slice(0, 2)
+
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return "Not set"
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    } catch {
+      return "Invalid date"
+    }
+  }
 
   return (
     <ProtectedRoute>
@@ -172,29 +174,53 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {profile.phoneNumber && (
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Phone className="w-6 h-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">Phone Number</p>
-                    <p className="text-lg font-semibold text-foreground">{profile.phoneNumber}</p>
-                  </div>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-6 h-6 text-primary" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Phone Number</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {profile.phoneNumber || <span className="text-muted-foreground italic">Not set</span>}
+                  </p>
+                </div>
+              </div>
 
-              {!profile.phoneNumber && (
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                    <Phone className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">Phone Number</p>
-                    <p className="text-lg text-muted-foreground italic">Not set</p>
-                  </div>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-6 h-6 text-primary" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Date of Birth</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {formatDate(profile.dateOfBirth)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <UserCircle className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Gender</p>
+                  <p className="text-lg font-semibold text-foreground capitalize">
+                    {profile.gender || <span className="text-muted-foreground italic">Not set</span>}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Address</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {profile.address || <span className="text-muted-foreground italic">Not set</span>}
+                  </p>
+                </div>
+              </div>
             </div>
           </Card>
         </main>
@@ -202,4 +228,3 @@ export default function ProfilePage() {
     </ProtectedRoute>
   )
 }
-
