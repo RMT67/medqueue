@@ -2,13 +2,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Plus, Edit2, Trash2 } from "lucide-react";
 import { DoctorAdmin } from "@/types/docterTypes";
+import Link from "next/link";
 
 interface DoctorsTabProps {
   doctors: DoctorAdmin[];
-  onAddDoctor: () => void;
+  onDeleteDoctor: (doctorId: string) => void;
 }
 
-export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
+export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -20,13 +21,12 @@ export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
             Manage Doctors
           </h2>
         </div>
-        <Button
-          onClick={onAddDoctor}
-          className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all h-11"
-        >
-          <Plus className="w-5 h-5" />
-          Add Doctor
-        </Button>
+        <Link href="/admin/dashboard/doctors/addDoctor">
+          <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all h-11">
+            <Plus className="w-5 h-5" />
+            Add Doctor
+          </Button>
+        </Link>
       </div>
 
       <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm overflow-x-auto">
@@ -94,13 +94,19 @@ export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex gap-2">
-                      <button
+                      <Link
+                        href={`/admin/dashboard/doctors/${doctor._id}`}
                         className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20"
-                        title="Edit Doctor"
                       >
-                        <Edit2 className="w-4 h-4 text-primary" />
-                      </button>
+                        <button
+                          className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20"
+                          title="Edit Doctor"
+                        >
+                          <Edit2 className="w-4 h-4 text-primary" />
+                        </button>
+                      </Link>
                       <button
+                        onClick={() => onDeleteDoctor(doctor._id.toString())}
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-800"
                         title="Delete Doctor"
                       >

@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const finalRole: UserRole = role ?? "patient";
 
     const user = await User.create({
-      name,
+      fullName: name,
       email,
       passwordHash,
       role: finalRole,
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       {
         user: {
           _id: user._id.toString(),
-          name: user.name as string,
+          name: user.fullName as string,
           email: user.email as string,
           role: user.role as UserRole,
         },

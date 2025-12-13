@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { DoctorAdmin, Doctor } from "@/types/docterTypes";
 import { DoctorsTab } from "./DoctorsTab";
+import Swal from "sweetalert2";
 
 // Fungsi untuk mapping Doctor ke DoctorAdmin
 const mapDoctorToAdmin = (doctor: Doctor): DoctorAdmin => {
@@ -33,7 +34,6 @@ const mapDoctorToAdmin = (doctor: Doctor): DoctorAdmin => {
 export default function DoctorsPage() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
-  const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
   const [doctors, setDoctors] = useState<DoctorAdmin[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
 
@@ -68,6 +68,53 @@ export default function DoctorsPage() {
     }
   }, [user, isLoading, router]);
 
+  const handleDeleteDoctor = async (doctorId: string) => {
+    const result = await Swal.fire({
+      title: "Delete Doctor?",
+      text: "This action cannot be undone!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it!",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/doctor/${doctorId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete doctor");
+      }
+
+      // Refresh the doctors list
+      setDoctors((prevDoctors) =>
+        prevDoctors.filter((doctor) => doctor._id.toString() !== doctorId)
+      );
+
+      Swal.fire({
+        title: "Deleted!",
+        text: "Doctor has been deleted successfully.",
+        icon: "success",
+        confirmButtonColor: "#10b981",
+      });
+    } catch (error) {
+      console.error("Error deleting doctor:", error);
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to delete doctor. Please try again.",
+        icon: "error",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
   if (isLoading || isLoadingDoctors) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -100,88 +147,8 @@ export default function DoctorsPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
         <AdminTabs />
 
-        <DoctorsTab
-          doctors={doctors}
-          onAddDoctor={() => setShowAddDoctorModal(true)}
-        />
+        <DoctorsTab doctors={doctors} onDeleteDoctor={handleDeleteDoctor} />
       </main>
-
-      {/* Add Doctor Modal */}
-      {showAddDoctorModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md p-8 lg:p-10 border-2 shadow-2xl space-y-6 bg-card/95 backdrop-blur-md">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-accent mb-4 shadow-lg">
-                <Plus className="w-8 h-8 text-white" />
-              </div>
-              <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
-                Add New Doctor
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Full Name
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Dr. John Doe"
-                  className="h-11 border-2 focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Specialization
-                </label>
-                <select className="w-full h-11 px-4 bg-input border-2 border-border rounded-lg text-foreground focus:border-primary transition-colors">
-                  <option>Select specialization</option>
-                  <option>General Practitioner</option>
-                  <option>Cardiologist</option>
-                  <option>Dermatologist</option>
-                  <option>Pediatrician</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Clinic
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Clinic name"
-                  className="h-11 border-2 focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  License Number
-                </label>
-                <Input
-                  type="text"
-                  placeholder="License number"
-                  className="h-11 border-2 focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowAddDoctorModal(false)}
-                className="flex-1 h-12 border-2 hover:bg-muted transition-colors"
-              >
-                Cancel
-              </Button>
-              <Button className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all">
-                Add Doctor
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
