@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Plus,
@@ -18,105 +18,110 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import { Medicine } from "@/types/medicineType";
+import { MedicineType } from "@/types/medicineType";
+import Swal from "sweetalert2";
+import { useAuth } from "@/lib/auth-context";
+import { Navigation } from "@/components/navigation";
+import { ScaleIn } from "@/components/animations";
 
 // Dummy data untuk obat-obatan
-const DUMMY_MEDICINES: Medicine[] = [
-  {
-    id: "MED-001",
-    name: "Paracetamol 500mg",
-    category: "Analgesic",
-    description: "Pain reliever and fever reducer",
-    stock: 500,
-    minStock: 100,
-    price: 2.5,
-    unit: "Tablet",
-    imageUrl:
-      "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=400&fit=crop",
-    manufacturer: "PharmaCorp",
-    expiryDate: "2026-12-31",
-  },
-  {
-    id: "MED-002",
-    name: "Amoxicillin 500mg",
-    category: "Antibiotic",
-    description: "Broad-spectrum antibiotic for bacterial infections",
-    stock: 250,
-    minStock: 50,
-    price: 5.0,
-    unit: "Capsule",
-    imageUrl:
-      "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=400&h=400&fit=crop",
-    manufacturer: "MediLab",
-    expiryDate: "2026-08-15",
-  },
-  {
-    id: "MED-003",
-    name: "Omeprazole 20mg",
-    category: "Antacid",
-    description: "Proton pump inhibitor for gastric acid reduction",
-    stock: 180,
-    minStock: 80,
-    price: 3.75,
-    unit: "Capsule",
-    imageUrl:
-      "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400&h=400&fit=crop",
-    manufacturer: "GastroHealth",
-    expiryDate: "2026-10-20",
-  },
-  {
-    id: "MED-004",
-    name: "Cetirizine 10mg",
-    category: "Antihistamine",
-    description: "Allergy relief medication",
-    stock: 45,
-    minStock: 50,
-    price: 1.25,
-    unit: "Tablet",
-    imageUrl:
-      "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&h=400&fit=crop",
-    manufacturer: "AllergyRelief Inc",
-    expiryDate: "2026-06-30",
-  },
-  {
-    id: "MED-005",
-    name: "Metformin 850mg",
-    category: "Antidiabetic",
-    description: "Type 2 diabetes medication",
-    stock: 320,
-    minStock: 100,
-    price: 4.0,
-    unit: "Tablet",
-    imageUrl:
-      "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=400&h=400&fit=crop",
-    manufacturer: "DiabetesCare",
-    expiryDate: "2027-03-15",
-  },
-  {
-    id: "MED-006",
-    name: "Ibuprofen 400mg",
-    category: "NSAID",
-    description: "Anti-inflammatory and pain relief",
-    stock: 420,
-    minStock: 150,
-    price: 2.0,
-    unit: "Tablet",
-    imageUrl:
-      "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=400&h=400&fit=crop",
-    manufacturer: "PainRelief Co",
-    expiryDate: "2026-11-25",
-  },
-];
+// const DUMMY_MEDICINES: Medicine[] = [
+//   {
+//     id: "MED-001",
+//     name: "Paracetamol 500mg",
+//     category: "Analgesic",
+//     description: "Pain reliever and fever reducer",
+//     stock: 500,
+//     minStock: 100,
+//     price: 2.5,
+//     unit: "Tablet",
+//     imageUrl:
+//       "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=400&fit=crop",
+//     manufacturer: "PharmaCorp",
+//     expiryDate: "2026-12-31",
+//   },
+//   {
+//     id: "MED-002",
+//     name: "Amoxicillin 500mg",
+//     category: "Antibiotic",
+//     description: "Broad-spectrum antibiotic for bacterial infections",
+//     stock: 250,
+//     minStock: 50,
+//     price: 5.0,
+//     unit: "Capsule",
+//     imageUrl:
+//       "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=400&h=400&fit=crop",
+//     manufacturer: "MediLab",
+//     expiryDate: "2026-08-15",
+//   },
+//   {
+//     id: "MED-003",
+//     name: "Omeprazole 20mg",
+//     category: "Antacid",
+//     description: "Proton pump inhibitor for gastric acid reduction",
+//     stock: 180,
+//     minStock: 80,
+//     price: 3.75,
+//     unit: "Capsule",
+//     imageUrl:
+//       "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400&h=400&fit=crop",
+//     manufacturer: "GastroHealth",
+//     expiryDate: "2026-10-20",
+//   },
+//   {
+//     id: "MED-004",
+//     name: "Cetirizine 10mg",
+//     category: "Antihistamine",
+//     description: "Allergy relief medication",
+//     stock: 45,
+//     minStock: 50,
+//     price: 1.25,
+//     unit: "Tablet",
+//     imageUrl:
+//       "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&h=400&fit=crop",
+//     manufacturer: "AllergyRelief Inc",
+//     expiryDate: "2026-06-30",
+//   },
+//   {
+//     id: "MED-005",
+//     name: "Metformin 850mg",
+//     category: "Antidiabetic",
+//     description: "Type 2 diabetes medication",
+//     stock: 320,
+//     minStock: 100,
+//     price: 4.0,
+//     unit: "Tablet",
+//     imageUrl:
+//       "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=400&h=400&fit=crop",
+//     manufacturer: "DiabetesCare",
+//     expiryDate: "2027-03-15",
+//   },
+//   {
+//     id: "MED-006",
+//     name: "Ibuprofen 400mg",
+//     category: "NSAID",
+//     description: "Anti-inflammatory and pain relief",
+//     stock: 420,
+//     minStock: 150,
+//     price: 2.0,
+//     unit: "Tablet",
+//     imageUrl:
+//       "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=400&h=400&fit=crop",
+//     manufacturer: "PainRelief Co",
+//     expiryDate: "2026-11-25",
+//   },
+// ];
 
 export default function ItemPage() {
-  const [medicines, setMedicines] = useState<Medicine[]>(DUMMY_MEDICINES);
+  const { user, logout, isLoading } = useAuth();
+  const [medicines, setMedicines] = useState<MedicineType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(
+  const [selectedMedicine, setSelectedMedicine] = useState<MedicineType | null>(
     null
   );
-  const [formData, setFormData] = useState<Partial<Medicine>>({
+  const [formData, setFormData] = useState({
     name: "",
     category: "",
     description: "",
@@ -129,13 +134,23 @@ export default function ItemPage() {
     expiryDate: "",
   });
 
-  // Filter medicines based on search
-  const filteredMedicines = medicines.filter(
-    (med) =>
-      med.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      med.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      med.manufacturer.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchMedicines = async (searchQuery: string) => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/item?search=${searchQuery}`
+      );
+      if (!res.ok) {
+        return Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to fetch medicines",
+        });
+      }
+      const resData = await res.json();
+      setMedicines(resData.data);
+    };
+    fetchMedicines(searchQuery);
+  }, [searchQuery]);
 
   // Handle Add Medicine
   const handleAdd = () => {
@@ -156,7 +171,7 @@ export default function ItemPage() {
   };
 
   // Handle Edit Medicine
-  const handleEdit = (medicine: Medicine) => {
+  const handleEdit = (medicine: MedicineType) => {
     setModalMode("edit");
     setSelectedMedicine(medicine);
     setFormData(medicine);
@@ -165,25 +180,68 @@ export default function ItemPage() {
 
   // Handle Delete Medicine
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this medicine?")) {
-      setMedicines(medicines.filter((med) => med.id !== id));
-    }
+    console.log("🚀 ~ handleDelete ~ id:", id);
+
+    Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/item/${id}`,
+          {
+            method: "DELETE",
+          }
+        );
+        if (res.ok) {
+          setMedicines(medicines.filter((med) => med._id !== id));
+          Swal.fire("Deleted!", "The medicine has been deleted.", "success");
+        } else {
+          Swal.fire("Error!", "Failed to delete the medicine.", "error");
+        }
+      }
+    });
   };
 
   // Handle Submit Form
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (modalMode === "add") {
-      const newMedicine: Medicine = {
-        ...(formData as Medicine),
-        id: `MED-${String(medicines.length + 1).padStart(3, "0")}`,
-      };
-      setMedicines([...medicines, newMedicine]);
+      // console.log(formData);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/item`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        return Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to add medicine",
+        });
+      } else {
+        const result = await res.json();
+        // console.log("🚀 ~ handleSubmit ~ result:", result);
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: result.message,
+        });
+        setMedicines([...medicines, result.data]);
+      }
     } else {
       setMedicines(
         medicines.map((med) =>
-          med.id === selectedMedicine?.id ? { ...med, ...formData } : med
+          med._id === selectedMedicine?._id ? { ...med, ...formData } : med
         )
       );
     }
@@ -192,237 +250,266 @@ export default function ItemPage() {
     setSelectedMedicine(null);
   };
 
-  return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 lg:p-8">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-5 pointer-events-none">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='100' height='100' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 100 0 L 0 0 0 100' fill='none' stroke='%23000000' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grid)'/%3E%3C/svg%3E")`,
-          }}
-        />
+  if (isLoading) {
+    return (
+      // loading spinner
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <ScaleIn>
+          <div className="w-16 h-16 border-4 border-t-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </ScaleIn>
       </div>
+    );
+  }
 
-      <div className="relative max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">
-              Medicine Inventory
-            </h1>
-            <p className="text-muted-foreground">
-              Manage your clinic&apos;s medicine stock and inventory
-            </p>
-          </div>
-          <Button
-            onClick={handleAdd}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium h-12 gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Add New Medicine
-          </Button>
+  return (
+    <>
+      <Navigation
+        isAuthenticated={!!user}
+        userRole={user?.role || "admin"}
+        userName={user?.name || "Guest"}
+        onLogout={logout}
+      />
+
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        {/* Background Pattern */}
+        <div className="fixed inset-0 opacity-5 pointer-events-none">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='100' height='100' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 100 0 L 0 0 0 100' fill='none' stroke='%23000000' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grid)'/%3E%3C/svg%3E")`,
+            }}
+          />
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-6 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">
-                  Total Items
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {medicines.length}
-                </p>
-              </div>
+        <div className="relative max-w-7xl mx-auto px-4 py-8 lg:px-8 lg:py-12 space-y-6">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">
+                Medicine Inventory
+              </h1>
+              <p className="text-muted-foreground">
+                Manage your clinic&apos;s medicine stock and inventory
+              </p>
             </div>
-          </Card>
-
-          <Card className="p-6 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-green-500 to-green-600 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">
-                  Total Value
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  $
-                  {medicines
-                    .reduce((acc, med) => acc + med.price * med.stock, 0)
-                    .toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-red-500 to-red-600 flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">
-                  Low Stock Items
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  {medicines.filter((med) => med.stock < med.minStock).length}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Search Bar */}
-        <Card className="p-4 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search by name, category, or manufacturer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-12 border-2 focus:border-primary"
-            />
+            <Button
+              onClick={handleAdd}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all font-medium h-12 gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Add New Medicine
+            </Button>
           </div>
-        </Card>
 
-        {/* Medicine Table */}
-        <Card className="border-2 shadow-xl bg-card/80 backdrop-blur-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50 border-b-2 border-border">
-                <tr>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Image
-                  </th>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Medicine
-                  </th>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Category
-                  </th>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Manufacturer
-                  </th>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Stock
-                  </th>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Price
-                  </th>
-                  <th className="text-left p-4 font-semibold text-foreground">
-                    Expiry
-                  </th>
-                  <th className="text-right p-4 font-semibold text-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMedicines.length === 0 ? (
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="p-6 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center">
+                  <Package className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Total Items
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {medicines.length}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-green-500 to-green-600 flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Total Value
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    $
+                    {medicines
+                      .reduce((acc, med) => acc + med.price * med.stock, 0)
+                      .toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-red-500 to-red-600 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Low Stock Items
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {medicines.filter((med) => med.stock < med.minStock).length}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Search Bar */}
+          <Card className="p-4 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by name, category, or manufacturer..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-12 border-2 focus:border-primary"
+              />
+            </div>
+          </Card>
+
+          {/* Medicine Table */}
+          <Card className="border-2 shadow-xl bg-card/80 backdrop-blur-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50 border-b-2 border-border">
                   <tr>
-                    <td
-                      colSpan={8}
-                      className="text-center p-8 text-muted-foreground"
-                    >
-                      No medicines found
-                    </td>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      No.
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Image
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Medicine
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Category
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Manufacturer
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Stock
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Price
+                    </th>
+                    <th className="text-left p-4 font-semibold text-foreground">
+                      Expiry
+                    </th>
+                    <th className="text-right p-4 font-semibold text-foreground">
+                      Actions
+                    </th>
                   </tr>
-                ) : (
-                  filteredMedicines.map((medicine) => (
-                    <tr
-                      key={medicine.id}
-                      className="border-b border-border hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border">
-                          <Image
-                            src={medicine.imageUrl}
-                            alt={medicine.name}
-                            fill
-                            className="object-cover"
-                            unoptimized
-                          />
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {medicine.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {medicine.id}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                          {medicine.category}
-                        </span>
-                      </td>
-                      <td className="p-4 text-foreground">
-                        {medicine.manufacturer}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-semibold ${
-                              medicine.stock < medicine.minStock
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {medicine.stock}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {medicine.unit}
-                          </span>
-                        </div>
-                        {medicine.stock < medicine.minStock && (
-                          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                            Low stock!
-                          </p>
-                        )}
-                      </td>
-                      <td className="p-4 font-semibold text-foreground">
-                        ${medicine.price.toFixed(2)}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {new Date(medicine.expiryDate).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(medicine)}
-                            className="hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(medicine.id)}
-                            className="hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                </thead>
+                <tbody>
+                  {medicines.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="text-center p-8 text-muted-foreground"
+                      >
+                        No medicines found
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                  ) : (
+                    medicines.map((medicine, index) => (
+                      <tr
+                        key={medicine._id}
+                        className="border-b border-border hover:bg-muted/30 transition-colors"
+                      >
+                        {/* col number */}
+                        <td>
+                          <div className="p-4 text-muted-foreground font-semibold flex justify-center">
+                            <p>{index + 1}</p>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border">
+                            <Image
+                              src={medicine.imageUrl}
+                              alt={medicine.name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {medicine.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {medicine._id}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                            {medicine.category}
+                          </span>
+                        </td>
+                        <td className="p-4 text-foreground">
+                          {medicine.manufacturer}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-semibold ${
+                                medicine.stock < medicine.minStock
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {medicine.stock}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {medicine.unit}
+                            </span>
+                          </div>
+                          {medicine.stock < medicine.minStock && (
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                              Low stock!
+                            </p>
+                          )}
+                        </td>
+                        <td className="p-4 font-semibold text-foreground">
+                          ${medicine.price.toFixed(2)}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {new Date(medicine.expiryDate).toLocaleDateString()}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(medicine)}
+                              className="hover:bg-primary/10 hover:text-primary"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(medicine._id)}
+                              className="hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Add/Edit Modal */}
@@ -718,6 +805,6 @@ export default function ItemPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

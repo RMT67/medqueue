@@ -1,5 +1,5 @@
-export interface Medicine {
-  id: string;
+export interface MedicineType {
+  _id: string;
   name: string;
   category: string;
   description: string;

@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
 // import { FadeIn, ScaleIn, SlideIn } from "@/components/animations";
 import { FadeIn, ScaleIn } from "@/components/animations";
+import { BookingDisplayType } from "@/types/bookingType";
 
 // Mock doctor data
 const DOCTOR_DATA = {
@@ -40,12 +41,6 @@ const DOCTOR_DATA = {
     timeRange: "09:00 - 12:00",
   },
 };
-
-interface BookingDisplayType {
-  bookingNumber?: string;
-  queueNumber?: string;
-  message?: string;
-}
 
 export default function BookingPage({
   params,
