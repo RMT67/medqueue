@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
-import { Card } from "@/components/ui/card";
-import { Users, Activity, Shield, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { OverviewTab } from "@/components/adminDashboard";
+import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
+import { DoctorAdmin } from "@/types/docterTypes";
+import { OverviewTab } from "./OverviewTab";
 
 // Mock data
 const STATS = {
@@ -16,24 +16,9 @@ const STATS = {
   completedVisits: 342,
 };
 
-interface Doctor {
-  id: string;
-  name: string;
-  specialization: string;
-  clinic: string;
-  status: string;
-  todayPatients: number;
-  currentQueue: number;
-  currentlyServing: string | null;
-  avgWaitTime: number;
-  completedToday: number;
-  image: string;
-  timeStatus: "onTime" | number;
-}
-
-const DOCTORS: Doctor[] = [
+const DOCTORS: DoctorAdmin[] = [
   {
-    id: "1",
+    _id: "675a3d4e8f1c2a3b4c5d6e7f" as unknown as DoctorAdmin["_id"],
     name: "Dr. Sarah Johnson",
     specialization: "General Practitioner",
     clinic: "Central Health Clinic",
@@ -48,7 +33,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: "onTime", // "onTime" | number (late minutes)
   },
   {
-    id: "2",
+    _id: "675a3d4e8f1c2a3b4c5d6e80" as unknown as DoctorAdmin["_id"],
     name: "Dr. Michael Chen",
     specialization: "Cardiologist",
     clinic: "Heart Care Medical Center",
@@ -63,7 +48,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: 5, // 5 minutes late
   },
   {
-    id: "3",
+    _id: "675a3d4e8f1c2a3b4c5d6e81" as unknown as DoctorAdmin["_id"],
     name: "Dr. Priya Patel",
     specialization: "Pediatrician",
     clinic: "Kids Wellness Clinic",
@@ -78,7 +63,7 @@ const DOCTORS: Doctor[] = [
     timeStatus: "onTime",
   },
   {
-    id: "4",
+    _id: "675a3d4e8f1c2a3b4c5d6e82" as unknown as DoctorAdmin["_id"],
     name: "Dr. James Wilson",
     specialization: "Dermatologist",
     clinic: "Skin Care Specialists",
@@ -96,7 +81,6 @@ const DOCTORS: Doctor[] = [
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const pathname = usePathname();
   const { user, logout, isLoading } = useAuth();
 
   useEffect(() => {
@@ -122,83 +106,13 @@ export default function AdminDashboard() {
         onLogout={logout}
       />
 
-      {/* Hero Header */}
-      <section className="relative bg-linear-to-br from-primary/10 via-accent/5 to-secondary/5 py-8 lg:py-10 border-b border-border overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='100' height='100' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 100 0 L 0 0 0 100' fill='none' stroke='%23000000' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grid)'/%3E%3C/svg%3E")`,
-            }}
-          />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6">
-            <div>
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 flex items-center gap-3">
-                <Shield className="w-7 h-7 md:w-8 md:h-8 text-primary" />
-                Admin <span className="text-primary">Dashboard</span>
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground">
-                Manage clinics, doctors, and patient support
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <AdminHeader
+        title='Admin <span class="text-primary">Dashboard</span>'
+        subtitle="Manage clinics, doctors, and patient support"
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-        {/* Tabs */}
-        <div className="mb-6 lg:mb-8">
-          <Card className="p-2 border-2 shadow-lg bg-card/80 backdrop-blur-sm">
-            <div className="flex gap-2 overflow-x-auto">
-              {(
-                [
-                  {
-                    key: "overview",
-                    label: "Overview",
-                    path: "/admin/dashboard",
-                    icon: Activity,
-                  },
-                  {
-                    key: "doctors",
-                    label: "Doctors",
-                    path: "/admin/dashboard/doctors",
-                    icon: Users,
-                  },
-                  {
-                    key: "schedule",
-                    label: "Schedule",
-                    path: "/admin/dashboard/schedules",
-                    icon: Calendar,
-                  },
-                ] as const
-              ).map((tab) => {
-                const Icon = tab.icon;
-                const isActive =
-                  pathname === tab.path ||
-                  (tab.path === "/admin/dashboard" &&
-                    pathname === "/admin/dashboard");
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => router.push(tab.path)}
-                    className={`px-5 py-3 rounded-lg font-semibold transition-all whitespace-nowrap capitalize flex items-center gap-2 ${
-                      isActive
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
+        <AdminTabs />
 
         <OverviewTab stats={STATS} doctors={DOCTORS} />
       </main>

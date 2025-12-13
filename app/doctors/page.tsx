@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
@@ -11,7 +11,7 @@ import { DoctorCard } from "@/components/doctor-card"
 import { DoctorCardGrid } from "@/components/doctor-card-grid"
 import { Search, Filter, Stethoscope, Users, Star, X, TrendingUp, UserSearch, List, Grid3x3 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { FadeIn, StaggerChildren } from "@/components/animations"
+import { FadeIn, ScaleIn, StaggerChildren } from "@/components/animations"
 
 // Mock data
 const DOCTORS = [
@@ -113,7 +113,7 @@ export default function DoctorsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <Navigation />
+      <Navigation isAuthenticated={!!user} userRole={user?.role} userName={user?.name} />
 
       {/* Hero Header */}
       <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-12 lg:py-16 border-b border-border/50 overflow-hidden">
