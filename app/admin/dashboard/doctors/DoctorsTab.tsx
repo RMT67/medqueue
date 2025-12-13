@@ -7,9 +7,14 @@ import Link from "next/link";
 interface DoctorsTabProps {
   doctors: DoctorAdmin[];
   onAddDoctor: () => void;
+  onDeleteDoctor: (doctorId: string) => void;
 }
 
-export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
+export function DoctorsTab({
+  doctors,
+  onAddDoctor,
+  onDeleteDoctor,
+}: DoctorsTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -107,6 +112,7 @@ export function DoctorsTab({ doctors, onAddDoctor }: DoctorsTabProps) {
                         </button>
                       </Link>
                       <button
+                        onClick={() => onDeleteDoctor(doctor._id.toString())}
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-800"
                         title="Delete Doctor"
                       >

@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { DoctorAdmin, Doctor } from "@/types/docterTypes";
 import { DoctorsTab } from "./DoctorsTab";
+import Swal from "sweetalert2";
 
 // Fungsi untuk mapping Doctor ke DoctorAdmin
 const mapDoctorToAdmin = (doctor: Doctor): DoctorAdmin => {
@@ -68,6 +69,53 @@ export default function DoctorsPage() {
     }
   }, [user, isLoading, router]);
 
+  const handleDeleteDoctor = async (doctorId: string) => {
+    const result = await Swal.fire({
+      title: "Delete Doctor?",
+      text: "This action cannot be undone!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it!",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/doctor/${doctorId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete doctor");
+      }
+
+      // Refresh the doctors list
+      setDoctors((prevDoctors) =>
+        prevDoctors.filter((doctor) => doctor._id.toString() !== doctorId)
+      );
+
+      Swal.fire({
+        title: "Deleted!",
+        text: "Doctor has been deleted successfully.",
+        icon: "success",
+        confirmButtonColor: "#10b981",
+      });
+    } catch (error) {
+      console.error("Error deleting doctor:", error);
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to delete doctor. Please try again.",
+        icon: "error",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
   if (isLoading || isLoadingDoctors) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -103,6 +151,7 @@ export default function DoctorsPage() {
         <DoctorsTab
           doctors={doctors}
           onAddDoctor={() => setShowAddDoctorModal(true)}
+          onDeleteDoctor={handleDeleteDoctor}
         />
       </main>
 
