@@ -1,16 +1,18 @@
 import { ObjectId } from "mongodb";
-import { db } from "../config/mongodb";
+import { getDb } from "../config/mongodb";
 import { MedicineFormType } from "@/types/medicineType";
 
 export default class MedicineModel {
-  static collection() {
+  static async collection() {
+    const db = await getDb();
     return db.collection("medicines");
   }
 
-  static async getAll(search: string) {
+  static async getAll(search?: string) {
+    const collection = await this.collection();
     if (search) {
       const regex = new RegExp(search, "i");
-      return await this.collection()
+      return collection
         .find({
           $or: [
             { code: { $regex: regex } },
@@ -21,26 +23,38 @@ export default class MedicineModel {
         })
         .toArray();
     }
-    return await this.collection().find().toArray();
+    return collection.find().toArray();
   }
 
   static async create(medicineData: MedicineFormType) {
-    const result = await this.collection().insertOne(medicineData);
-    const insertedId = result.insertedId;
-    const insertedMedicine = await this.collection().findOne({
-      _id: insertedId,
-    });
-    return insertedMedicine;
+    const collection = await this.collection();
+    const medicine = {
+      ...medicineData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const result = await collection.insertOne(medicine);
+    return {
+      ...medicine,
+      _id: result.insertedId,
+    };
   }
 
   static async getById(id: string) {
-    return await this.collection().findOne({ _id: new ObjectId(id) });
+    const collection = await this.collection();
+    return collection.findOne({ _id: new ObjectId(id) });
   }
 
   static async update(id: string, medicineData: Partial<MedicineFormType>) {
-    const result = await this.collection().updateOne(
+    const collection = await this.collection();
+    const result = await collection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: medicineData }
+      { 
+        $set: {
+          ...medicineData,
+          updatedAt: new Date()
+        }
+      }
     );
     if (result.modifiedCount === 0) {
       return null;
@@ -49,7 +63,8 @@ export default class MedicineModel {
   }
 
   static async delete(id: string) {
-    const result = await this.collection().deleteOne({ _id: new ObjectId(id) });
+    const collection = await this.collection();
+    const result = await collection.deleteOne({ _id: new ObjectId(id) });
     return result.deletedCount > 0;
   }
 }
