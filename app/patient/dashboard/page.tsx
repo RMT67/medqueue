@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
@@ -11,9 +12,96 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn } from "@/components/animations"
 import { DoctorCardGrid } from "@/components/doctor-card-grid"
 
+interface DashboardData {
+  summary: {
+    activeQueue: number
+    pendingPayments: number
+    upcomingAppointments: number
+  }
+  pendingInvoice: {
+    invoiceId: string
+    invoiceNumber: string
+    date: string
+    dueDate: string
+    status: string
+    items: Array<{
+      type: string
+      name: string
+      quantity: number
+      unitPrice: number
+      total: number
+    }>
+    subtotal: number
+    total: number
+    medicationReceipt: {
+      medicines: Array<{
+        name: string
+        dosage: string
+        quantity: number
+        price: number
+      }>
+    }
+    doctor: {
+      doctorId: string
+      name: string
+      specialization: string
+      clinic: string
+      rating: number
+      totalReviews: number
+      image: string
+    }
+    daysUntilDue: number
+  } | null
+  recommendedDoctors: Array<{
+    doctorId: string
+    name: string
+    specialization: string
+    clinic: string
+    schedule: string
+    rating: number
+    totalReviews: number
+    image: string
+    consultationFee: number
+    isTopRated: boolean
+  }>
+}
+
 export default function PatientDashboardPage() {
   const router = useRouter()
   const { user, logout } = useAuth()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const token = localStorage.getItem("medqueue_token")
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
+        const response = await fetch("/api/patient/dashboard", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setDashboardData(data)
+        } else {
+          console.error("Failed to fetch dashboard data")
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDashboard()
+  }, [])
 
   const menuCards = [
     {
@@ -93,8 +181,10 @@ export default function PatientDashboardPage() {
                         <Activity className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <div className="text-xl font-bold text-foreground">Active</div>
-                        <div className="text-xs text-muted-foreground font-medium">Queue</div>
+                        <div className="text-xl font-bold text-foreground">
+                          {isLoading ? "..." : dashboardData?.summary.activeQueue || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-medium">Active Queue</div>
                       </div>
                     </div>
                   </Card>
@@ -104,8 +194,10 @@ export default function PatientDashboardPage() {
                         <TrendingUp className="w-5 h-5 text-accent" />
                       </div>
                       <div>
-                        <div className="text-xl font-bold text-foreground">Health</div>
-                        <div className="text-xs text-muted-foreground font-medium">Status</div>
+                        <div className="text-xl font-bold text-foreground">
+                          {isLoading ? "..." : dashboardData?.summary.pendingPayments || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-medium">Pending Payments</div>
                       </div>
                     </div>
                   </Card>
@@ -194,19 +286,20 @@ export default function PatientDashboardPage() {
           </FadeIn>
 
           {/* Pending Payment Section */}
-          <FadeIn direction="up" delay={400}>
-            <div className="mt-12 lg:mt-16">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg ring-4 ring-amber-100 dark:ring-amber-900/30">
-                  <AlertCircle className="w-6 h-6 text-white" />
+          {dashboardData?.pendingInvoice && (
+            <FadeIn direction="up" delay={400}>
+              <div className="mt-12 lg:mt-16">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg ring-4 ring-amber-100 dark:ring-amber-900/30">
+                    <AlertCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl lg:text-4xl font-bold text-foreground">Pending Payment</h2>
+                    <p className="text-sm text-muted-foreground mt-1">Invoice and receipt that require payment</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-3xl lg:text-4xl font-bold text-foreground">Pending Payment</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Invoice and receipt that require payment</p>
-                </div>
-              </div>
 
-              <Card className="p-8 border border-amber-200/50 dark:border-amber-800/50 shadow-2xl bg-gradient-to-br from-amber-50/40 via-card to-amber-50/20 dark:from-amber-950/30 dark:via-card dark:to-amber-950/10 backdrop-blur-md ring-1 ring-amber-100/50 dark:ring-amber-900/20">
+                <Card className="p-8 border border-amber-200/50 dark:border-amber-800/50 shadow-2xl bg-gradient-to-br from-amber-50/40 via-card to-amber-50/20 dark:from-amber-950/30 dark:via-card dark:to-amber-950/10 backdrop-blur-md ring-1 ring-amber-100/50 dark:ring-amber-900/20">
                 <div className="flex flex-col lg:flex-row gap-8">
                   {/* Invoice Info */}
                   <div className="flex-1 space-y-5">
@@ -219,91 +312,133 @@ export default function PatientDashboardPage() {
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Invoice Number</p>
-                          <p className="text-sm font-bold text-foreground">INV-2024-001234</p>
+                          <p className="text-sm font-bold text-foreground">{dashboardData.pendingInvoice.invoiceNumber}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Due Date</p>
-                          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Dec 7, 2024</p>
+                          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                            {new Date(dashboardData.pendingInvoice.dueDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric"
+                            })}
+                          </p>
                         </div>
                       </div>
                       <div className="pt-3 border-t border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">Consultation Fee</span>
-                          <span className="text-sm font-semibold text-foreground">Rp 150.000</span>
-                        </div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">Medication</span>
-                          <span className="text-sm font-semibold text-foreground">Rp 75.000</span>
-                        </div>
+                        {dashboardData.pendingInvoice.items.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-muted-foreground">{item.name}</span>
+                            <span className="text-sm font-semibold text-foreground">
+                              Rp {item.total.toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        ))}
                         <div className="flex items-center justify-between pt-2 border-t border-border">
                           <span className="text-sm font-bold text-foreground">Total Amount</span>
-                          <span className="text-xl font-bold text-amber-600 dark:text-amber-400">Rp 225.000</span>
+                          <span className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                            Rp {dashboardData.pendingInvoice.total.toLocaleString("id-ID")}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Medication Receipt */}
-                    <div>
-                      <div className="flex items-center gap-2.5 mb-4">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Pill className="w-4 h-4 text-primary" />
+                    {dashboardData.pendingInvoice.medicationReceipt.medicines.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-4">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Pill className="w-4 h-4 text-primary" />
+                          </div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medication Receipt</p>
                         </div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medication Receipt</p>
+                        {dashboardData.pendingInvoice.medicationReceipt.medicines.map((medicine, index) => (
+                          <div key={index} className="p-4 bg-accent/10 rounded-xl border border-accent/30 shadow-sm mb-3">
+                            <p className="text-sm font-semibold text-foreground mb-1.5">{medicine.name}</p>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              {medicine.dosage} • Qty: {medicine.quantity}
+                            </p>
+                            <p className="text-sm font-bold text-accent">Rp {medicine.price.toLocaleString("id-ID")}</p>
+                          </div>
+                        ))}
                       </div>
-                      <div className="p-4 bg-accent/10 rounded-xl border border-accent/30 shadow-sm">
-                        <p className="text-sm font-semibold text-foreground mb-1.5">Paracetamol 500mg</p>
-                        <p className="text-xs text-muted-foreground mb-2">2x daily for 3 days • Qty: 1 box</p>
-                        <p className="text-sm font-bold text-accent">Rp 75.000</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Action Section */}
                   <div className="lg:w-96 flex flex-col justify-between gap-6">
                     <div className="space-y-5">
                       {/* Doctor Information */}
-                      <div className="p-5 bg-card/90 rounded-xl border border-border/50 shadow-lg backdrop-blur-sm">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-2 ring-primary/10">
-                            <img
-                              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                              alt="Dr. Sarah Johnson"
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.style.display = 'none'
-                                const parent = target.parentElement
-                                if (parent) {
-                                  const fallback = parent.querySelector('.doctor-fallback') as HTMLElement
-                                  if (fallback) fallback.style.display = 'flex'
-                                }
-                              }}
-                            />
-                            <div className="doctor-fallback hidden w-full h-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
-                              SJ
+                      {dashboardData.pendingInvoice.doctor && (
+                        <div className="p-5 bg-card/90 rounded-xl border border-border/50 shadow-lg backdrop-blur-sm">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-2 ring-primary/10">
+                              {dashboardData.pendingInvoice.doctor.image ? (
+                                <>
+                                  <img
+                                    src={dashboardData.pendingInvoice.doctor.image}
+                                    alt={dashboardData.pendingInvoice.doctor.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      target.style.display = 'none'
+                                      const parent = target.parentElement
+                                      if (parent) {
+                                        const fallback = parent.querySelector('.doctor-fallback') as HTMLElement
+                                        if (fallback) fallback.style.display = 'flex'
+                                      }
+                                    }}
+                                  />
+                                  <div className="doctor-fallback hidden w-full h-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
+                                    {dashboardData.pendingInvoice.doctor.name
+                                      .split(" ")
+                                      .map(n => n[0])
+                                      .join("")
+                                      .toUpperCase()}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
+                                  {dashboardData.pendingInvoice.doctor.name
+                                    .split(" ")
+                                    .map(n => n[0])
+                                    .join("")
+                                    .toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-foreground text-base truncate mb-0.5">
+                                {dashboardData.pendingInvoice.doctor.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate mb-2">
+                                {dashboardData.pendingInvoice.doctor.specialization}
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                                <span className="text-xs font-bold text-foreground">
+                                  {dashboardData.pendingInvoice.doctor.rating}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({dashboardData.pendingInvoice.doctor.totalReviews} reviews)
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-foreground text-base truncate mb-0.5">Dr. Sarah Johnson</p>
-                            <p className="text-xs text-muted-foreground truncate mb-2">General Practitioner</p>
-                            <div className="flex items-center gap-1.5">
-                              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                              <span className="text-xs font-bold text-foreground">4.8</span>
-                              <span className="text-xs text-muted-foreground">(156 reviews)</span>
-                            </div>
+                          <div className="pt-4 border-t border-border/50">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Clinic</p>
+                            <p className="text-sm font-medium text-foreground">
+                              {dashboardData.pendingInvoice.doctor.clinic}
+                            </p>
                           </div>
                         </div>
-                        <div className="pt-4 border-t border-border/50">
-                          <p className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Clinic</p>
-                          <p className="text-sm font-medium text-foreground">Central Health Clinic</p>
-                        </div>
-                      </div>
+                      )}
 
                       <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/50 rounded-xl shadow-sm">
                         <div className="flex items-start gap-3">
                           <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                           <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
-                            Payment is due in 2 days. Please complete payment to avoid service interruption.
+                            Payment is due in {dashboardData.pendingInvoice.daysUntilDue} {dashboardData.pendingInvoice.daysUntilDue === 1 ? 'day' : 'days'}. Please complete payment to avoid service interruption.
                           </p>
                         </div>
                       </div>
@@ -329,6 +464,7 @@ export default function PatientDashboardPage() {
               </Card>
             </div>
           </FadeIn>
+          )}
 
           {/* Recommended Doctors Section */}
           <FadeIn direction="up" delay={500}>
@@ -349,46 +485,25 @@ export default function PatientDashboardPage() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <DoctorCardGrid
-                  id="1"
-                  name="Dr. Sarah Johnson"
-                  specialization="General Practitioner"
-                  clinic="Central Health Clinic"
-                  schedule="08:00 - 12:00"
-                  rating={4.8}
-                  reviews={156}
-                  image="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                />
-                <DoctorCardGrid
-                  id="2"
-                  name="Dr. Michael Chen"
-                  specialization="Cardiologist"
-                  clinic="Heart Care Medical Center"
-                  schedule="09:00 - 15:00"
-                  rating={4.9}
-                  reviews={203}
-                  image="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                />
-                <DoctorCardGrid
-                  id="3"
-                  name="Dr. Priya Patel"
-                  specialization="Pediatrician"
-                  clinic="Kids Wellness Clinic"
-                  schedule="10:00 - 14:00"
-                  rating={4.7}
-                  reviews={128}
-                  image="https://images.unsplash.com/photo-1551836022-d5d88e9218df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                />
-                <DoctorCardGrid
-                  id="4"
-                  name="Dr. James Wilson"
-                  specialization="Dermatologist"
-                  clinic="Skin Care Specialists"
-                  schedule="11:00 - 16:00"
-                  rating={4.6}
-                  reviews={89}
-                  image="https://images.unsplash.com/photo-1582750433449-648ed127bb54?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                />
+                {isLoading ? (
+                  <div className="col-span-4 text-center py-8 text-muted-foreground">Loading doctors...</div>
+                ) : dashboardData?.recommendedDoctors && dashboardData.recommendedDoctors.length > 0 ? (
+                  dashboardData.recommendedDoctors.map((doctor) => (
+                    <DoctorCardGrid
+                      key={doctor.doctorId}
+                      id={doctor.doctorId}
+                      name={doctor.name}
+                      specialization={doctor.specialization}
+                      clinic={doctor.clinic}
+                      schedule={doctor.schedule}
+                      rating={doctor.rating}
+                      reviews={doctor.totalReviews}
+                      image={doctor.image}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-4 text-center py-8 text-muted-foreground">No recommended doctors available</div>
+                )}
               </div>
             </div>
           </FadeIn>
