@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
+import { emitQueueStatusChange } from "@/lib/socket-server";
 
 export async function PATCH(
   req: Request,
@@ -76,6 +77,11 @@ export async function PATCH(
     // ✅ 5. Get updated booking
     const updatedBooking = await bookingsCollection.findOne({
       _id: new ObjectId(bookingId)
+    });
+
+    // ✅ 6. Emit socket event for status change
+    emitQueueStatusChange(bookingId, {
+      queueStatus: "cancelled"
     });
 
     return NextResponse.json({

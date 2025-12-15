@@ -1,0 +1,9 @@
+# Dependencies
+node_modules
+.next
+out
+build
+
+# Server file (CommonJS, not TypeScript)
+server.js
+

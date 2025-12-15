@@ -6,6 +6,7 @@ import BookingModel from "@/db/models/Booking";
 import DoctorModel from "@/db/models/Doctor";
 import DoctorScheduleModel from "@/db/models/DoctorSchedule";
 import { calculateEstimatedCallTime } from "@/lib/queue-utils";
+import { emitQueuePositionUpdate, emitCallTimeUpdate, emitQueueStatusChange } from "@/lib/socket-server";
 
 export async function GET(req: Request) {
   try {
@@ -134,7 +135,32 @@ export async function GET(req: Request) {
       hour12: false
     });
 
-    // ✅ 10. Return response
+    // ✅ 10. Emit socket events for real-time updates
+    const bookingIdStr = activeBooking._id.toString();
+    
+    // Emit position update
+    emitQueuePositionUpdate(bookingIdStr, {
+      currentlyServing: currentlyServing || "",
+      patientsAhead: Math.max(0, patientsAhead),
+      queueNumber: activeBooking.queueNumber || ""
+    });
+
+    // Emit call time update
+    emitCallTimeUpdate(bookingIdStr, {
+      estimatedCallTime: callTimeData.estimatedCallTime,
+      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp,
+      patientsAhead: Math.max(0, patientsAhead),
+      estimatedTime: callTimeData.estimatedTime
+    });
+
+    // Emit status change
+    emitQueueStatusChange(bookingIdStr, {
+      queueStatus: queueStatus,
+      estimatedCallTime: callTimeData.estimatedCallTime,
+      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp
+    });
+
+    // ✅ 11. Return response
     return NextResponse.json({
       bookingId: activeBooking._id.toString(),
       bookingNumber: activeBooking.bookingNumber || "",
