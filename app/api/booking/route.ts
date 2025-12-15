@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       (day) => day.hari === selectedDayOfWeek
     );
 
-    if (!daySchedule || !daySchedule.availabel) {
+    if (!daySchedule || !daySchedule.available) {
       return NextResponse.json(
         { message: `Doctor is not available on ${selectedDayOfWeek}` },
         { status: 400 }
@@ -62,20 +62,26 @@ export async function POST(req: Request) {
 
     const averageTimePerPatient = doctor?.averageTimePerPatient || 15;
 
-    // 4. get currentPatient = count of CONFIRMED/PENDING bookings for that doctor ON THAT DATE
+    // 4. get currentPatient = count of active bookings for that doctor ON THAT DATE
+    // Active bookings = all status EXCEPT "cancelled"
+    // Include: "pending", "confirmed", "completed" (completed still takes slot for that day)
     const allBookingsForDoctor = await Booking.findByDoctorId(
       body.doctorId.toString()
     );
 
-    // Filter bookings: same date AND not cancelled
+    // Filter bookings: same date AND active (not cancelled)
     const bookingsOnDate = allBookingsForDoctor.filter((booking) => {
       const bookingDate = new Date(booking.scheduleDate);
       const isSameDate =
         bookingDate.getFullYear() === selectedDate.getFullYear() &&
         bookingDate.getMonth() === selectedDate.getMonth() &&
         bookingDate.getDate() === selectedDate.getDate();
-      const isNotCancelled = booking.status !== "cancelled";
-      return isSameDate && isNotCancelled;
+
+      // Count all active bookings (exclude only cancelled)
+      // "pending", "confirmed", "completed" all take a slot
+      const isActiveBooking = booking.status !== "cancelled";
+
+      return isSameDate && isActiveBooking;
     });
 
     const currentPatient = bookingsOnDate.length;
@@ -100,11 +106,11 @@ export async function POST(req: Request) {
         patientId: body.patientId,
         doctorId: body.doctorId,
         scheduleDate: new Date(body.scheduleDate),
-        timeRange: body.timeRange,
         complaint: body.complaint,
       },
       averageTimePerPatient,
-      bookingsOnDate // pass existing bookings to avoid re-querying
+      bookingsOnDate, // pass existing bookings to avoid re-querying
+      daySchedule // pass the selected day schedule for startTime/endTime
     );
     return NextResponse.json(
       {

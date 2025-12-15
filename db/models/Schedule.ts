@@ -4,7 +4,7 @@ import { getDb } from "../config/mongodb";
 export default class ScheduleModel {
   static async collection() {
     const db = await getDb();
-    return db.collection("doctorschedules");
+    return db.collection("doctorSchedules");
   }
 
   static async getByDoctorId(doctorId: string) {

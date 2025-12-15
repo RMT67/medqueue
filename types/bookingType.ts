@@ -6,7 +6,6 @@ export interface BookingType {
   doctorId: string | ObjectId;
   scheduleId?: string | ObjectId;
   scheduleDate: Date;
-  timeRange: string;
   appointmentTime?: Date;
   complaint: string;
   cancelReason?: string;

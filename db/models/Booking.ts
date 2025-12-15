@@ -14,7 +14,8 @@ export default class BookingModel {
   static async create(
     bookingData: BookingType,
     averageTimePerPatient: number,
-    existingBookingsOnDate?: WithId<Document>[] // optional: bookings already filtered by date
+    existingBookingsOnDate?: WithId<Document>[], // optional: bookings already filtered by date
+    selectedDaySchedule?: { startTime: string; endTime: string } // pass the day schedule from route
   ) {
     // get last booking number
     const collection = await this.collection();
@@ -83,12 +84,46 @@ export default class BookingModel {
     // 3. appointmentTime is sum of last appointmentTime + average time per patient
     // if no previous booking, set appointmentTime to schedule firstCallTime
     if (bookingsOnDate.length === 0) {
-      bookingData.appointmentTime = new Date(bookingData.scheduleDate);
-      const [startHour, startMinute] = schedule.timeRange
-        .split(" - ")[0]
-        .split(":")
-        .map(Number);
-      bookingData.appointmentTime.setHours(startHour, startMinute, 0, 0);
+      // Create appointmentTime using the scheduleDate's year, month, day
+      const scheduleDate = new Date(bookingData.scheduleDate);
+      
+      // Get startTime from selectedDaySchedule or use schedule's dayOfWeek
+      let startHour = 9; // default
+      let startMinute = 0; // default
+      
+      if (selectedDaySchedule) {
+        [startHour, startMinute] = selectedDaySchedule.startTime
+          .split(":")
+          .map(Number);
+      } else if (schedule && schedule.dayOfWeek && schedule.dayOfWeek.length > 0) {
+        // Get the day of week from scheduleDate
+        const dayIndex = scheduleDate.getDay();
+        const dayMap: { [key: number]: string } = {
+          0: "Minggu",
+          1: "Senin",
+          2: "Selasa",
+          3: "Rabu",
+          4: "Kamis",
+          5: "Jumat",
+          6: "Sabtu",
+        };
+        const dayName = dayMap[dayIndex];
+        const daySchedule = schedule.dayOfWeek.find((d) => d.hari === dayName);
+        if (daySchedule) {
+          [startHour, startMinute] = daySchedule.startTime.split(":").map(Number);
+        }
+      }
+      
+      // Create a new date with the correct date and time
+      bookingData.appointmentTime = new Date(
+        scheduleDate.getFullYear(),
+        scheduleDate.getMonth(),
+        scheduleDate.getDate(),
+        startHour,
+        startMinute,
+        0,
+        0
+      );
     } else {
       // get last booking appointmentTime
       const lastBookingOnDate = bookingsOnDate.reduce((latest, current) => {

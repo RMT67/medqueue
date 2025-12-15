@@ -28,10 +28,12 @@ export interface DoctorSchedule {
 export default class DoctorScheduleModel {
   static async collection() {
     const db = await getDb();
-    return db.collection("doctorschedules");
+    return db.collection("doctorSchedules");
   }
 
-  static async create(scheduleData: Omit<DoctorSchedule, "_id" | "createdAt" | "updatedAt">) {
+  static async create(
+    scheduleData: Omit<DoctorSchedule, "_id" | "createdAt" | "updatedAt">
+  ) {
     const collection = await this.collection();
     const schedule = {
       ...scheduleData,
@@ -54,11 +56,8 @@ export default class DoctorScheduleModel {
     const collection = await this.collection();
     // Support both ObjectId and string doctorId
     const query: any = {
-      $or: [
-        { doctorId: new ObjectId(doctorId) },
-        { doctorId: doctorId }
-      ],
-      isAvailable: true
+      $or: [{ doctorId: new ObjectId(doctorId) }, { doctorId: doctorId }],
+      isAvailable: true,
     };
     return collection.find(query).sort({ createdAt: 1 }).toArray();
   }
@@ -67,16 +66,13 @@ export default class DoctorScheduleModel {
     const collection = await this.collection();
     // Support both ObjectId and string doctorId
     const query: any = {
-      $or: [
-        { doctorId: new ObjectId(doctorId) },
-        { doctorId: doctorId }
-      ],
-      isAvailable: true
+      $or: [{ doctorId: new ObjectId(doctorId) }, { doctorId: doctorId }],
+      isAvailable: true,
     };
     // If isDefault exists, use it; otherwise get first available schedule
     const defaultSchedule = await collection.findOne({
       ...query,
-      isDefault: true
+      isDefault: true,
     });
     if (defaultSchedule) return defaultSchedule;
     // Fallback: get first available schedule
@@ -86,13 +82,10 @@ export default class DoctorScheduleModel {
   static async getByDayOfWeek(doctorId: string, hari: string) {
     const collection = await this.collection();
     const query: any = {
-      $or: [
-        { doctorId: new ObjectId(doctorId) },
-        { doctorId: doctorId }
-      ],
+      $or: [{ doctorId: new ObjectId(doctorId) }, { doctorId: doctorId }],
       isAvailable: true,
       "dayOfWeek.hari": hari,
-      "dayOfWeek.availabel": true
+      "dayOfWeek.availabel": true,
     };
     return collection.findOne(query);
   }
@@ -101,14 +94,13 @@ export default class DoctorScheduleModel {
     const collection = await this.collection();
     await collection.updateOne(
       { _id: new ObjectId(scheduleId) },
-      { 
+      {
         $set: {
           ...updateData,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
     return await this.getById(scheduleId);
   }
 }
-
