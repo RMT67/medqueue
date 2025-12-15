@@ -93,7 +93,7 @@ export default function MyQueuePage() {
     }
   }, [user, isLoading, router])
 
-  // ✅ Fetch queue data
+  // ✅ Fetch queue data and setup Socket.IO
   useEffect(() => {
     const fetchQueueData = async () => {
       try {
@@ -138,11 +138,132 @@ export default function MyQueuePage() {
 
     if (user && user.role === "patient") {
       fetchQueueData()
-      // Poll every 30 seconds for updates
-      const interval = setInterval(fetchQueueData, 30000)
-      return () => clearInterval(interval)
     }
   }, [user])
+
+  // ✅ Socket.IO connection and event listeners
+  useEffect(() => {
+    if (!user || user.role !== "patient" || !queueData?.bookingId) {
+      return
+    }
+
+    let socketCleanup: (() => void) | null = null
+
+    // Dynamic import untuk client-side only
+    import("@/lib/socket-client").then(({ getSocket, joinQueueRoom, leaveQueueRoom }) => {
+      const socket = getSocket()
+      if (!socket) {
+        console.warn("Socket not available")
+        return
+      }
+
+      const bookingId = queueData.bookingId
+
+      // Join queue room
+      joinQueueRoom(bookingId)
+
+      // Listen for queue position updates
+      const handlePositionUpdate = (data: {
+        bookingId: string
+        currentlyServing: string
+        patientsAhead: number
+        queueNumber: string
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueueData((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              currentlyServing: data.currentlyServing,
+              patientsAhead: data.patientsAhead,
+              queueNumber: data.queueNumber
+            }
+          })
+        }
+      }
+
+      // Listen for queue status changes
+      const handleStatusChange = (data: {
+        bookingId: string
+        queueStatus: "waiting" | "being-served" | "completed"
+        estimatedCallTime?: string
+        estimatedCallTimeTimestamp?: string
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueueData((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              queueStatus: data.queueStatus,
+              ...(data.estimatedCallTime && { estimatedCallTime: data.estimatedCallTime }),
+              ...(data.estimatedCallTimeTimestamp && { estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp })
+            }
+          })
+        }
+      }
+
+      // Listen for call time updates
+      const handleCallTimeUpdate = (data: {
+        bookingId: string
+        estimatedCallTime: string
+        estimatedCallTimeTimestamp: string
+        patientsAhead: number
+        estimatedTime: number
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueueData((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              estimatedCallTime: data.estimatedCallTime,
+              estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
+              patientsAhead: data.patientsAhead,
+              estimatedTime: data.estimatedTime
+            }
+          })
+        }
+      }
+
+      socket.on("queue:position-update", handlePositionUpdate)
+      socket.on("queue:status-change", handleStatusChange)
+      socket.on("queue:call-time-update", handleCallTimeUpdate)
+
+      // Setup cleanup function
+      socketCleanup = () => {
+        leaveQueueRoom(bookingId)
+        socket.off("queue:position-update", handlePositionUpdate)
+        socket.off("queue:status-change", handleStatusChange)
+        socket.off("queue:call-time-update", handleCallTimeUpdate)
+      }
+    })
+
+    // Fallback: Poll every 60 seconds as backup (reduced frequency since we have socket)
+    const interval = setInterval(async () => {
+      const token = localStorage.getItem("medqueue_token")
+      if (!token) return
+
+      try {
+        const response = await fetch("/api/patient/queue/active", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setQueueData(data)
+        }
+      } catch (error) {
+        console.error("Error polling queue data:", error)
+      }
+    }, 60000) // Poll every 60 seconds as backup
+
+    return () => {
+      clearInterval(interval)
+      if (socketCleanup) {
+        socketCleanup()
+      }
+    }
+  }, [user, queueData?.bookingId])
 
   // ✅ Fetch past appointments
   useEffect(() => {
