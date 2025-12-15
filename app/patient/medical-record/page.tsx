@@ -1,80 +1,104 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Navigation } from "@/components/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { FileText, Calendar, Stethoscope, Pill, Activity, Search, Filter, ArrowLeft, MapPin } from "lucide-react"
+import { FileText, Calendar, Stethoscope, Pill, Activity, Search, ArrowLeft, MapPin } from "lucide-react"
 import Image from "next/image"
 import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn, StaggerChildren } from "@/components/animations"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 
-// Mock data
-const MEDICAL_RECORDS = [
-  {
-    id: "1",
-    date: "Dec 5, 2024",
-    type: "Consultation",
-    doctor: "Dr. Sarah Johnson",
-    specialization: "General Practitioner",
-    clinic: "Central Health Clinic",
-    diagnosis: "Headache and Fatigue",
-    prescription: "Paracetamol 500mg - 2x daily for 3 days",
-    notes: "Patient experiencing persistent headaches for the past week, especially in the morning. Also feeling fatigued. Recommended rest and follow-up if symptoms persist.",
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    attachments: ["Lab_Results_Dec5.pdf"],
-  },
-  {
-    id: "2",
-    date: "Nov 15, 2024",
-    type: "Check-up",
-    doctor: "Dr. Michael Chen",
-    specialization: "Cardiologist",
-    clinic: "Heart Care Medical Center",
-    diagnosis: "Routine Cardiovascular Check",
-    prescription: "No medication needed",
-    notes: "Regular check-up. Blood pressure and heart rate are within normal range. Continue healthy lifestyle and exercise.",
-    image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    attachments: ["ECG_Report_Nov15.pdf"],
-  },
-  {
-    id: "3",
-    date: "Oct 28, 2024",
-    type: "Consultation",
-    doctor: "Dr. Priya Patel",
-    specialization: "Pediatrician",
-    clinic: "Kids Wellness Clinic",
-    diagnosis: "Seasonal Allergy",
-    prescription: "Cetirizine 10mg - 1x daily for 7 days",
-    notes: "Patient showing symptoms of seasonal allergies. Prescribed antihistamine and advised to avoid allergens.",
-    image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-    attachments: [],
-  },
-]
-
-const RECORD_TYPES = ["All", "Consultation", "Check-up", "Lab Results", "Prescription"]
+interface MedicalRecord {
+  recordId: string
+  date: string
+  formattedDate: string
+  type: string
+  doctor: {
+    doctorId: string
+    name: string
+    specialization: string
+    clinic: string
+    image: string
+  } | null
+  diagnosis: string
+  prescription: string
+  prescriptions: Array<{
+    medicineName: string
+    dosage: string
+    quantity: number
+    unitPrice: number
+  }>
+  notes: string
+  attachments: string[]
+  bookingId: string
+  bookingNumber: string
+}
 
 export default function MedicalRecordPage() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [search, setSearch] = useState("")
-  const [filterType, setFilterType] = useState("All")
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null)
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredRecords = MEDICAL_RECORDS.filter((record) => {
-    const matchesSearch =
-      record.doctor.toLowerCase().includes(search.toLowerCase()) ||
-      record.diagnosis.toLowerCase().includes(search.toLowerCase()) ||
-      record.type.toLowerCase().includes(search.toLowerCase())
-    const matchesType = filterType === "All" || record.type === filterType
-    return matchesSearch && matchesType
-  })
+  // ✅ Fetch medical records from API
+  useEffect(() => {
+    const fetchMedicalRecords = async () => {
+      try {
+        const token = localStorage.getItem("medqueue_token")
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
+        // Build query params
+        const params = new URLSearchParams()
+        if (search) params.append("search", search)
+
+        const response = await fetch(`/api/patient/medical-records?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setMedicalRecords(data.medicalRecords || [])
+        } else {
+          console.error("Failed to fetch medical records")
+        }
+      } catch (error) {
+        console.error("Error fetching medical records:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchMedicalRecords()
+  }, [search])
+
+  // ✅ Use records directly (no type filtering)
+  const filteredRecords = medicalRecords
 
   const toggleExpand = (id: string) => {
     setExpandedRecord(expandedRecord === id ? null : id)
+  }
+
+  // ✅ Format prescription for display
+  const formatPrescriptionDisplay = (prescriptions: MedicalRecord["prescriptions"]): string => {
+    if (!prescriptions || prescriptions.length === 0) {
+      return "No medication needed"
+    }
+    return prescriptions
+      .map((prescription) => {
+        return `${prescription.medicineName}${prescription.dosage ? ` - ${prescription.dosage}` : ""}${prescription.quantity > 1 ? ` • Qty: ${prescription.quantity}` : ""}`
+      })
+      .join(", ")
   }
 
   return (
@@ -135,28 +159,11 @@ export default function MedicalRecordPage() {
                     </div>
                     <Input
                       type="text"
-                      placeholder="Search by doctor, diagnosis, or type..."
+                      placeholder="Search by doctor, diagnosis, or notes..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       className="w-full pl-12 pr-4 h-12 text-base border border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl transition-all"
                     />
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <div className="flex gap-2 bg-card/80 backdrop-blur-sm p-1.5 rounded-xl border border-border/50 shadow-sm">
-                      {RECORD_TYPES.map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setFilterType(type)}
-                          className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                            filterType === type
-                              ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </Card>
@@ -164,19 +171,33 @@ export default function MedicalRecordPage() {
           </FadeIn>
 
           {/* Medical Records List */}
-          {filteredRecords.length > 0 ? (
+          {isLoading ? (
+            <FadeIn direction="up" delay={0}>
+              <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+                <div className="max-w-md mx-auto">
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                    <FileText className="w-12 h-12 text-muted-foreground animate-pulse" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-foreground mb-4">Loading...</h3>
+                  <p className="text-muted-foreground">Fetching your medical records</p>
+                </div>
+              </Card>
+            </FadeIn>
+          ) : filteredRecords.length > 0 ? (
             <StaggerChildren staggerDelay={50}>
               <div className="space-y-4">
                 {filteredRecords.map((record) => {
                   const initials = record.doctor
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
+                    ? record.doctor.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                    : "DR"
 
                   return (
                     <Card
-                      key={record.id}
+                      key={record.recordId}
                       className="border border-border/50 hover:shadow-2xl transition-all duration-500 bg-card/95 backdrop-blur-sm hover:border-primary/30 group"
                     >
                       <div className="p-8">
@@ -186,11 +207,11 @@ export default function MedicalRecordPage() {
                           <div className="flex items-center gap-5 flex-1 min-w-0">
                             {/* Doctor Photo */}
                             <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-lg ring-2 ring-primary/10 group-hover:ring-primary/20 transition-all">
-                              {record.image ? (
+                              {record.doctor?.image ? (
                                 <>
                                   <Image
-                                    src={record.image}
-                                    alt={record.doctor}
+                                    src={record.doctor.image}
+                                    alt={record.doctor.name}
                                     fill
                                     unoptimized
                                     className="object-cover group-hover:scale-110 transition-transform duration-500"
@@ -219,16 +240,20 @@ export default function MedicalRecordPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-3 mb-3 flex-wrap">
                                 <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
-                                  {record.doctor}
+                                  {record.doctor?.name || "Unknown Doctor"}
                                 </h3>
                                 <span className="px-4 py-1.5 bg-primary/10 text-primary rounded-xl text-xs font-semibold border border-primary/20 shadow-sm">
-                                  {record.date}
+                                  {record.formattedDate}
                                 </span>
                               </div>
-                              <p className="text-sm text-primary font-semibold mb-3">{record.specialization}</p>
+                              <p className="text-sm text-primary font-semibold mb-3">
+                                {record.doctor?.specialization || ""}
+                              </p>
                               <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                                 <MapPin className="w-4 h-4 flex-shrink-0 text-primary" />
-                                <span className="truncate font-medium">{record.clinic}</span>
+                                <span className="truncate font-medium">
+                                  {record.doctor?.clinic || ""}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -243,14 +268,14 @@ export default function MedicalRecordPage() {
                             </div>
                             <Button
                               variant="outline"
-                              onClick={() => toggleExpand(record.id)}
+                              onClick={() => toggleExpand(record.recordId)}
                               className={`border-2 transition-all duration-300 font-semibold ${
-                                expandedRecord === record.id
+                                expandedRecord === record.recordId
                                   ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-primary hover:from-primary/90 hover:to-primary shadow-lg"
                                   : "hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-md"
                               }`}
                             >
-                              {expandedRecord === record.id ? "Hide Details" : "View Details"}
+                              {expandedRecord === record.recordId ? "Hide Details" : "View Details"}
                             </Button>
                           </div>
                         </div>
@@ -269,10 +294,10 @@ export default function MedicalRecordPage() {
                         </div>
 
                       {/* Expanded Details */}
-                      {expandedRecord === record.id && (
+                      {expandedRecord === record.recordId && (
                         <div className="mt-8 pt-8 border-t border-border/50 space-y-6 animate-in fade-in slide-in-from-top-2">
                           {/* Prescription */}
-                          {record.prescription && (
+                          {record.prescriptions && record.prescriptions.length > 0 && (
                             <div className="p-5 bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl border border-accent/30 shadow-sm">
                               <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center ring-1 ring-accent/30">
@@ -282,9 +307,21 @@ export default function MedicalRecordPage() {
                                   Prescription
                                 </span>
                               </div>
-                              <p className="text-base font-semibold text-foreground leading-relaxed">
-                                {record.prescription}
-                              </p>
+                              <div className="space-y-3">
+                                {record.prescriptions.map((prescription, index) => (
+                                  <div key={index} className="p-3 bg-card/50 rounded-lg border border-accent/20">
+                                    <p className="text-base font-semibold text-foreground mb-1">
+                                      {prescription.medicineName}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      {prescription.dosage} • Qty: {prescription.quantity}
+                                    </p>
+                                    <p className="text-sm font-bold text-accent">
+                                      Rp {prescription.unitPrice.toLocaleString("id-ID")}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
 
@@ -321,8 +358,8 @@ export default function MedicalRecordPage() {
                   </div>
                   <h3 className="text-3xl font-bold text-foreground mb-4">No records found</h3>
                   <p className="text-muted-foreground mb-8 leading-relaxed text-base">
-                    {search || filterType !== "All"
-                      ? "No medical records match your search criteria. Try adjusting your filters."
+                    {search
+                      ? "No medical records match your search criteria. Try adjusting your search."
                       : "You don't have any medical records yet. Your records will appear here after your appointments."}
                   </p>
                   {search && (
@@ -330,11 +367,10 @@ export default function MedicalRecordPage() {
                       variant="outline"
                       onClick={() => {
                         setSearch("")
-                        setFilterType("All")
                       }}
                       className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold shadow-sm hover:shadow-md"
                     >
-                      Clear Filters
+                      Clear Search
                     </Button>
                   )}
                 </div>

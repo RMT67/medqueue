@@ -7,6 +7,110 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+// AI Insights Component
+function AIInsights({ bookingId }: { bookingId: string }) {
+  const [insights, setInsights] = useState<{
+    insights: string[]
+    warnings: string[]
+    smartSuggestion: {
+      arrivalTime: string
+      reason: string
+    }
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const token = localStorage.getItem("medqueue_token")
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
+        const response = await fetch(`/api/patient/queue/${bookingId}/insights`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setInsights({
+            insights: data.insights || [],
+            warnings: data.warnings || [],
+            smartSuggestion: data.smartSuggestion || {
+              arrivalTime: "",
+              reason: ""
+            }
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching insights:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchInsights()
+  }, [bookingId])
+
+  if (isLoading) {
+    return (
+      <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border border-primary/20 rounded-xl p-5 space-y-3 shadow-sm">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md ring-2 ring-primary/20 flex-shrink-0">
+            <Lightbulb className="w-5 h-5 text-white" />
+          </div>
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">AI Insights</h4>
+        </div>
+        <p className="text-sm text-muted-foreground">Loading insights...</p>
+      </div>
+    )
+  }
+
+  if (!insights || insights.insights.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border border-primary/20 rounded-xl p-5 space-y-3 shadow-sm">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md ring-2 ring-primary/20 flex-shrink-0">
+          <Lightbulb className="w-5 h-5 text-white" />
+        </div>
+        <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">AI Insights</h4>
+      </div>
+      
+      {insights.warnings.length > 0 && (
+        <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/50 rounded-lg mb-3">
+          {insights.warnings.map((warning, index) => (
+            <p key={index} className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+              ⚠️ {warning}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {insights.insights.map((insight, index) => (
+          <p key={index} className="text-sm text-foreground leading-relaxed">
+            {insight}
+          </p>
+        ))}
+      </div>
+
+      {insights.smartSuggestion.reason && (
+        <div className="pt-3 border-t border-primary/20">
+          <p className="text-sm font-semibold text-primary">
+            💡 Smart Suggestion: {insights.smartSuggestion.reason}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface QueueCardProps {
   currentlyServing: string
   patientsAhead: number
@@ -22,6 +126,7 @@ interface QueueCardProps {
   appointmentTime?: string
   timeRange?: string
   patientComplaint?: string
+  bookingId?: string
   onMarkComplete?: () => void
   onCancel?: () => void
   onRate?: () => void
@@ -245,35 +350,7 @@ export function QueueCard({
         </div>
 
         {/* AI Insights */}
-        {status === "waiting" && (() => {
-          const now = new Date()
-          const averageServiceTime = 7
-          const totalWaitMinutes = patientsAhead * averageServiceTime
-          const recommendedArrivalMinutes = Math.max(5, Math.ceil(totalWaitMinutes * 0.8))
-          const arrivalTime = new Date(now.getTime() + (totalWaitMinutes - recommendedArrivalMinutes) * 60 * 1000)
-          const arrivalHours = arrivalTime.getHours()
-          const arrivalMinutes = arrivalTime.getMinutes()
-          const arrivalTimeStr = `${arrivalHours.toString().padStart(2, '0')}:${arrivalMinutes.toString().padStart(2, '0')}`
-          
-          return (
-            <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border border-primary/20 rounded-xl p-5 space-y-3 shadow-sm">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md ring-2 ring-primary/20 flex-shrink-0">
-                  <Lightbulb className="w-5 h-5 text-white" />
-                </div>
-                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">AI Insights</h4>
-              </div>
-              <p className="text-sm text-foreground leading-relaxed">
-                Based on current queue analysis, the doctor is running on schedule with an average service time of 7 minutes per patient. Clinic traffic is low today, which means shorter wait times. With {patientsAhead} patient{patientsAhead !== 1 ? 's' : ''} ahead of you, we recommend arriving at the clinic approximately {recommendedArrivalMinutes} minutes before your estimated call time to ensure you're ready when your turn comes.
-              </p>
-              <div className="pt-3 border-t border-primary/20">
-                <p className="text-sm font-semibold text-primary">
-                  💡 Smart Suggestion: Plan to arrive around {arrivalTimeStr} to avoid waiting while ensuring you're on time for your appointment.
-                </p>
-              </div>
-            </div>
-          )
-        })()}
+        {status === "waiting" && bookingId && <AIInsights bookingId={bookingId} />}
 
         {/* Reminder */}
         {status === "waiting" && (

@@ -3,7 +3,6 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
 import ReviewModel from "@/db/models/Review";
-import BookingModel from "@/db/models/Booking";
 import DoctorModel from "@/db/models/Doctor";
 
 interface CreateReviewRequest {
@@ -84,15 +83,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 8. Validate doctorId matches booking
-    if (booking.doctorId !== doctorId) {
-      return NextResponse.json(
-        { error: "Doctor ID does not match booking" },
-        { status: 400 }
-      );
-    }
-
-    // ✅ 9. Create review
+    // ✅ 8. Create review
     const review = await ReviewModel.create({
       bookingId: new ObjectId(bookingId),
       patientId: new ObjectId(userId),
@@ -101,7 +92,7 @@ export async function POST(req: Request) {
       comment: comment || ""
     });
 
-    // ✅ 10. Update doctor's average rating and total reviews
+    // ✅ 9. Update doctor's average rating and total reviews
     const doctor = await DoctorModel.getDoctorById(doctorId);
     if (doctor) {
       const reviewsCollection = db.collection("reviews");
@@ -117,7 +108,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // ✅ 11. Return response
+    // ✅ 10. Return response
     return NextResponse.json(
       {
         message: "Review submitted successfully",

@@ -34,49 +34,9 @@ export default class ReviewModel {
     };
   }
 
-  static async getById(reviewId: string) {
-    const collection = await this.collection();
-    return collection.findOne({ _id: new ObjectId(reviewId) });
-  }
-
   static async getByBookingId(bookingId: string) {
     const collection = await this.collection();
     return collection.findOne({ bookingId: new ObjectId(bookingId) });
-  }
-
-  static async getByDoctorId(doctorId: string, limit?: number) {
-    const collection = await this.collection();
-    const query = { doctorId: doctorId };
-    const cursor = collection.find(query).sort({ createdAt: -1 });
-    if (limit) {
-      cursor.limit(limit);
-    }
-    return cursor.toArray();
-  }
-
-  static async getByPatientId(patientId: string) {
-    const collection = await this.collection();
-    return collection.find({ patientId: new ObjectId(patientId) }).sort({ createdAt: -1 }).toArray();
-  }
-
-  static async update(reviewId: string, updateData: Partial<Review>) {
-    const collection = await this.collection();
-    await collection.updateOne(
-      { _id: new ObjectId(reviewId) },
-      {
-        $set: {
-          ...updateData,
-          updatedAt: new Date()
-        }
-      }
-    );
-    return await this.getById(reviewId);
-  }
-
-  static async delete(reviewId: string) {
-    const collection = await this.collection();
-    const result = await collection.deleteOne({ _id: new ObjectId(reviewId) });
-    return result.deletedCount > 0;
   }
 }
 
