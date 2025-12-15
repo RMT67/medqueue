@@ -27,4 +27,5 @@ export type Doctor = {
   defaultSchedule?: string;
   createdAt?: string;
   updatedAt?: string;
+  averageTimePerPatient?: number;
 };

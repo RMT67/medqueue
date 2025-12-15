@@ -262,19 +262,22 @@ export default function BookingPage({
       // });
 
       // call API to create booking
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/booking`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          patientId: user?._id || "10" /* dummy patient ID */,
-          doctorId: id,
-          scheduleDate: selectedDate,
-          timeRange: timeRange,
-          complaint: patientComplaint,
-        }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/booking`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            patientId: user?._id || "10" /* dummy patient ID */,
+            doctorId: id,
+            scheduleDate: selectedDate,
+            timeRange: timeRange,
+            complaint: patientComplaint,
+          }),
+        }
+      );
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
