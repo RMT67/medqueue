@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
-import { Service } from "@/types/serviceTypes";
 import { ScheduleTab } from "./ScheduleTab";
+import { DoctorWithSchedule } from "@/types/scheduleTypes";
 
 export default function SchedulePage() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
-  const [services, setServices] = useState<Service[]>([]);
+  const [schedules, setSchedules] = useState<DoctorWithSchedule[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,29 +21,36 @@ export default function SchedulePage() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const response = await fetch("/api/services?isActive=true");
-        const data = await response.json();
-        if (data.success) {
-          setServices(data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching services:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchServices();
+    if (user && user.role === "admin") {
+      fetchSchedules();
     }
   }, [user]);
+
+  const fetchSchedules = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/schedules");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch schedules");
+      }
+
+      const data = await response.json();
+      setSchedules(data);
+    } catch (error) {
+      console.error("Error fetching schedules:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (isLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -62,14 +69,14 @@ export default function SchedulePage() {
       />
 
       <AdminHeader
-        title='Medical <span class="text-primary">Services</span>'
-        subtitle="Manage medical services and pricing"
+        title='Doctor <span class="text-primary">Schedules</span>'
+        subtitle="Manage doctor schedules and availability"
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
         <AdminTabs />
 
-        <ScheduleTab services={services} />
+        <ScheduleTab schedules={schedules} />
       </main>
     </div>
   );
