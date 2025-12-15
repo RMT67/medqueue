@@ -147,10 +147,17 @@ export function QueueCard({
   appointmentTime = "10:30",
   timeRange,
   patientComplaint,
+  bookingId,
   onMarkComplete,
   onCancel,
   onRate,
 }: QueueCardProps) {
+  const normalizedBookingId =
+    (bookingId as any)?._id?.toString?.() ||
+    bookingId?.toString?.() ||
+    (bookingId as any)?.id ||
+    ""
+
   const initials = doctorName
     .split(" ")
     .map((n) => n[0])
@@ -350,7 +357,9 @@ export function QueueCard({
         </div>
 
         {/* AI Insights */}
-        {status === "waiting" && bookingId && <AIInsights bookingId={bookingId} />}
+        {status === "waiting" && normalizedBookingId && (
+          <AIInsights bookingId={normalizedBookingId} />
+        )}
 
         {/* Reminder */}
         {status === "waiting" && (
@@ -396,5 +405,3 @@ export function QueueCard({
     </Card>
   )
 }
-
-

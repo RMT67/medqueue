@@ -12,6 +12,7 @@ import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 
 interface QueueData {
+  _id?: string
   bookingId: string
   bookingNumber: string
   queueNumber: string
@@ -479,7 +480,12 @@ export default function MyQueuePage() {
                 appointmentTime={queueData.appointmentTime}
                 timeRange={queueData.timeRange}
                 patientComplaint={queueData.patientComplaint}
-                bookingId={queueData.bookingId}
+                bookingId={
+                  queueData.bookingId ||
+                  queueData._id?.toString?.() ||
+                  (queueData as any)?.id ||
+                  ""
+                }
                 onMarkComplete={handleMarkComplete}
                 onCancel={handleCancel}
                 onRate={() => {

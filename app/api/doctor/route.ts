@@ -1,23 +1,71 @@
-import { NextRequest, NextResponse } from "next/server";
-import DoctorModel from "@/db/models/Doctor";
+import { NextResponse } from "next/server";
+import DoctorModel, {
+  FindDoctorsFilter,
+  FindDoctorsOptions,
+} from "@/db/models/Doctor";
 
-export async function GET(request: NextRequest) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const doctorIds = searchParams.get("doctorIds");
+    const { searchParams } = new URL(req.url);
 
-    const doctors = await DoctorModel.getAllDoctors();
+    // Extract query parameters
+    const q = searchParams.get("q") || undefined;
+    const specialization = searchParams.get("specialization") || undefined;
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+    const isActiveParam = searchParams.get("isActive");
+    const sort = searchParams.get("sort") || undefined;
 
-    // Filter by doctorIds if provided
-    if (doctorIds) {
-      const idsArray = doctorIds.split(",");
-      const filteredDoctors = doctors.filter((doctor) =>
-        idsArray.includes(doctor._id.toString())
-      );
-      return NextResponse.json({ doctors: filteredDoctors }, { status: 200 });
+    // Parse pagination (clamp to match model)
+    const page = Math.max(1, pageParam ? parseInt(pageParam, 10) : 1);
+    const rawLimit = limitParam ? parseInt(limitParam, 10) : 12;
+    const limit = Math.min(
+      50,
+      Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 12)
+    );
+
+    // Parse isActive (default to true for public access)
+    let isActive: boolean | undefined = true;
+    if (isActiveParam !== null) {
+      isActive = isActiveParam === "true";
     }
 
-    return NextResponse.json({ doctors }, { status: 200 });
+    // Build filter
+    const filter: FindDoctorsFilter = {};
+    if (q) filter.q = q;
+    if (specialization && specialization !== "All Specializations") {
+      filter.specialization = specialization;
+    }
+    if (isActive !== undefined) filter.isActive = isActive;
+
+    // Build options
+    const options: FindDoctorsOptions = {
+      page,
+      limit,
+    };
+    if (sort) options.sort = sort;
+
+    // Fetch doctors and total count
+    const [doctors, total] = await Promise.all([
+      DoctorModel.findDoctors(filter, options),
+      DoctorModel.countDoctors(filter),
+    ]);
+
+    // Calculate pagination metadata (keep 0 when total=0)
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+
+    return NextResponse.json(
+      {
+        doctors,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching doctors:", error);
     return NextResponse.json(

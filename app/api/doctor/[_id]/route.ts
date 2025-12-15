@@ -8,6 +8,7 @@ export async function GET(
 ) {
   try {
     const { _id: doctorId } = await params;
+    console.log("[api/doctor/:_id] incoming request", { doctorId });
 
     if (!doctorId) {
       return NextResponse.json(
@@ -19,9 +20,13 @@ export async function GET(
     const doctor = await DoctorModel.getDoctorById(doctorId);
 
     if (!doctor) {
+      console.log("[api/doctor/:_id] doctor not found", { doctorId });
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
+    console.log("[api/doctor/:_id] doctor found", {
+      doctorId: doctor._id?.toString?.() || doctorId,
+    });
     return NextResponse.json({ doctor }, { status: 200 });
   } catch (error) {
     console.error("Error fetching doctor:", error);

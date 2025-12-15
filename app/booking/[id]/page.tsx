@@ -30,7 +30,8 @@ import { Doctor } from "@/types/docterTypes";
 
 interface DaySchedule {
   hari: string;
-  available: boolean;
+  available?: boolean;
+  availabel?: boolean;
   startTime: string;
   endTime: string;
 }
@@ -47,6 +48,15 @@ interface DoctorSchedule {
   maxPatients: number;
   currentPatients: number;
   dayOfWeek: DaySchedule[];
+}
+
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+
+function buildApiUrl(path: string) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!API_BASE_URL) return normalizedPath;
+  return `${API_BASE_URL}${normalizedPath}`;
 }
 
 export default function BookingPage({
@@ -68,25 +78,41 @@ export default function BookingPage({
     null
   );
   const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<string>("");
 
   const { id } = use(params);
 
+  useEffect(() => {
+    if (id) {
+      console.log("[booking] param id:", id);
+    }
+  }, [id]);
+
   // Fetch doctor data from API
   useEffect(() => {
     const fetchDoctor = async () => {
+      const doctorUrl = buildApiUrl(`/api/doctor/${id}`);
+      console.log("[booking] fetchDoctor url:", doctorUrl);
       try {
         setDoctorLoading(true);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/doctor/${id}`
-        );
+        const response = await fetch(doctorUrl);
+        console.log("[booking] fetchDoctor status:", response.status);
+
+        if (response.status === 404) {
+          console.warn("[booking] doctor not found", { doctorUrl });
+          setDoctor(null);
+          return;
+        }
 
         if (!response.ok) {
-          throw new Error("Failed to fetch doctor data");
+          throw new Error(
+            `Failed to fetch doctor data (status ${response.status})`
+          );
         }
 
         const data = await response.json();
-        setDoctor(data.doctor);
+        setDoctor(data.doctor ?? data);
       } catch (error) {
         console.error("Error fetching doctor:", error);
         Swal.fire({
@@ -107,21 +133,57 @@ export default function BookingPage({
   // Fetch doctor schedule from API
   useEffect(() => {
     const fetchDoctorSchedule = async () => {
+      const scheduleUrl = buildApiUrl(`/api/schedules?doctorId=${id}`);
+      console.log("[booking] fetchDoctorSchedule url:", scheduleUrl);
       try {
         setScheduleLoading(true);
+        setScheduleMessage(null);
         // Use query parameter to get schedule by doctorId
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/schedules?doctorId=${id}`
+        const response = await fetch(scheduleUrl);
+        console.log(
+          "[booking] fetchDoctorSchedule status:",
+          response.status
         );
 
+        if (response.status === 404) {
+          console.warn("[booking] schedule not found", { scheduleUrl });
+          setDoctorSchedule(null);
+          setScheduleMessage("Schedule not available");
+          return;
+        }
+
         if (!response.ok) {
-          throw new Error("Failed to fetch doctor schedule");
+          throw new Error(
+            `Failed to fetch doctor schedule (status ${response.status})`
+          );
         }
 
         const data = await response.json();
-        setDoctorSchedule(data);
+        const normalizedSchedule = data?.dayOfWeek
+          ? {
+              ...data,
+              dayOfWeek: data.dayOfWeek.map((day: DaySchedule) => ({
+                ...day,
+                available:
+                  day.available !== undefined
+                    ? day.available
+                    : day.availabel !== undefined
+                    ? day.availabel
+                    : false,
+              })),
+            }
+          : null;
+
+        setDoctorSchedule(normalizedSchedule);
+        setScheduleMessage(
+          normalizedSchedule?.dayOfWeek?.length
+            ? null
+            : "Schedule not available"
+        );
       } catch (error) {
         console.error("Error fetching doctor schedule:", error);
+        setDoctorSchedule(null);
+        setScheduleMessage("Schedule not available");
         // Don't show error popup for schedule, just use fallback
       } finally {
         setScheduleLoading(false);
@@ -405,24 +467,22 @@ export default function BookingPage({
   const handleBooking = async () => {
     try {
       setLoading(true);
+      const bookingUrl = buildApiUrl(`/api/booking`);
 
       // call API to create booking
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/booking`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            patientId: user?._id || "10" /* dummy patient ID */,
-            doctorId: id,
-            scheduleDate: selectedDate,
-            timeRange: timeRange,
-            complaint: patientComplaint,
-          }),
-        }
-      );
+      const res = await fetch(bookingUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: user?._id || "10" /* dummy patient ID */,
+          doctorId: id,
+          scheduleDate: selectedDate,
+          timeRange: timeRange,
+          complaint: patientComplaint,
+        }),
+      });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -636,6 +696,17 @@ export default function BookingPage({
                       </div>
                     </div>
                   )}
+                {!scheduleLoading && scheduleMessage && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                      Schedule not available
+                    </p>
+                    <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">
+                      We couldn&apos;t load a schedule for this doctor yet. You can still choose a
+                      date, and we&apos;ll update once a schedule is added.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
