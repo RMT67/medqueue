@@ -1,10 +1,10 @@
 import { ObjectId } from "mongodb";
-import { db } from "../config/mongodb";
+import { getDb } from "../config/mongodb";
 import { MedicineFormType } from "@/types/medicineType";
 
 export default class MedicineModel {
   static collection() {
-    return db.collection("medicines");
+    return getDb().collection("medicines");
   }
 
   static async getAll(search: string) {
