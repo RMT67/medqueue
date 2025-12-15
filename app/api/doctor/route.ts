@@ -1,9 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import DoctorModel from "@/db/models/Doctor";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const doctorIds = searchParams.get("doctorIds");
+
     const doctors = await DoctorModel.getAllDoctors();
+
+    // Filter by doctorIds if provided
+    if (doctorIds) {
+      const idsArray = doctorIds.split(",");
+      const filteredDoctors = doctors.filter((doctor) =>
+        idsArray.includes(doctor._id.toString())
+      );
+      return NextResponse.json({ doctors: filteredDoctors }, { status: 200 });
+    }
+
     return NextResponse.json({ doctors }, { status: 200 });
   } catch (error) {
     console.error("Error fetching doctors:", error);

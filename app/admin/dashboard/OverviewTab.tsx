@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { DoctorAdmin } from "@/types/docterTypes";
+import { DoctorWithSchedule } from "@/types/scheduleTypes";
 
 interface OverviewTabProps {
   stats: {
@@ -18,6 +19,7 @@ interface OverviewTabProps {
     completedVisits: number;
   };
   doctors: DoctorAdmin[];
+  schedules: DoctorWithSchedule[];
 }
 
 export function OverviewTab({ stats, doctors }: OverviewTabProps) {
@@ -82,20 +84,29 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
         </Card>
       </div>
 
-      {/* Active Doctors with Schedule */}
+      {/* Active Doctors in today */}
       <div>
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
             <Users className="w-5 h-5 text-white" />
           </div>
           <h3 className="text-xl font-bold text-foreground">
-            Active Doctors & Queue Status
+            Active Doctors Today
           </h3>
+          <span className="text-sm text-muted-foreground">
+            ({doctors.length} doctor{doctors.length !== 1 ? "s" : ""} with
+            schedule)
+          </span>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-          {doctors
-            .filter((doctor) => doctor.status === "online")
-            .map((doctor) => {
+        {doctors.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">
+              No doctors with schedule for today
+            </p>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+            {doctors.map((doctor) => {
               const initials = doctor.name
                 .split(" ")
                 .map((n) => n[0])
@@ -120,7 +131,8 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                           <Image
                             src={doctor.image}
                             alt={doctor.name}
-                            fill
+                            width={80}
+                            height={80}
                             unoptimized
                             className="object-cover"
                             onError={(e) => {
@@ -135,7 +147,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                               }
                             }}
                           />
-                          <div className="image-fallback hidden w-full h-full items-center justify-center bg-linear-to-br from-primary to-accent text-white font-bold text-xl">
+                          <div className="image-fallback hidden w-full h-full absolute inset-0 items-center justify-center bg-linear-to-br from-primary to-accent text-white font-bold text-xl">
                             {initials}
                           </div>
                         </>
@@ -162,24 +174,48 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                         </div>
                       </div>
 
-                      {/* Time Status */}
-                      <div
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 ${
-                          isOnTime
-                            ? "bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-                            : "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-                        }`}
-                      >
-                        {isOnTime ? (
-                          <>
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            <span>Tepat Waktu</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            <span>Telat {lateMinutes} menit</span>
-                          </>
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 ${
+                            doctor.status === "online"
+                              ? "bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                              : "bg-gray-50 dark:bg-gray-950/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800"
+                          }`}
+                        >
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              doctor.status === "online"
+                                ? "bg-green-500"
+                                : "bg-gray-500"
+                            }`}
+                          />
+                          <span>
+                            {doctor.status === "online" ? "Online" : "Offline"}
+                          </span>
+                        </div>
+
+                        {/* Time Status */}
+                        {doctor.status === "online" && (
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 ${
+                              isOnTime
+                                ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                                : "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                            }`}
+                          >
+                            {isOnTime ? (
+                              <>
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                <span>On Time</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>Late {lateMinutes}m</span>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -193,7 +229,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                           Queue
                         </p>
                         <p className="text-2xl font-bold text-primary">
-                          {doctor.currentQueue}
+                          {doctor.currentQueue ?? 0}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           patients waiting
@@ -218,7 +254,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                           Avg Wait
                         </p>
                         <p className="text-xl font-bold text-foreground">
-                          {doctor.avgWaitTime} min
+                          {doctor.avgWaitTime ?? 0} min
                         </p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg border border-border">
@@ -226,7 +262,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                           Completed
                         </p>
                         <p className="text-xl font-bold text-foreground">
-                          {doctor.completedToday}
+                          {doctor.completedToday ?? 0}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           today
@@ -240,7 +276,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                           Total Today
                         </p>
                         <p className="text-lg font-bold text-foreground">
-                          {doctor.todayPatients} patients
+                          {doctor.todayPatients ?? 0} patients
                         </p>
                       </div>
                     </div>
@@ -248,11 +284,12 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                 </Card>
               );
             })}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Recent Activity */}
-      <Card className="p-6 lg:p-8 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
+      {/* <Card className="p-6 lg:p-8 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-accent to-secondary flex items-center justify-center shadow-md">
             <Activity className="w-5 h-5 text-white" />
@@ -276,7 +313,7 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
             </div>
           ))}
         </div>
-      </Card>
+      </Card> */}
     </div>
   );
 }

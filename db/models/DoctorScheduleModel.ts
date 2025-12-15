@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "../config/mongodb";
-import { DoctorSchedule } from "@/types/scheduleTypes";
+import { DoctorSchedule, DoctorWithSchedule } from "@/types/scheduleTypes";
 
 export default class DoctorScheduleModel {
   static async collection() {
@@ -24,11 +24,11 @@ export default class DoctorScheduleModel {
     }) as Promise<DoctorSchedule | null>;
   }
 
-  static async getSchedulesWithDoctorInfo() {
+  static async getSchedulesWithDoctorInfo(): Promise<DoctorWithSchedule[]> {
     const db = await getDb();
     const doctorsCollection = db.collection("doctors");
 
-    return doctorsCollection
+    const result = await doctorsCollection
       .aggregate([
         {
           $lookup: {
@@ -65,6 +65,8 @@ export default class DoctorScheduleModel {
         },
       ])
       .toArray();
+
+    return result as DoctorWithSchedule[];
   }
 
   static async create(scheduleData: Partial<DoctorSchedule>) {
