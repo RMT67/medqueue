@@ -10,7 +10,7 @@ export default class DoctorModel {
   }
   static async getAllDoctors(): Promise<Doctor[]> {
     const collection = await this.collection();
-    return collection.find({}).toArray() as Promise<Doctor[]>;
+    return collection.find({}).toArray() as unknown as Promise<Doctor[]>;
   }
   static async getDoctorById(doctorId: string): Promise<Doctor | null> {
     const collection = await this.collection();
@@ -26,7 +26,7 @@ export default class DoctorModel {
     };
     try {
       const collection = await this.collection();
-      await collection.insertOne(doctorData);
+      await collection.insertOne(doctorData as any);
       return doctorData;
     } catch (err) {
       throw err;

@@ -25,7 +25,7 @@ export type Doctor = {
   totalReviews: number;
   isActive: boolean;
   defaultSchedule?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
   averageTimePerPatient?: number;
 };

@@ -2,11 +2,11 @@ import { ObjectId } from "mongodb";
 import { getDb } from "../config/mongodb";
 
 export interface Prescription {
-  medicineId?: string;
-  medicineName: string;
+  medicineId: string; // ✅ Reference ke Medicines collection
+  medicineName: string; // ✅ Snapshot name (untuk historical accuracy)
   dosage: string;
   quantity: number;
-  unitPrice: number;
+  unitPrice: number; // ✅ Snapshot price (untuk historical accuracy)
   notes?: string;
 }
 
@@ -15,6 +15,10 @@ export interface MedicalRecord {
   patientId: ObjectId;
   doctorId: string;
   bookingId: ObjectId;
+  serviceId?: string; // ✅ Reference ke Services collection
+  serviceName?: string; // ✅ Snapshot name (untuk historical accuracy)
+  servicePrice?: number; // ✅ Snapshot price (untuk historical accuracy)
+  type?: "Consultation" | "Check-up" | "Lab Results" | "Prescription";
   diagnosis: string;
   prescriptions: Prescription[];
   notes?: string;
