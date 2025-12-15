@@ -3,7 +3,9 @@ import { MongoClient, Db } from "mongodb";
 const uri = process.env.MONGODB_URI || "";
 
 if (!uri) {
-  throw new Error("Please define the MONGODB_URI environment variable inside .env.local");
+  throw new Error(
+    "Please define the MONGODB_URI environment variable inside .env.local"
+  );
 }
 
 // Extract database name from URI if specified, otherwise use default
@@ -52,11 +54,11 @@ if (process.env.NODE_ENV === "development") {
 export async function getDb(): Promise<Db> {
   const client = await clientPromise;
   const db = client.db(databaseName);
-  
+
   // Debug logging (server-side only)
   console.log(`[MongoDB] Database name: ${db.databaseName}`);
   const count = await db.collection("doctors").countDocuments();
   console.log(`[MongoDB] doctors collection count: ${count}`);
-  
+
   return db;
 }
