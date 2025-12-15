@@ -28,6 +28,27 @@ import { FadeIn, ScaleIn } from "@/components/animations";
 import { BookingDisplayType } from "@/types/bookingType";
 import { Doctor } from "@/types/docterTypes";
 
+interface DaySchedule {
+  hari: string;
+  available: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+interface DoctorSchedule {
+  _id: string;
+  doctorId: string;
+  date: string;
+  timeRange: string;
+  isAvailable: boolean;
+  firstCallTime: string | null;
+  isOnTime: boolean;
+  delayMinutes: number;
+  maxPatients: number;
+  currentPatients: number;
+  dayOfWeek: DaySchedule[];
+}
+
 export default function BookingPage({
   params,
 }: {
@@ -43,6 +64,11 @@ export default function BookingPage({
   );
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [doctorLoading, setDoctorLoading] = useState(true);
+  const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(
+    null
+  );
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<string>("");
 
   const { id } = use(params);
 
@@ -78,12 +104,67 @@ export default function BookingPage({
     }
   }, [id]);
 
-  // Debug: Track bookingData changes
+  // Fetch doctor schedule from API
   useEffect(() => {
-    console.log("📊 bookingData state updated:", bookingData);
-  }, [bookingData]);
+    const fetchDoctorSchedule = async () => {
+      try {
+        setScheduleLoading(true);
+        // Use query parameter to get schedule by doctorId
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/schedules?doctorId=${id}`
+        );
 
-  if (isLoading || doctorLoading) {
+        if (!response.ok) {
+          throw new Error("Failed to fetch doctor schedule");
+        }
+
+        const data = await response.json();
+        setDoctorSchedule(data);
+      } catch (error) {
+        console.error("Error fetching doctor schedule:", error);
+        // Don't show error popup for schedule, just use fallback
+      } finally {
+        setScheduleLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchDoctorSchedule();
+    }
+  }, [id]);
+
+  // Update timeRange when selectedDate changes
+  useEffect(() => {
+    if (selectedDate && doctorSchedule) {
+      const selected = new Date(selectedDate);
+      const dayOfWeekIndex = selected.getDay();
+      const dayOfWeekMap: { [key: number]: string } = {
+        0: "Minggu",
+        1: "Senin",
+        2: "Selasa",
+        3: "Rabu",
+        4: "Kamis",
+        5: "Jumat",
+        6: "Sabtu",
+      };
+      const selectedDayName = dayOfWeekMap[dayOfWeekIndex];
+
+      // Find schedule for selected day
+      const daySchedule = doctorSchedule.dayOfWeek.find(
+        (day) => day.hari === selectedDayName && day.available
+      );
+
+      if (daySchedule) {
+        setTimeRange(`${daySchedule.startTime} - ${daySchedule.endTime}`);
+      } else {
+        setTimeRange("");
+      }
+    } else {
+      setTimeRange("");
+    }
+  }, [selectedDate, doctorSchedule]);
+
+  if (isLoading || doctorLoading || scheduleLoading) {
     return (
       // loading spinner
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -205,8 +286,6 @@ export default function BookingPage({
     );
   }
 
-  // Get doctor's time range from defaultSchedule or use a fallback
-  const timeRange = doctor?.defaultSchedule || "09:00 - 17:00";
   const initials =
     doctor?.name
       .split(" ")
@@ -241,6 +320,77 @@ export default function BookingPage({
       });
     }
 
+    // Check if doctor is available on selected day
+    if (doctorSchedule) {
+      const dayOfWeekIndex = selected.getDay();
+      const dayOfWeekMap: { [key: number]: string } = {
+        0: "Minggu",
+        1: "Senin",
+        2: "Selasa",
+        3: "Rabu",
+        4: "Kamis",
+        5: "Jumat",
+        6: "Sabtu",
+      };
+      const selectedDayName = dayOfWeekMap[dayOfWeekIndex];
+
+      const daySchedule = doctorSchedule.dayOfWeek.find(
+        (day) => day.hari === selectedDayName && day.available
+      );
+
+      if (!daySchedule) {
+        return Swal.fire({
+          icon: "error",
+          title: "Doctor Not Available",
+          text: `Doctor is not available on ${selectedDayName}. Please select another date.`,
+        });
+      }
+
+      // Check if booking today but practice time already passed
+      const now = new Date();
+      const isToday =
+        selected.getFullYear() === now.getFullYear() &&
+        selected.getMonth() === now.getMonth() &&
+        selected.getDate() === now.getDate();
+
+      if (isToday) {
+        // Parse endTime (format: "HH:MM")
+        const [endHour, endMinute] = daySchedule.endTime.split(":").map(Number);
+        const practiceEndTime = new Date(now);
+        practiceEndTime.setHours(endHour, endMinute, 0, 0);
+
+        // Check if current time has passed the practice end time
+        if (now >= practiceEndTime) {
+          return Swal.fire({
+            icon: "error",
+            title: "Practice Time Ended",
+            text: `Doctor's practice time for today (${daySchedule.startTime} - ${daySchedule.endTime}) has already ended. Please select another date.`,
+          });
+        }
+
+        // Optional: Also check if we're too close to end time (e.g., 30 minutes buffer)
+        const thirtyMinutesBeforeEnd = new Date(practiceEndTime);
+        thirtyMinutesBeforeEnd.setMinutes(
+          thirtyMinutesBeforeEnd.getMinutes() - 30
+        );
+
+        if (now >= thirtyMinutesBeforeEnd) {
+          return Swal.fire({
+            icon: "warning",
+            title: "Limited Time",
+            text: `Doctor's practice time ends soon at ${daySchedule.endTime}. Consider booking for another day.`,
+            showCancelButton: true,
+            confirmButtonText: "Continue Anyway",
+            cancelButtonText: "Select Another Date",
+          }).then((result) => {
+            if (!result.isConfirmed) {
+              return;
+            }
+          });
+        }
+      }
+    }
+
     if (!complaint) {
       return Swal.fire({
         icon: "error",
@@ -255,26 +405,24 @@ export default function BookingPage({
   const handleBooking = async () => {
     try {
       setLoading(true);
-      // console.log("Booking confirmed:", {
-      //   selectedDate,
-      //   timeRange: timeRange,
-      //   patientComplaint,
-      // });
 
       // call API to create booking
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/booking`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          patientId: user?._id || "10" /* dummy patient ID */,
-          doctorId: id,
-          scheduleDate: selectedDate,
-          timeRange: timeRange,
-          complaint: patientComplaint,
-        }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/booking`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            patientId: user?._id || "10" /* dummy patient ID */,
+            doctorId: id,
+            scheduleDate: selectedDate,
+            timeRange: timeRange,
+            complaint: patientComplaint,
+          }),
+        }
+      );
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -466,6 +614,29 @@ export default function BookingPage({
               </div>
 
               <div className="space-y-6">
+                {/* Show available days info */}
+                {doctorSchedule &&
+                  doctorSchedule.dayOfWeek &&
+                  doctorSchedule.dayOfWeek.length > 0 && (
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                        📅 Doctor&apos;s Available Days:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {doctorSchedule.dayOfWeek
+                          .filter((day) => day.available)
+                          .map((day) => (
+                            <span
+                              key={day.hari}
+                              className="px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium"
+                            >
+                              {day.hari} ({day.startTime} - {day.endTime})
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
                     Select Date
@@ -483,22 +654,39 @@ export default function BookingPage({
                     <label className="block text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
                       Available Time
                     </label>
-                    <div className="flex items-center gap-3 p-4 bg-linear-to-br from-primary/10 to-accent/10 rounded-xl border-2 border-primary/20">
-                      <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                        <Clock className="w-5 h-5 text-white" />
+                    {timeRange ? (
+                      <div className="flex items-center gap-3 p-4 bg-linear-to-br from-primary/10 to-accent/10 rounded-xl border-2 border-primary/20">
+                        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                          <Clock className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
+                            Time Range
+                          </p>
+                          <p className="text-lg font-bold text-primary">
+                            {timeRange}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
-                          Time Range
-                        </p>
-                        <p className="text-lg font-bold text-primary">
-                          {timeRange}
-                        </p>
+                    ) : (
+                      <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border-2 border-red-200 dark:border-red-800">
+                        <div className="w-10 h-10 rounded-lg bg-red-500 flex items-center justify-center shrink-0">
+                          <Clock className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-0.5">
+                            Not Available
+                          </p>
+                          <p className="text-sm text-red-700 dark:text-red-300">
+                            Doctor is not available on this day
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      This doctor has one schedule per day. Your appointment
-                      will be scheduled within this time range.
+                      {timeRange
+                        ? "Your appointment will be scheduled within this time range."
+                        : "Please select a date when the doctor is available."}
                     </p>
                   </div>
                 )}
@@ -807,7 +995,7 @@ export default function BookingPage({
                     {bookingData?.bookingNumber || "Loading..."}
                   </p>
                 </div>
-                <div className="pb-4 border-b-2 border-border">
+                <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     Queue Number
                   </p>
@@ -815,7 +1003,7 @@ export default function BookingPage({
                     {bookingData?.queueNumber || "Loading..."}
                   </p>
                 </div>
-                <div>
+                {/* <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     Appointment Details
                   </p>
@@ -825,7 +1013,7 @@ export default function BookingPage({
                   <p className="text-sm text-muted-foreground">
                     {selectedDate} ({timeRange})
                   </p>
-                </div>
+                </div> */}
               </div>
 
               <Link href="/my-queue">
