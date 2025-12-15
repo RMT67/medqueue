@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Card } from "@/components/ui/card"
@@ -12,69 +12,87 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn, StaggerChildren } from "@/components/animations"
 import { ReviewDoctorModal } from "@/components/review-doctor-modal"
 
-// Mock data
-const APPOINTMENTS = [
-  {
-    id: "1",
-    date: "Dec 5, 2024",
-    time: "10:30 AM",
-    doctor: "Dr. Sarah Johnson",
-    specialization: "General Practitioner",
-    clinic: "Central Health Clinic",
-    status: "completed",
-    rating: 4.8,
-    reviews: 156,
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "2",
-    date: "Nov 15, 2024",
-    time: "02:00 PM",
-    doctor: "Dr. Michael Chen",
-    specialization: "Cardiologist",
-    clinic: "Heart Care Medical Center",
-    status: "completed",
-    rating: 4.9,
-    reviews: 203,
-    image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "3",
-    date: "Oct 28, 2024",
-    time: "09:00 AM",
-    doctor: "Dr. Priya Patel",
-    specialization: "Pediatrician",
-    clinic: "Kids Wellness Clinic",
-    status: "completed",
-    rating: 4.7,
-    reviews: 128,
-    image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "4",
-    date: "Dec 10, 2024",
-    time: "11:00 AM",
-    doctor: "Dr. Sarah Johnson",
-    specialization: "General Practitioner",
-    clinic: "Central Health Clinic",
-    status: "upcoming",
-    rating: null,
-    reviews: null,
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-  },
-]
+interface Appointment {
+  bookingId: string
+  bookingNumber: string
+  date: string
+  formattedDate: string
+  time: string
+  appointmentTime: string
+  status: string
+  statusDisplay: "upcoming" | "completed" | "cancelled"
+  doctor: {
+    doctorId: string
+    name: string
+    specialization: string
+    clinic: string
+    rating: number
+    totalReviews: number
+    image: string
+  } | null
+  service: {
+    serviceId: string
+    name: string
+    category: string
+    price: number
+  } | null
+  complaint: string
+  queueNumber: string | null
+  hasReview: boolean
+  review: {
+    reviewId: string
+    rating: number
+    comment: string
+    createdAt: string
+  } | null
+  hasMedicalRecord: boolean
+  hasInvoice: boolean
+  invoiceId: string | null
+}
 
 export default function MyAppointmentsPage() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [filter, setFilter] = useState<"all" | "upcoming" | "completed" | "cancelled">("all")
   const [showReviewModal, setShowReviewModal] = useState(false)
-  const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredAppointments = APPOINTMENTS.filter((appointment) => {
-    if (filter === "all") return true
-    return appointment.status === filter
-  })
+  // ✅ Fetch appointments from API
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const token = localStorage.getItem("medqueue_token")
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
+        const params = new URLSearchParams()
+        if (filter !== "all") params.append("status", filter)
+
+        const response = await fetch(`/api/patient/appointments?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setAppointments(data.appointments || [])
+        } else {
+          console.error("Failed to fetch appointments")
+        }
+      } catch (error) {
+        console.error("Error fetching appointments:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAppointments()
+  }, [filter])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -200,125 +218,149 @@ export default function MyAppointmentsPage() {
           </FadeIn>
 
           {/* Appointments List */}
-          {filteredAppointments.length > 0 ? (
+          {isLoading ? (
+            <FadeIn direction="up" delay={0}>
+              <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+                <div className="max-w-md mx-auto">
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                    <Calendar className="w-12 h-12 text-muted-foreground animate-pulse" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-foreground mb-4">Loading...</h3>
+                  <p className="text-muted-foreground">Fetching your appointments</p>
+                </div>
+              </Card>
+            </FadeIn>
+          ) : appointments.length > 0 ? (
             <StaggerChildren staggerDelay={50}>
               <div className="space-y-4">
-                {filteredAppointments.map((appointment) => (
-                  <Card
-                    key={appointment.id}
-                    className="p-8 border border-border/50 hover:shadow-2xl transition-all duration-500 bg-card/95 backdrop-blur-sm hover:border-primary/30 group"
-                  >
-                    <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
-                      {/* Date & Time */}
-                      <div className="flex items-center gap-5 flex-shrink-0">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex flex-col items-center justify-center text-white shadow-xl ring-4 ring-primary/10">
-                          <span className="text-xs font-semibold">
-                            {appointment.date.split(" ")[0]}
-                          </span>
-                          <span className="text-3xl font-bold">
-                            {appointment.date.split(" ")[1].replace(",", "")}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2.5 text-sm text-muted-foreground mb-2">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
-                              <Clock className="w-4 h-4 text-primary" />
-                            </div>
-                            <span className="font-semibold">{appointment.time}</span>
+                {appointments.map((appointment) => {
+                  const initials = appointment.doctor
+                    ? appointment.doctor.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                    : "DR"
+
+                  return (
+                    <Card
+                      key={appointment.bookingId}
+                      className="p-8 border border-border/50 hover:shadow-2xl transition-all duration-500 bg-card/95 backdrop-blur-sm hover:border-primary/30 group"
+                    >
+                      <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
+                        {/* Date & Time */}
+                        <div className="flex items-center gap-5 flex-shrink-0">
+                          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex flex-col items-center justify-center text-white shadow-xl ring-4 ring-primary/10">
+                            <span className="text-xs font-semibold">
+                              {appointment.formattedDate.split(" ")[0]}
+                            </span>
+                            <span className="text-3xl font-bold">
+                              {appointment.formattedDate.split(" ")[1].replace(",", "")}
+                            </span>
                           </div>
-                          <div className="text-xs text-muted-foreground font-medium">{appointment.date}</div>
-                        </div>
-                      </div>
-
-                      {/* Doctor Photo & Info */}
-                      <div className="flex items-start gap-5 flex-1 min-w-0">
-                        {/* Doctor Photo */}
-                        <div className="relative w-28 h-28 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-lg ring-2 ring-primary/10 group-hover:ring-primary/20 transition-all">
-                          {appointment.image ? (
-                            <>
-                              <Image
-                                src={appointment.image}
-                                alt={appointment.doctor}
-                                fill
-                                unoptimized
-                                className="object-cover group-hover:scale-110 transition-transform duration-500"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.style.display = 'none'
-                                  const parent = target.parentElement
-                                  if (parent) {
-                                    const fallback = parent.querySelector('.image-fallback') as HTMLElement
-                                    if (fallback) fallback.style.display = 'flex'
-                                  }
-                                }}
-                              />
-                              <div className="image-fallback hidden w-full h-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-2xl">
-                                {appointment.doctor
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .toUpperCase()}
+                          <div>
+                            <div className="flex items-center gap-2.5 text-sm text-muted-foreground mb-2">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                                <Clock className="w-4 h-4 text-primary" />
                               </div>
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-2xl">
-                              {appointment.doctor
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .toUpperCase()}
+                              <span className="font-semibold">{appointment.time}</span>
                             </div>
-                          )}
-                        </div>
-
-                        {/* Doctor Info */}
-                        <div className="flex-1 min-w-0 flex flex-col justify-between">
-                          <div className="flex items-start justify-between gap-4 mb-4">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors duration-300">
-                                {appointment.doctor}
-                              </h3>
-                              <p className="text-sm text-primary font-semibold mb-3">{appointment.specialization}</p>
-                              <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                                <MapPin className="w-4 h-4 flex-shrink-0 text-primary" />
-                                <span className="truncate font-medium">{appointment.clinic}</span>
-                              </div>
-                            </div>
-                            <div className="flex-shrink-0">
-                              {getStatusBadge(appointment.status)}
-                            </div>
+                            <div className="text-xs text-muted-foreground font-medium">{appointment.formattedDate}</div>
                           </div>
+                        </div>
 
-                          {/* Rating and Review Button for completed appointments */}
-                          {appointment.status === "completed" && (
-                            <div className="flex items-center justify-between gap-4">
-                              {appointment.rating && (
-                                <div className="flex items-center gap-1.5">
-                                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-base font-bold text-foreground">{appointment.rating}</span>
-                                  {appointment.reviews && (
-                                    <span className="text-sm text-muted-foreground">({appointment.reviews})</span>
-                                  )}
+                        {/* Doctor Photo & Info */}
+                        <div className="flex items-start gap-5 flex-1 min-w-0">
+                          {/* Doctor Photo */}
+                          <div className="relative w-28 h-28 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-lg ring-2 ring-primary/10 group-hover:ring-primary/20 transition-all">
+                            {appointment.doctor?.image ? (
+                              <>
+                                <Image
+                                  src={appointment.doctor.image}
+                                  alt={appointment.doctor.name}
+                                  fill
+                                  unoptimized
+                                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = 'none'
+                                    const parent = target.parentElement
+                                    if (parent) {
+                                      const fallback = parent.querySelector('.image-fallback') as HTMLElement
+                                      if (fallback) fallback.style.display = 'flex'
+                                    }
+                                  }}
+                                />
+                                <div className="image-fallback hidden w-full h-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-2xl">
+                                  {initials}
                                 </div>
-                              )}
-                              <Button
-                                onClick={() => {
-                                  setSelectedDoctor(appointment.doctor)
-                                  setShowReviewModal(true)
-                                }}
-                                variant="outline"
-                                className="flex-shrink-0 border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
-                              >
-                                <MessageSquare className="w-4 h-4" />
-                                Review Doctor
-                              </Button>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-2xl">
+                                {initials}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Doctor Info */}
+                          <div className="flex-1 min-w-0 flex flex-col justify-between">
+                            <div className="flex items-start justify-between gap-4 mb-4">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors duration-300">
+                                  {appointment.doctor?.name || "Unknown Doctor"}
+                                </h3>
+                                <p className="text-sm text-primary font-semibold mb-3">
+                                  {appointment.doctor?.specialization || ""}
+                                </p>
+                                <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                                  <MapPin className="w-4 h-4 flex-shrink-0 text-primary" />
+                                  <span className="truncate font-medium">
+                                    {appointment.doctor?.clinic || ""}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0">
+                                {getStatusBadge(appointment.statusDisplay)}
+                              </div>
                             </div>
-                          )}
+
+                            {/* Rating and Review Button for completed appointments */}
+                            {appointment.statusDisplay === "completed" && (
+                              <div className="flex items-center justify-between gap-4">
+                                {appointment.doctor && appointment.doctor.rating > 0 && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                    <span className="text-base font-bold text-foreground">
+                                      {appointment.doctor.rating.toFixed(1)}
+                                    </span>
+                                    {appointment.doctor.totalReviews > 0 && (
+                                      <span className="text-sm text-muted-foreground">
+                                        ({appointment.doctor.totalReviews})
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {!appointment.hasReview && (
+                                  <Button
+                                    onClick={() => {
+                                      setSelectedAppointment(appointment)
+                                      setShowReviewModal(true)
+                                    }}
+                                    variant="outline"
+                                    className="flex-shrink-0 border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                                  >
+                                    <MessageSquare className="w-4 h-4" />
+                                    Review Doctor
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  )
+                })}
               </div>
             </StaggerChildren>
           ) : (
@@ -353,19 +395,60 @@ export default function MyAppointmentsPage() {
           )}
 
           {/* Review Doctor Modal */}
-          {selectedDoctor && (
+          {selectedAppointment && selectedAppointment.doctor && (
             <ReviewDoctorModal
               isOpen={showReviewModal}
               onClose={() => {
                 setShowReviewModal(false)
-                setSelectedDoctor(null)
+                setSelectedAppointment(null)
               }}
-              doctorName={selectedDoctor}
-              onSubmit={(rating, feedback) => {
-                console.log("Rating submitted for", selectedDoctor, ":", rating, feedback)
-                // TODO: Implement API call to submit review
-                setShowReviewModal(false)
-                setSelectedDoctor(null)
+              doctorName={selectedAppointment.doctor.name}
+              onSubmit={async (rating, feedback) => {
+                try {
+                  const token = localStorage.getItem("medqueue_token")
+                  if (!token) {
+                    console.error("No token found")
+                    return
+                  }
+
+                  const response = await fetch("/api/patient/reviews", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      bookingId: selectedAppointment.bookingId,
+                      doctorId: selectedAppointment.doctor.doctorId,
+                      rating: rating,
+                      comment: feedback || "",
+                    }),
+                  })
+
+                  if (response.ok) {
+                    // Refresh appointments to show updated review status
+                    const params = new URLSearchParams()
+                    if (filter !== "all") params.append("status", filter)
+                    const refreshResponse = await fetch(`/api/patient/appointments?${params.toString()}`, {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                      },
+                    })
+                    if (refreshResponse.ok) {
+                      const data = await refreshResponse.json()
+                      setAppointments(data.appointments || [])
+                    }
+                    setShowReviewModal(false)
+                    setSelectedAppointment(null)
+                  } else {
+                    const error = await response.json()
+                    console.error("Failed to submit review:", error)
+                    alert(error.error || "Failed to submit review")
+                  }
+                } catch (error) {
+                  console.error("Error submitting review:", error)
+                  alert("Failed to submit review")
+                }
               }}
             />
           )}
