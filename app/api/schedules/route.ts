@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import DoctorScheduleModel from "@/db/models/DoctorScheduleModel";
+import { DoctorWithSchedule, DaySchedule } from "@/types/scheduleTypes";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const doctorId = searchParams.get("doctorId");
+    const day = searchParams.get("day");
 
     if (doctorId) {
       const schedule = await DoctorScheduleModel.getScheduleByDoctorId(
@@ -22,8 +24,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all schedules with doctor info
-    const schedulesWithDoctorInfo =
+    const schedulesWithDoctorInfo: DoctorWithSchedule[] =
       await DoctorScheduleModel.getSchedulesWithDoctorInfo();
+
+    // Filter by day if provided
+    if (day) {
+      const filteredSchedules = schedulesWithDoctorInfo.filter((schedule) => {
+        return schedule.dayOfWeek.some(
+          (daySchedule: DaySchedule) =>
+            daySchedule.hari === day && daySchedule.availabel
+        );
+      });
+      return NextResponse.json(filteredSchedules);
+    }
 
     return NextResponse.json(schedulesWithDoctorInfo);
   } catch (error) {

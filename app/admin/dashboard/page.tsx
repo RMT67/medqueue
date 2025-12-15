@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { DoctorAdmin } from "@/types/docterTypes";
+import { DoctorWithSchedule } from "@/types/scheduleTypes";
 import { OverviewTab } from "./OverviewTab";
 
 interface DashboardStats {
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
     completedVisits: 0,
   });
   const [doctors, setDoctors] = useState<DoctorAdmin[]>([]);
+  const [schedules, setSchedules] = useState<DoctorWithSchedule[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,60 +35,112 @@ export default function AdminDashboard() {
     }
   }, [user, isLoading, router]);
 
-  useEffect(() => {
-    if (user && user.role === "admin") {
-      fetchDashboardData();
-    }
-  }, [user]);
+  const getTodayDayName = (): string => {
+    const days = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+    const today = new Date();
+    return days[today.getDay()];
+  };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch doctors data
-      const doctorsResponse = await fetch("/api/doctor");
-      if (doctorsResponse.ok) {
-        const doctorsData = await doctorsResponse.json();
+      // Get today's day name in Indonesian
+      const todayDay = getTodayDayName();
 
-        // Ensure doctorsData is an array
-        const doctorsArray = Array.isArray(doctorsData) ? doctorsData : [];
-        setDoctors(doctorsArray);
+      // Fetch schedules filtered by today's day from API
+      const schedulesResponse = await fetch(
+        `/api/schedules?day=${encodeURIComponent(todayDay)}`
+      );
 
-        // Calculate stats from doctors data
-        const activeDocs = doctorsArray.filter(
-          (d: DoctorAdmin) => d.status === "online"
-        );
-        const totalPatients = activeDocs.reduce(
-          (sum: number, d: DoctorAdmin) => sum + (d.todayPatients || 0),
-          0
-        );
-        const completedVisits = activeDocs.reduce(
-          (sum: number, d: DoctorAdmin) => sum + (d.completedToday || 0),
-          0
-        );
-        const avgWait =
-          activeDocs.length > 0
-            ? Math.round(
-                activeDocs.reduce(
-                  (sum: number, d: DoctorAdmin) => sum + (d.avgWaitTime || 0),
-                  0
-                ) / activeDocs.length
-              )
-            : 0;
+      if (schedulesResponse.ok) {
+        const todaySchedules = await schedulesResponse.json();
 
-        setStats({
-          totalPatients,
-          avgWaitTime: `${avgWait} min`,
-          activeDoctors: activeDocs.length,
-          completedVisits,
-        });
+        // Ensure data is array
+        const schedulesArray = Array.isArray(todaySchedules)
+          ? todaySchedules
+          : [];
+
+        setSchedules(schedulesArray);
+
+        // Get doctor IDs who have schedules today
+        const doctorIdsWithScheduleToday = schedulesArray.map(
+          (schedule: DoctorWithSchedule) => schedule.doctorId
+        );
+
+        if (doctorIdsWithScheduleToday.length > 0) {
+          // Fetch only doctors who have schedules today
+          const doctorsResponse = await fetch(
+            `/api/doctor?doctorIds=${doctorIdsWithScheduleToday.join(",")}`
+          );
+
+          if (doctorsResponse.ok) {
+            const doctorsData = await doctorsResponse.json();
+            const doctorsArray = Array.isArray(doctorsData.doctors)
+              ? doctorsData.doctors
+              : [];
+
+            setDoctors(doctorsArray);
+
+            // Calculate stats from active doctors with schedules
+            const totalPatients = doctorsArray.reduce(
+              (sum: number, d: DoctorAdmin) => sum + (d.todayPatients || 0),
+              0
+            );
+            const completedVisits = doctorsArray.reduce(
+              (sum: number, d: DoctorAdmin) => sum + (d.completedToday || 0),
+              0
+            );
+            const avgWait =
+              doctorsArray.length > 0
+                ? Math.round(
+                    doctorsArray.reduce(
+                      (sum: number, d: DoctorAdmin) =>
+                        sum + (d.avgWaitTime || 0),
+                      0
+                    ) / doctorsArray.length
+                  )
+                : 0;
+
+            setStats({
+              totalPatients,
+              avgWaitTime: `${avgWait} min`,
+              activeDoctors: doctorsArray.length,
+              completedVisits,
+            });
+          }
+        } else {
+          // No schedules for today
+          setDoctors([]);
+          setSchedules([]);
+          setStats({
+            totalPatients: 0,
+            avgWaitTime: "0 min",
+            activeDoctors: 0,
+            completedVisits: 0,
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user && user.role === "admin") {
+      fetchDashboardData();
+    }
+  }, [user, fetchDashboardData]);
 
   if (isLoading || loading) {
     return (
@@ -102,9 +156,8 @@ export default function AdminDashboard() {
   if (!user) {
     return null;
   }
-
   return (
-    <div className="min-h-screen bg-liniaer-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <Navigation
         isAuthenticated={true}
         userRole="admin"
@@ -120,7 +173,7 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
         <AdminTabs />
 
-        <OverviewTab stats={stats} doctors={doctors} />
+        <OverviewTab stats={stats} doctors={doctors} schedules={schedules} />
       </main>
     </div>
   );
