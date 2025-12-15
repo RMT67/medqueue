@@ -1,78 +1,110 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Calendar, Edit2 } from "lucide-react";
-import { DoctorAdmin } from "@/types/docterTypes";
+import { Calendar as CalendarIcon, List } from "lucide-react";
+import { CalendarView } from "./CalendarView";
+import Image from "next/image";
+import { DoctorWithSchedule } from "@/types/scheduleTypes";
 
 interface ScheduleTabProps {
-  doctors: DoctorAdmin[];
+  schedules: DoctorWithSchedule[];
 }
 
-export function ScheduleTab({ doctors }: ScheduleTabProps) {
+export function ScheduleTab({ schedules }: ScheduleTabProps) {
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+
+  if (schedules.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-muted-foreground">No schedules found</p>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
-          <Calendar className="w-5 h-5 text-white" />
+      {/* View Toggle */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setViewMode("calendar")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+            viewMode === "calendar"
+              ? "bg-primary text-white border-primary"
+              : "bg-card border-border hover:border-primary/50"
+          }`}
+        >
+          <CalendarIcon className="w-4 h-4" />
+          <span className="text-sm font-medium">Calendar View</span>
+        </button>
+        <button
+          onClick={() => setViewMode("list")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+            viewMode === "list"
+              ? "bg-primary text-white border-primary"
+              : "bg-card border-border hover:border-primary/50"
+          }`}
+        >
+          <List className="w-4 h-4" />
+          <span className="text-sm font-medium">List View</span>
+        </button>
+      </div>
+
+      {/* Content */}
+      {viewMode === "calendar" ? (
+        <CalendarView schedules={schedules} />
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          {schedules.map((schedule) => (
+            <Card
+              key={schedule._id}
+              className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm hover:shadow-2xl transition-all"
+            >
+              <div className="flex items-start gap-4 mb-4">
+                {schedule.doctorInfo.image && (
+                  <Image
+                    src={schedule.doctorInfo.image}
+                    alt={schedule.doctorInfo.name}
+                    width={64}
+                    height={64}
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                )}
+                <div className="flex-1">
+                  <h3 className="font-bold text-foreground text-xl mb-1">
+                    {schedule.doctorInfo.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    {schedule.doctorInfo.specialization}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {schedule.doctorInfo.clinic}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {schedule.dayOfWeek
+                  .filter((day) => day.availabel)
+                  .map((day, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center p-3 bg-muted/30 rounded-lg"
+                    >
+                      <span className="text-sm font-medium">{day.hari}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {day.startTime} - {day.endTime}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+
+              <div className="mt-4 pt-4 border-t flex justify-between text-sm">
+                <span className="text-muted-foreground">Max Patients:</span>
+                <span className="font-bold">{schedule.maxPatients}</span>
+              </div>
+            </Card>
+          ))}
         </div>
-        <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
-          Doctor Schedules
-        </h2>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        {doctors.map((doctor) => (
-          <Card
-            key={doctor._id.toString()}
-            className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm hover:shadow-2xl transition-all"
-          >
-            <div className="flex justify-between items-start mb-5 pb-5 border-b-2 border-border">
-              <div>
-                <h3 className="font-bold text-foreground text-xl mb-1">
-                  {doctor.name}
-                </h3>
-                <p className="text-sm text-muted-foreground font-medium">
-                  {doctor.specialization}
-                </p>
-              </div>
-              <button
-                className="p-2 hover:bg-primary/10 rounded-lg transition-all border border-transparent hover:border-primary/20 hover:scale-105"
-                title="Edit Schedule"
-              >
-                <Edit2 className="w-5 h-5 text-primary" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="p-4 bg-linear-to-br from-primary/5 to-accent/5 rounded-xl border-2 border-primary/20">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5" /> Monday - Friday
-                </p>
-                <p className="text-sm font-bold text-foreground">
-                  09:00 - 17:00
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  1 hour lunch break at 12:00
-                </p>
-              </div>
-              <div className="p-4 bg-muted/50 rounded-xl border-2 border-border">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                  Saturday
-                </p>
-                <p className="text-sm font-bold text-foreground">
-                  09:00 - 13:00
-                </p>
-              </div>
-              <div className="p-4 bg-muted/50 rounded-xl border-2 border-border">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                  Sunday
-                </p>
-                <p className="text-sm font-bold text-muted-foreground">
-                  Closed
-                </p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      )}
     </div>
   );
 }
