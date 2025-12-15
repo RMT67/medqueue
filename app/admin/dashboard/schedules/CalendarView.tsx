@@ -7,7 +7,7 @@ interface CalendarViewProps {
   schedules: DoctorWithSchedule[];
 }
 
-const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+const DAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const TIME_SLOTS = [
   "08:00",
   "09:00",

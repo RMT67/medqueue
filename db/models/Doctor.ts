@@ -26,7 +26,7 @@ export default class DoctorModel {
     };
     try {
       const collection = await this.collection();
-      await collection.insertOne(doctorData as any);
+      await collection.insertOne(doctorData as Omit<Doctor, "_id">);
       return doctorData;
     } catch (err) {
       throw err;

@@ -26,36 +26,41 @@ export default class DoctorScheduleModel {
 
   static async getSchedulesWithDoctorInfo() {
     const db = await getDb();
-    const collection = db.collection("doctorSchedules");
+    const doctorsCollection = db.collection("doctors");
 
-    return collection
+    return doctorsCollection
       .aggregate([
         {
           $lookup: {
-            from: "doctors",
-            localField: "doctorId",
-            foreignField: "_id",
-            as: "doctorInfo",
+            from: "doctorSchedules",
+            localField: "_id",
+            foreignField: "doctorId",
+            as: "schedules",
           },
         },
         {
-          $unwind: "$doctorInfo",
+          $unwind: {
+            path: "$schedules",
+            preserveNullAndEmptyArrays: false,
+          },
         },
         {
           $project: {
-            _id: 1,
-            doctorId: 1,
-            dayOfWeek: 1,
-            timeRange: 1,
-            isAvailable: 1,
-            firstCallTime: 1,
-            isOnTime: 1,
-            delayMinutes: 1,
-            maxPatients: 1,
-            "doctorInfo.name": 1,
-            "doctorInfo.specialization": 1,
-            "doctorInfo.clinic": 1,
-            "doctorInfo.image": 1,
+            _id: "$schedules._id",
+            doctorId: "$_id",
+            dayOfWeek: "$schedules.dayOfWeek",
+            timeRange: "$schedules.timeRange",
+            isAvailable: "$schedules.isAvailable",
+            firstCallTime: "$schedules.firstCallTime",
+            isOnTime: "$schedules.isOnTime",
+            delayMinutes: "$schedules.delayMinutes",
+            maxPatients: "$schedules.maxPatients",
+            doctorInfo: {
+              name: "$name",
+              specialization: "$specialization",
+              clinic: "$clinic",
+              image: "$image",
+            },
           },
         },
       ])
