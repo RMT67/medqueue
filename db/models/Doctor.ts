@@ -45,8 +45,14 @@ export default class DoctorModel {
     const query: any = {};
 
     // Default to active doctors for public access
-    if (filter.isActive !== undefined) query.isActive = filter.isActive;
-    else query.isActive = true;
+    if (filter.isActive !== undefined) {
+      query.$or = [
+        { isActive: filter.isActive },
+        ...(filter.isActive === true ? [{ isActive: { $exists: false } }] : []),
+      ];
+    } else {
+      query.$or = [{ isActive: true }, { isActive: { $exists: false } }];
+    }
 
     // Search keyword (q) - search in name, clinic, specialization
     if (filter.q && filter.q.trim()) {
@@ -106,8 +112,14 @@ export default class DoctorModel {
     const collection = await this.collection();
     const query: any = {};
 
-    if (filter.isActive !== undefined) query.isActive = filter.isActive;
-    else query.isActive = true;
+    if (filter.isActive !== undefined) {
+      query.$or = [
+        { isActive: filter.isActive },
+        ...(filter.isActive === true ? [{ isActive: { $exists: false } }] : []),
+      ];
+    } else {
+      query.$or = [{ isActive: true }, { isActive: { $exists: false } }];
+    }
 
     if (filter.q && filter.q.trim()) {
       const safeQ = escapeRegex(filter.q.trim());
