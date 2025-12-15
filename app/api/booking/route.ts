@@ -11,37 +11,90 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as BookingType;
 
-    // firstly validate the queue of the doctor on that date and timeRange
     // 1. get data schedules from doctorschedules collection by doctorId
     const schedules = (await ScheduleModel.getByDoctorId(
       body.doctorId.toString()
     )) as DoctorScheduleType;
-    // 2. get data avaerage time per patient => this data should be in doctors colection, if averageTimePerPatient in data is null, set default 15 minutes
-    const doctor = (await DoctorModel.getDoctorById(
-      body.doctorId.toString()
-    )) as Doctor;
-    const averageTimePerPatient = doctor?.averageTimePerPatient || 15;
-    // 3. get data currentPatient => this data should be in doctorschedules collection
-    const currentPatient = schedules?.currentPatients || 0;
-    // 4. calculate maxPatient = timeRange / averageTimePerPatient
-    const timeRangeParts = schedules.timeRange.split("-");
-    // sample data time range "08:30-12:00"
-    const startTimeParts = timeRangeParts[0].split(":");
-    const endTimeParts = timeRangeParts[1].split(":");
-    const startTime =
-      parseInt(startTimeParts[0], 10) + parseInt(startTimeParts[1], 10) / 60;
-    const endTime =
-      parseInt(endTimeParts[0], 10) + parseInt(endTimeParts[1], 10) / 60;
-    const totalHours = endTime - startTime;
-    const maxPatient = Math.floor((totalHours * 60) / averageTimePerPatient);
-    // 5. if currentPatient >= maxPatient, return error "No available queue for this time range"
-    if (currentPatient >= maxPatient) {
+
+    if (!schedules) {
       return NextResponse.json(
-        { message: "No available queue for this time range" },
+        { message: "Doctor schedule not found" },
+        { status: 404 }
+      );
+    }
+
+    // 2. Validate if doctor is available on the selected day
+    const selectedDate = new Date(body.scheduleDate);
+    const dayOfWeekIndex = selectedDate.getDay(); // 0 (Sunday) to 6 (Saturday)
+    const dayOfWeekMap: { [key: number]: string } = {
+      0: "Minggu",
+      1: "Senin",
+      2: "Selasa",
+      3: "Rabu",
+      4: "Kamis",
+      5: "Jumat",
+      6: "Sabtu",
+    };
+    const selectedDayOfWeek = dayOfWeekMap[dayOfWeekIndex];
+
+    const daySchedule = schedules.dayOfWeek.find(
+      (day) => day.hari === selectedDayOfWeek
+    );
+
+    if (!daySchedule || !daySchedule.availabel) {
+      return NextResponse.json(
+        { message: `Doctor is not available on ${selectedDayOfWeek}` },
         { status: 400 }
       );
     }
 
+    // 3. get data average time per patient => from doctors collection, default 15 minutes
+    const doctor = (await DoctorModel.getDoctorById(
+      body.doctorId.toString()
+    )) as Doctor;
+
+    if (!doctor) {
+      return NextResponse.json(
+        { message: "Doctor not found" },
+        { status: 404 }
+      );
+    }
+
+    const averageTimePerPatient = doctor?.averageTimePerPatient || 15;
+
+    // 4. get currentPatient = count of CONFIRMED/PENDING bookings for that doctor ON THAT DATE
+    const allBookingsForDoctor = await Booking.findByDoctorId(
+      body.doctorId.toString()
+    );
+
+    // Filter bookings: same date AND not cancelled
+    const bookingsOnDate = allBookingsForDoctor.filter((booking) => {
+      const bookingDate = new Date(booking.scheduleDate);
+      const isSameDate =
+        bookingDate.getFullYear() === selectedDate.getFullYear() &&
+        bookingDate.getMonth() === selectedDate.getMonth() &&
+        bookingDate.getDate() === selectedDate.getDate();
+      const isNotCancelled = booking.status !== "cancelled";
+      return isSameDate && isNotCancelled;
+    });
+
+    const currentPatient = bookingsOnDate.length;
+
+    // 5. get maxPatient from schedule
+    const maxPatient = schedules.maxPatients;
+
+    // 6. if currentPatient >= maxPatient, return error
+    if (currentPatient >= maxPatient) {
+      return NextResponse.json(
+        {
+          message:
+            "No available queue for this date. Maximum patients reached.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 7. Create booking
     const booking = await Booking.create(
       {
         patientId: body.patientId,
@@ -50,7 +103,8 @@ export async function POST(req: Request) {
         timeRange: body.timeRange,
         complaint: body.complaint,
       },
-      averageTimePerPatient
+      averageTimePerPatient,
+      bookingsOnDate // pass existing bookings to avoid re-querying
     );
     return NextResponse.json(
       {

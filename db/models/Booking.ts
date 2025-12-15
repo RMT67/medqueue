@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { ObjectId, WithId, Document } from "mongodb";
 import { getDb } from "../config/mongodb";
 
 import { BookingType } from "@/types/bookingType";
@@ -11,7 +11,11 @@ export default class BookingModel {
     return db.collection("bookings");
   }
 
-  static async create(bookingData: BookingType, averageTimePerPatient: number) {
+  static async create(
+    bookingData: BookingType,
+    averageTimePerPatient: number,
+    existingBookingsOnDate?: WithId<Document>[] // optional: bookings already filtered by date
+  ) {
     // get last booking number
     const collection = await this.collection();
     const lastBooking = await collection
@@ -56,20 +60,56 @@ export default class BookingModel {
     }
 
     // appointmentTime, set based on last queue number for that doctor on that date
-    // 1. find all bookings for that doctor on that date, using static method findByDoctorId
-    const bookingsForDoctor = await this.findByDoctorId(
-      bookingData.doctorId.toString()
-    );
+    // 1. Use existing bookings if provided, otherwise query from database
+    let bookingsOnDate: WithId<Document>[] = existingBookingsOnDate || [];
+
+    if (!existingBookingsOnDate) {
+      const bookingsForDoctor = await this.findByDoctorId(
+        bookingData.doctorId.toString()
+      );
+      bookingsOnDate = bookingsForDoctor.filter((booking) => {
+        const bookingDate = new Date(booking.scheduleDate as Date);
+        const targetDate = new Date(bookingData.scheduleDate);
+        const isSameDate =
+          bookingDate.getFullYear() === targetDate.getFullYear() &&
+          bookingDate.getMonth() === targetDate.getMonth() &&
+          bookingDate.getDate() === targetDate.getDate();
+        const isNotCancelled = booking.status !== "cancelled";
+        return isSameDate && isNotCancelled;
+      });
+    }
     // 2. get average time per patient for that doctor => this data should be in doctors collection, if averageTimePerPatient in data is null, set default 15 minutes
     // (averageTimePerPatient is passed as parameter)
     // 3. appointmentTime is sum of last appointmentTime + average time per patient
     // if no previous booking, set appointmentTime to schedule firstCallTime
-    if (bookingsForDoctor.length === 0) {
-      bookingData
+    if (bookingsOnDate.length === 0) {
+      bookingData.appointmentTime = new Date(bookingData.scheduleDate);
+      const [startHour, startMinute] = schedule.timeRange
+        .split(" - ")[0]
+        .split(":")
+        .map(Number);
+      bookingData.appointmentTime.setHours(startHour, startMinute, 0, 0);
+    } else {
+      // get last booking appointmentTime
+      const lastBookingOnDate = bookingsOnDate.reduce((latest, current) => {
+        const latestTime = new Date(
+          (latest.appointmentTime as Date) || (latest.scheduleDate as Date)
+        ).getTime();
+        const currentTime = new Date(
+          (current.appointmentTime as Date) || (current.scheduleDate as Date)
+        ).getTime();
+        return currentTime > latestTime ? current : latest;
+      });
+      const lastAppointmentTime = new Date(
+        (lastBookingOnDate.appointmentTime as Date) || 
+        (lastBookingOnDate.scheduleDate as Date)
+      );
+      lastAppointmentTime.setMinutes(
+        lastAppointmentTime.getMinutes() + averageTimePerPatient
+      );
+      bookingData.appointmentTime = lastAppointmentTime;
     }
-    // if there are previous bookings, get last booking appointmentTime and add averageTimePerPatient
     // 4. make real time, if previous booking got cancelled, skip that time slot
-    // 5. if booking successful, increment currentPatient in doctorschedules collection
 
     // get last queue number
     let queueNumber;
