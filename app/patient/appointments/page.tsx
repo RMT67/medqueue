@@ -48,6 +48,7 @@ interface Appointment {
   hasMedicalRecord: boolean
   hasInvoice: boolean
   invoiceId: string | null
+  invoiceStatus: string | null
 }
 
 export default function MyAppointmentsPage() {
@@ -385,7 +386,7 @@ export default function MyAppointmentsPage() {
                             {/* Action Buttons */}
                             <div className="pt-4 border-t border-border/50 flex flex-wrap items-center gap-3">
                               {/* Rating and Review for completed appointments */}
-                              {appointment.statusDisplay === "completed" && (
+                              {appointment.statusDisplay === "completed" && appointment.invoiceStatus === "paid" && (
                                 <>
                                   {appointment.doctor && appointment.doctor.rating > 0 && (
                                     <div className="flex items-center gap-1.5">
@@ -564,4 +565,3 @@ export default function MyAppointmentsPage() {
     </ProtectedRoute>
   )
 }
-

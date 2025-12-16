@@ -4,6 +4,7 @@ import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
 import ReviewModel from "@/db/models/Review";
 import DoctorModel from "@/db/models/Doctor";
+import InvoiceModel from "@/db/models/Invoice";
 
 interface CreateReviewRequest {
   bookingId: string;
@@ -14,13 +15,10 @@ interface CreateReviewRequest {
 
 export async function POST(req: Request) {
   try {
-    // ✅ 1. Authentication
+    // バ. 1. Authentication
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId, role } = verifyToken(authHeader);
@@ -31,11 +29,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 2. Get request body
+    // バ. 2. Get request body
     const body: CreateReviewRequest = await req.json();
     const { bookingId, doctorId, rating, comment } = body;
 
-    // ✅ 3. Validate required fields
+    // バ. 3. Validate required fields
     if (!bookingId || !doctorId || !rating) {
       return NextResponse.json(
         { error: "bookingId, doctorId, and rating are required" },
@@ -43,7 +41,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 4. Validate rating (1-5)
+    // バ. 4. Validate rating (1-5)
     if (rating < 1 || rating > 5) {
       return NextResponse.json(
         { error: "Rating must be between 1 and 5" },
@@ -51,12 +49,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 5. Validate booking exists and belongs to patient
+    // バ. 5. Validate booking exists and belongs to patient
     const db = await getDb();
     const bookingsCollection = db.collection("bookings");
     const booking = await bookingsCollection.findOne({
       _id: new ObjectId(bookingId),
-      patientId: new ObjectId(userId)
+      patientId: new ObjectId(userId),
     });
 
     if (!booking) {
@@ -66,7 +64,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 6. Validate booking is completed
+    // バ. 6. Validate booking is completed
     if (booking.status !== "completed") {
       return NextResponse.json(
         { error: "Can only review completed appointments" },
@@ -74,7 +72,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 7. Check if review already exists
+    // バ. 6b. Validate invoice is paid for this booking
+    const invoice = await InvoiceModel.collection().then((col) =>
+      col.findOne({
+        bookingId: new ObjectId(bookingId),
+        patientId: new ObjectId(userId),
+      })
+    );
+    if (!invoice || invoice.status !== "paid") {
+      return NextResponse.json(
+        { error: "Invoice must be paid before submitting a review" },
+        { status: 400 }
+      );
+    }
+
+    // バ. 7. Check if review already exists
     const existingReview = await ReviewModel.getByBookingId(bookingId);
     if (existingReview) {
       return NextResponse.json(
@@ -83,32 +95,34 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 8. Create review
+    // バ. 8. Create review
     const review = await ReviewModel.create({
       bookingId: new ObjectId(bookingId),
       patientId: new ObjectId(userId),
       doctorId: doctorId,
       rating: rating,
-      comment: comment || ""
+      comment: comment || "",
     });
 
-    // ✅ 9. Update doctor's average rating and total reviews
+    // バ. 9. Update doctor's average rating and total reviews
     const doctor = await DoctorModel.getDoctorById(doctorId);
     if (doctor) {
       const reviewsCollection = db.collection("reviews");
-      const allReviews = await reviewsCollection.find({ doctorId: doctorId }).toArray();
-      
+      const allReviews = await reviewsCollection
+        .find({ doctorId: doctorId })
+        .toArray();
+
       const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
       const averageRating = totalRating / allReviews.length;
       const totalReviews = allReviews.length;
 
       await DoctorModel.update(doctorId, {
         averageRating: averageRating,
-        totalReviews: totalReviews
+        totalReviews: totalReviews,
       });
     }
 
-    // ✅ 10. Return response
+    // バ. 10. Return response
     return NextResponse.json(
       {
         message: "Review submitted successfully",
@@ -119,8 +133,8 @@ export async function POST(req: Request) {
           patientId: userId,
           rating: review.rating,
           comment: review.comment,
-          createdAt: review.createdAt
-        }
+          createdAt: review.createdAt,
+        },
       },
       { status: 201 }
     );

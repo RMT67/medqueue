@@ -184,7 +184,8 @@ export async function GET(req: Request) {
           } : null,
           hasMedicalRecord: !!medicalRecord,
           hasInvoice: !!invoice,
-          invoiceId: invoice ? invoice._id.toString() : null
+          invoiceId: invoice ? invoice._id.toString() : null,
+          invoiceStatus: invoice?.status || null
         };
       })
     );
@@ -209,4 +210,3 @@ export async function GET(req: Request) {
     );
   }
 }
-

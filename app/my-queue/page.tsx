@@ -68,6 +68,33 @@ export default function MyQueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const MIDTRANS_CLIENT_KEY =
+    process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
+  const MIDTRANS_SNAP_URL =
+    process.env.NEXT_PUBLIC_MIDTRANS_SNAP_URL ||
+    "https://app.sandbox.midtrans.com/snap/snap.js";
+
+  // Load snap.js once
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!MIDTRANS_CLIENT_KEY) {
+      console.warn("Midtrans client key is not set; snap.js not loaded");
+      return;
+    }
+    if ((window as any).snap) return;
+    const script = document.createElement("script");
+    script.src = `${MIDTRANS_SNAP_URL}?client-key=${MIDTRANS_CLIENT_KEY}`;
+    script.async = true;
+    script.onload = () => {
+      console.log("Midtrans snap.js loaded");
+    };
+    script.onerror = () => {
+      console.error("Failed to load Midtrans snap.js");
+    };
+    document.body.appendChild(script);
+  }, [MIDTRANS_CLIENT_KEY, MIDTRANS_SNAP_URL]);
   const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(null);
 
   useEffect(() => {
@@ -117,6 +144,81 @@ export default function MyQueuePage() {
       fetchQueues();
     }
   }, [user, fetchQueues]);
+
+  const handlePayInvoice = useCallback(
+    async (invoiceId: string | undefined | null) => {
+      if (!invoiceId) return;
+      if (!MIDTRANS_CLIENT_KEY) {
+        alert("Midtrans client key not configured");
+        return;
+      }
+      try {
+        setIsPaying(true);
+        const token = localStorage.getItem("medqueue_token");
+        if (!token) {
+          alert("Authentication required");
+          return;
+        }
+
+        const snapRes = await fetch("/api/payments/snap-token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ invoiceId }),
+        });
+
+        if (!snapRes.ok) {
+          const err = await snapRes.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to create snap token");
+        }
+
+        const { token: snapToken } = await snapRes.json();
+        const snap = (window as any).snap;
+        if (!snap) {
+          throw new Error("Midtrans snap is not loaded");
+        }
+
+        snap.pay(snapToken, {
+          onSuccess: async () => {
+            if (
+              process.env.NODE_ENV !== "production" &&
+              process.env.NEXT_PUBLIC_DEV_ALLOW_STATUS_PATCH === "true"
+            ) {
+              await fetch("/api/payments/update-status", {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ invoiceId, status: "paid" }),
+              });
+            }
+            await fetchQueues();
+          },
+          onPending: async () => {
+            await fetchQueues();
+          },
+          onError: (err: unknown) => {
+            console.error("Snap error", err);
+            alert("Payment failed. Please try again.");
+          },
+          onClose: async () => {
+            await fetchQueues();
+          },
+        });
+      } catch (err) {
+        console.error(err);
+        alert(
+          err instanceof Error ? err.message : "Failed to start payment session"
+        );
+      } finally {
+        setIsPaying(false);
+      }
+    },
+    [MIDTRANS_CLIENT_KEY, fetchQueues]
+  );
 
   useEffect(() => {
     const fetchPatientProfile = async () => {
@@ -485,10 +587,11 @@ export default function MyQueuePage() {
                       {currentQueue.invoice.status === "pending" && (
                         <Button
                           className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-                          onClick={() => alert("Payment flow coming soon")}
+                          disabled={isPaying}
+                          onClick={() => handlePayInvoice(currentQueue.invoice?._id)}
                         >
                           <CreditCard className="w-5 h-5" />
-                          Process Payment
+                          {isPaying ? "Processing..." : "Process Payment"}
                         </Button>
                       )}
                     </div>
