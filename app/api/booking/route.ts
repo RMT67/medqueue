@@ -265,3 +265,68 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { bookingId, status } = body;
+
+    if (!bookingId || !status) {
+      return NextResponse.json(
+        { success: false, message: "Booking ID and status are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate status
+    const validStatuses = ["pending", "confirmed", "cancelled", "completed"];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid status" },
+        { status: 400 }
+      );
+    }
+
+    // If status is cancelled, adjust appointment times for subsequent bookings
+    if (status === "cancelled") {
+      // Get booking to find doctor and get averageTimePerPatient
+      const collection = await Booking.collection();
+      const booking = await collection.findOne({ _id: new ObjectId(bookingId) });
+      
+      if (!booking) {
+        return NextResponse.json(
+          { success: false, message: "Booking not found" },
+          { status: 404 }
+        );
+      }
+
+      // Get doctor's average time per patient
+      const doctor = await DoctorModel.getDoctorById(booking.doctorId.toString());
+      const averageTimePerPatient = doctor?.averageTimePerPatient || 15;
+
+      // Cancel booking and adjust subsequent appointment times
+      await Booking.cancelAndAdjustTimes(bookingId, averageTimePerPatient);
+    } else {
+      // For other status updates, just update the status
+      const result = await Booking.updateStatus(bookingId, status);
+
+      if (result.matchedCount === 0) {
+        return NextResponse.json(
+          { success: false, message: "Booking not found" },
+          { status: 404 }
+        );
+      }
+    }
+
+    return NextResponse.json(
+      { success: true, message: "Booking status updated successfully" },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error updating booking status:", error);
+    return NextResponse.json(
+      { success: false, message: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

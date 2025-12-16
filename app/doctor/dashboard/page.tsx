@@ -281,8 +281,26 @@ export default function DoctorDashboard() {
     }
   };
 
-  const handleSkip = () => {
-    console.log("Patient skipped");
+  const handleSkip = async () => {
+    if (!currentPatient) return;
+
+    try {
+      // Update booking status to cancelled
+      const response = await apiFetch<
+        { success: boolean; message: string },
+        { bookingId: string; status: string }
+      >("/api/booking", {
+        method: "PATCH",
+        body: { bookingId: currentPatient._id, status: "cancelled" },
+      });
+
+      if (response.success) {
+        // Move to next patient
+        handleCallNext();
+      }
+    } catch (error) {
+      console.error("Error skipping patient:", error);
+    }
   };
 
   const handleFinish = () => {
