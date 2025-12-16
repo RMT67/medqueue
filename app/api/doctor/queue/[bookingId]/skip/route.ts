@@ -19,9 +19,9 @@ export async function PATCH(
     }
 
     const { userId, role } = verifyToken(authHeader);
-    if (role !== "patient") {
+    if (role !== "doctor") {
       return NextResponse.json(
-        { error: "Forbidden - Patient access only" },
+        { error: "Forbidden - Doctor access only" },
         { status: 403 }
       );
     }
@@ -29,79 +29,36 @@ export async function PATCH(
     // ✅ Handle Next.js 15 params (can be Promise)
     const resolvedParams = params instanceof Promise ? await params : params;
     const { bookingId } = resolvedParams;
-    
-    // ✅ Parse body safely (handle empty body)
-    let cancelReason = "";
-    try {
-      const contentType = req.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const body = await req.json();
-        cancelReason = body.cancelReason || "";
-      }
-    } catch (error) {
-      // Body is optional, continue with empty cancelReason
-    }
-
-    const db = await getDb();
-    const patientObjectId = new ObjectId(userId);
-    const bookingsCollection = db.collection("bookings");
 
     // ✅ 2. Validate bookingId format
-    if (!bookingId) {
-      return NextResponse.json(
-        { error: "Booking ID is required" },
-        { status: 400 }
-      );
-    }
-    
-    if (typeof bookingId !== "string") {
-      return NextResponse.json(
-        { error: "Invalid booking ID format" },
-        { status: 400 }
-      );
-    }
-    
-    if (!ObjectId.isValid(bookingId)) {
+    if (!bookingId || !ObjectId.isValid(bookingId)) {
       return NextResponse.json(
         { error: "Invalid booking ID" },
         { status: 400 }
       );
     }
 
-    const bookingObjectId = new ObjectId(bookingId);
+    const db = await getDb();
+    const doctorObjectId = new ObjectId(userId);
+    const bookingsCollection = db.collection("bookings");
 
-    // ✅ 3. Get booking and verify ownership
-    // Try to find booking first without patientId filter to see if it exists
-    const bookingExists = await bookingsCollection.findOne({
-      _id: bookingObjectId
+    // ✅ 3. Get booking and verify it belongs to this doctor
+    const booking = await bookingsCollection.findOne({
+      _id: new ObjectId(bookingId),
+      doctorId: doctorObjectId
     });
 
-    if (!bookingExists) {
+    if (!booking) {
       return NextResponse.json(
-        { error: "Booking not found" },
+        { error: "Booking not found or does not belong to doctor" },
         { status: 404 }
       );
     }
 
-    // Check if patientId matches (handle both ObjectId and string formats)
-    const bookingPatientId = bookingExists.patientId instanceof ObjectId
-      ? bookingExists.patientId.toString()
-      : bookingExists.patientId?.toString();
-    const requestPatientId = patientObjectId.toString();
-
-    if (bookingPatientId !== requestPatientId) {
-      return NextResponse.json(
-        { error: "Booking does not belong to patient" },
-        { status: 403 }
-      );
-    }
-
-    const booking = bookingExists;
-
-    // ✅ 3. Validate: Can only cancel confirmed or in-progress bookings
+    // ✅ 4. Validate: Can only skip confirmed or in-progress bookings
     if (booking.status === "completed") {
       return NextResponse.json(
-        { error: "Cannot cancel completed appointment" },
+        { error: "Cannot skip completed appointment" },
         { status: 400 }
       );
     }
@@ -113,29 +70,29 @@ export async function PATCH(
       );
     }
 
-    // ✅ 4. Update booking status
+    // ✅ 5. Update booking status to cancelled (marked as no-show/skipped)
     await bookingsCollection.updateOne(
       { _id: new ObjectId(bookingId) },
       {
         $set: {
           status: "cancelled",
-          cancelReason: cancelReason || "",
+          cancelReason: "Skipped by doctor - Patient no-show",
           updatedAt: new Date()
         }
       }
     );
 
-    // ✅ 5. Get updated booking
+    // ✅ 6. Get updated booking
     const updatedBooking = await bookingsCollection.findOne({
       _id: new ObjectId(bookingId)
     });
 
-    // ✅ 6. Emit socket event for status change
+    // ✅ 7. Emit socket event for status change
     emitQueueStatusChange(bookingId, {
       queueStatus: "cancelled"
     });
 
-    // ✅ 7. Recalculate and emit call time updates to all remaining patients in the same queue
+    // ✅ 8. Recalculate and emit call time updates to all remaining patients in the same queue
     try {
       const scheduleDate = booking.scheduleDate 
         ? new Date(booking.scheduleDate) 
@@ -146,15 +103,15 @@ export async function PATCH(
       await recalculateAndEmitCallTimeUpdates(
         booking.doctorId.toString(),
         scheduleDate,
-        bookingId // Pass cancelled booking ID to exclude it from recalculation
+        bookingId // Pass skipped booking ID to exclude it from recalculation
       );
     } catch (error) {
-      console.error("Error recalculating call times after cancellation:", error);
+      console.error("Error recalculating call times after skip:", error);
       // Don't fail the request if recalculation fails
     }
 
     return NextResponse.json({
-      message: "Appointment cancelled successfully",
+      message: "Patient skipped successfully",
       booking: {
         bookingId: updatedBooking?._id.toString(),
         status: updatedBooking?.status,
@@ -162,9 +119,9 @@ export async function PATCH(
       }
     });
   } catch (error) {
-    console.error("Error cancelling appointment:", error);
+    console.error("Error skipping patient:", error);
     return NextResponse.json(
-      { error: "Failed to cancel appointment" },
+      { error: "Failed to skip patient" },
       { status: 500 }
     );
   }

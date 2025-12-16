@@ -456,8 +456,8 @@ export default function BookingPage({
     if (!complaint) {
       return Swal.fire({
         icon: "error",
-        title: "Missing Complaint",
-        text: "Please enter your symptoms or concern before proceeding.",
+        title: "Missing Symptoms / Concerns",
+        text: "Please enter your symptoms or concerns before proceeding.",
       });
     }
     setSelectedDate(dateStr);
@@ -764,7 +764,7 @@ export default function BookingPage({
 
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
-                    Patient Complaint
+                    Symptoms / Concerns
                   </label>
                   <Textarea
                     value={patientComplaint}
@@ -903,7 +903,7 @@ export default function BookingPage({
                       </div>
                       <div className="flex-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                          Patient Complaint
+                          Symptoms / Concerns
                         </p>
                         <p className="text-sm text-foreground whitespace-pre-wrap">
                           {patientComplaint}

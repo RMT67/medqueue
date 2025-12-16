@@ -48,6 +48,12 @@ interface Appointment {
   hasMedicalRecord: boolean
   hasInvoice: boolean
   invoiceId: string | null
+  invoice: {
+    _id: string
+    status: string
+    invoiceNumber: string
+    total: number
+  } | null
 }
 
 export default function MyAppointmentsPage() {
@@ -377,7 +383,7 @@ export default function MyAppointmentsPage() {
                             {/* Complaint */}
                             {appointment.complaint && (
                               <div className="pt-4 border-t border-border/50">
-                                <p className="text-sm text-muted-foreground mb-1 font-semibold">Complaint:</p>
+                                <p className="text-sm text-muted-foreground mb-1 font-semibold">Symptoms / Concerns:</p>
                                 <p className="text-sm text-foreground">{appointment.complaint}</p>
                               </div>
                             )}
@@ -400,7 +406,7 @@ export default function MyAppointmentsPage() {
                                       )}
                                     </div>
                                   )}
-                                  {!appointment.hasReview && (
+                                  {!appointment.hasReview && appointment.invoice?.status === "paid" && (
                                     <Button
                                       onClick={() => {
                                         setSelectedAppointment(appointment)

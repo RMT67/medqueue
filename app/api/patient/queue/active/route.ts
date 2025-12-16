@@ -55,8 +55,9 @@ export async function GET(req: Request) {
       );
     }
 
-    // ✅ 4. Get schedule info
+    // ✅ 4. Get schedule info and extract startTime
     let scheduleInfo = null;
+    let scheduleStartTime: string | null = null;
     if (activeBooking.scheduleId) {
       const schedule = await DoctorScheduleModel.getById(activeBooking.scheduleId);
       if (schedule) {
@@ -65,6 +66,22 @@ export async function GET(req: Request) {
           timeRange: schedule.timeRange,
           isAvailable: schedule.isAvailable
         };
+        
+        // Extract startTime from dayOfWeek for the booking date (not today!)
+        if (schedule.dayOfWeek && schedule.dayOfWeek.length > 0) {
+          // ✅ FIX: Use booking's scheduleDate, not today's date
+          const bookingDate = activeBooking.scheduleDate 
+            ? new Date(activeBooking.scheduleDate) 
+            : activeBooking.appointmentTime 
+            ? new Date(activeBooking.appointmentTime) 
+            : new Date();
+          const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+          const bookingDayName = dayNames[bookingDate.getDay()];
+          const bookingDaySchedule = schedule.dayOfWeek.find(day => day.hari === bookingDayName);
+          if (bookingDaySchedule && bookingDaySchedule.startTime) {
+            scheduleStartTime = bookingDaySchedule.startTime; // "09:00"
+          }
+        }
       }
     } else {
       // Fallback: get default schedule
@@ -75,6 +92,22 @@ export async function GET(req: Request) {
           timeRange: defaultSchedule.timeRange,
           isAvailable: defaultSchedule.isAvailable
         };
+        
+        // Extract startTime from default schedule for the booking date (not today!)
+        if (defaultSchedule.dayOfWeek && defaultSchedule.dayOfWeek.length > 0) {
+          // ✅ FIX: Use booking's scheduleDate, not today's date
+          const bookingDate = activeBooking.scheduleDate 
+            ? new Date(activeBooking.scheduleDate) 
+            : activeBooking.appointmentTime 
+            ? new Date(activeBooking.appointmentTime) 
+            : new Date();
+          const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+          const bookingDayName = dayNames[bookingDate.getDay()];
+          const bookingDaySchedule = defaultSchedule.dayOfWeek.find(day => day.hari === bookingDayName);
+          if (bookingDaySchedule && bookingDaySchedule.startTime) {
+            scheduleStartTime = bookingDaySchedule.startTime;
+          }
+        }
       }
     }
 
@@ -96,9 +129,39 @@ export async function GET(req: Request) {
     );
 
     // Find currently serving (in-progress)
+    // Only show queue number if there's actually a patient being served
+    // AND the schedule has started (current time >= schedule start time)
     const currentlyServingBooking = queueBookings.find(b => b.status === "in-progress");
-    const currentlyServing = currentlyServingBooking?.queueNumber || 
-      (queueBookings.length > 0 ? queueBookings[0].queueNumber : null);
+    
+    let currentlyServing: string | null = null;
+    
+    // Only show currentlyServing if:
+    // 1. There's a booking with status "in-progress"
+    // 2. scheduleStartTime is available
+    // 3. Current time >= schedule start time
+    if (currentlyServingBooking && scheduleStartTime) {
+      // Validate that schedule has started
+      const now = new Date();
+      const [startHours, startMinutes] = scheduleStartTime.split(":").map(Number);
+      
+      // Use booking date for validation
+      const scheduleDateForValidation = activeBooking.scheduleDate 
+        ? new Date(activeBooking.scheduleDate) 
+        : activeBooking.appointmentTime 
+        ? new Date(activeBooking.appointmentTime) 
+        : new Date();
+      
+      // Create schedule start datetime
+      const scheduleStart = new Date(scheduleDateForValidation);
+      scheduleStart.setHours(startHours, startMinutes, 0, 0);
+      
+      // Only show currentlyServing if current time >= schedule start time
+      if (now >= scheduleStart) {
+        currentlyServing = currentlyServingBooking.queueNumber;
+      }
+    }
+    // If scheduleStartTime is not available, currentlyServing remains null
+    // This ensures we only show serving when we can validate the schedule has started
 
     const patientsAhead = currentlyServingBooking
       ? queueBookings.findIndex(b => b._id.toString() === currentlyServingBooking._id.toString()) - currentQueueIndex
@@ -107,13 +170,65 @@ export async function GET(req: Request) {
     // ✅ 6. Get average service time from doctor
     const averageServiceTime = doctor.averageServiceTime || 10; // default 10 minutes
 
-    // ✅ 7. Calculate estimated call time
+    // ✅ 7. Get actual session start time (when doctor started the session)
+    // Check if there's any booking that's "in-progress" or "completed" to get actual start time
+    // This handles the case when doctor is late - call time will be adjusted accordingly
+    let actualSessionStartTime: Date | null = null;
+    
+    // Get all bookings for this doctor on this date (including completed ones)
+    const scheduleDate = activeBooking.scheduleDate 
+      ? new Date(activeBooking.scheduleDate) 
+      : activeBooking.appointmentTime 
+      ? new Date(activeBooking.appointmentTime) 
+      : new Date();
+    
+    const startOfDay = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate(), 0, 0, 0, 0);
+    const endOfDay = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate(), 23, 59, 59, 999);
+    
+    const allBookingsForDate = await bookingsCollection
+      .find({
+        doctorId: activeBooking.doctorId,
+        status: { $in: ["in-progress", "completed"] },
+        appointmentTime: {
+          $gte: startOfDay,
+          $lte: endOfDay
+        }
+      })
+      .sort({ queueNumber: 1 })
+      .toArray();
+    
+    // Find the first booking that was started (in-progress or completed)
+    const firstStartedBooking = allBookingsForDate.find(b => 
+      b.status === "in-progress" || b.status === "completed"
+    );
+    
+    if (firstStartedBooking) {
+      if (firstStartedBooking.status === "in-progress") {
+        // Doctor sedang melayani pasien pertama sekarang (mungkin telat)
+        // Gunakan waktu saat ini sebagai session start time
+        actualSessionStartTime = new Date();
+      } else if (firstStartedBooking.status === "completed" && firstStartedBooking.completedAt) {
+        // Doctor sudah selesai melayani pasien pertama
+        // Estimasi waktu mulai sesi = completedAt - averageServiceTime
+        const completedAt = new Date(firstStartedBooking.completedAt);
+        actualSessionStartTime = new Date(completedAt.getTime() - averageServiceTime * 60 * 1000);
+      }
+    }
+    // Jika belum ada yang mulai, actualSessionStartTime tetap null, akan menggunakan scheduleStartTime
+
+    // ✅ 8. Calculate estimated call time
+    // Logic:
+    // - Jika doctor sudah mulai (actualSessionStartTime ada): gunakan actualSessionStartTime sebagai base
+    // - Jika doctor belum mulai: gunakan scheduleStartTime sebagai base
     const callTimeData = calculateEstimatedCallTime(
       Math.max(0, patientsAhead),
-      averageServiceTime
+      averageServiceTime,
+      scheduleStartTime, // Pass schedule startTime (fallback if doctor hasn't started)
+      scheduleDate, // Pass schedule date
+      actualSessionStartTime // Pass actual session start time (if doctor has started)
     );
 
-    // ✅ 8. Map queue status
+    // ✅ 9. Map queue status
     let queueStatus: "waiting" | "being-served" | "completed" = "waiting";
     if (activeBooking.status === "in-progress") {
       queueStatus = "being-served";
@@ -121,7 +236,7 @@ export async function GET(req: Request) {
       queueStatus = "completed";
     }
 
-    // ✅ 9. Format dates
+    // ✅ 10. Format dates
     const appointmentDate = new Date(activeBooking.appointmentTime);
     const formattedDate = appointmentDate.toLocaleDateString("en-US", {
       weekday: "long",
@@ -135,7 +250,7 @@ export async function GET(req: Request) {
       hour12: false
     });
 
-    // ✅ 10. Emit socket events for real-time updates
+    // ✅ 11. Emit socket events for real-time updates
     const bookingIdStr = activeBooking._id.toString();
     
     // Emit position update
@@ -148,7 +263,7 @@ export async function GET(req: Request) {
     // Emit call time update
     emitCallTimeUpdate(bookingIdStr, {
       estimatedCallTime: callTimeData.estimatedCallTime,
-      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp,
+      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp.toISOString(),
       patientsAhead: Math.max(0, patientsAhead),
       estimatedTime: callTimeData.estimatedTime
     });
@@ -157,10 +272,10 @@ export async function GET(req: Request) {
     emitQueueStatusChange(bookingIdStr, {
       queueStatus: queueStatus,
       estimatedCallTime: callTimeData.estimatedCallTime,
-      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp
+      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp.toISOString()
     });
 
-    // ✅ 11. Return response
+    // ✅ 12. Return response
     return NextResponse.json({
       bookingId: activeBooking._id.toString(),
       bookingNumber: activeBooking.bookingNumber || "",
@@ -172,7 +287,7 @@ export async function GET(req: Request) {
       estimatedTime: callTimeData.estimatedTime,
       estimatedCallTime: callTimeData.estimatedCallTime,
       estimatedCallTimeFormatted: callTimeData.estimatedCallTimeFormatted,
-      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp,
+      estimatedCallTimeTimestamp: callTimeData.estimatedCallTimeTimestamp.toISOString(),
       appointmentDate: activeBooking.appointmentTime,
       appointmentTime: appointmentTime,
       appointmentDateFormatted: formattedDate,
