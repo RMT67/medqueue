@@ -21,6 +21,9 @@ import {
   CreditCard,
   UserCircle,
   MapPin,
+  CheckCircle2,
+  MessageSquare,
+  FileText,
 } from "lucide-react";
 import { ReviewDoctorModal } from "@/components/review-doctor-modal";
 import { useAuth } from "@/lib/auth-context";
@@ -28,6 +31,7 @@ import { apiFetch } from "@/lib/api";
 import { ProfileUser } from "@/types/userTypes";
 import Link from "next/link";
 import { FadeIn } from "@/components/animations";
+import { getSocket, joinQueueRoom, leaveQueueRoom } from "@/lib/socket-client";
 
 type QueueDoctor = {
   _id: string;
@@ -58,6 +62,9 @@ type QueueItem = {
   complaint?: string;
   doctor: QueueDoctor | null;
   invoice: QueueInvoice | null;
+  hasMedicalRecord?: boolean;
+  hasInvoice?: boolean;
+  hasReview?: boolean;
 };
 
 export default function MyQueuePage() {
@@ -69,6 +76,14 @@ export default function MyQueuePage() {
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(null);
+  const [queuePosition, setQueuePosition] = useState<{
+    patientsAhead: number;
+    estimatedTime: number;
+    currentlyServing: string;
+  } | null>(null);
+  const [isLoadingPosition, setIsLoadingPosition] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "patient")) {
@@ -116,7 +131,37 @@ export default function MyQueuePage() {
     if (user && user.role === "patient") {
       fetchQueues();
     }
-  }, [user, fetchQueues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const fetchQueuePosition = useCallback(async (bookingId: string) => {
+    try {
+      setIsLoadingPosition(true);
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) return;
+
+      const res = await fetch("/api/patient/queue/active", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.bookingId === bookingId) {
+          setQueuePosition({
+            patientsAhead: data.patientsAhead || 0,
+            estimatedTime: data.estimatedTime || 0,
+            currentlyServing: data.currentlyServing || "",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching queue position:", error);
+    } finally {
+      setIsLoadingPosition(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchPatientProfile = async () => {
@@ -138,6 +183,225 @@ export default function MyQueuePage() {
     () => queues.filter((q) => q.status === "completed"),
     [queues]
   );
+
+  useEffect(() => {
+    if (currentQueue && currentQueue.status !== "completed") {
+      fetchQueuePosition(currentQueue.bookingId);
+    } else {
+      setQueuePosition(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQueue?.bookingId, currentQueue?.status]);
+
+  // Socket.IO real-time updates
+  useEffect(() => {
+    if (!user || user.role !== "patient" || !currentQueue || currentQueue.status === "completed") {
+      return;
+    }
+
+    let socketCleanup: (() => void) | null = null;
+    const bookingId = currentQueue.bookingId;
+
+    // Dynamic import untuk client-side only
+    import("@/lib/socket-client").then(({ getSocket, joinQueueRoom, leaveQueueRoom }) => {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn("⚠️ Socket not available - token may be missing");
+        return;
+      }
+
+      console.log("🔌 Setting up Socket.IO for booking:", bookingId);
+
+      // Wait for socket to connect before joining room
+      if (socket.connected) {
+        joinQueueRoom(bookingId);
+      } else {
+        socket.once("connect", () => {
+          console.log("✅ Socket connected, joining queue room");
+          joinQueueRoom(bookingId);
+        });
+      }
+
+      // Listen for queue position updates
+      const handlePositionUpdate = (data: {
+        bookingId: string;
+        currentlyServing: string;
+        patientsAhead: number;
+        queueNumber: string;
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueuePosition((prev) => ({
+            patientsAhead: data.patientsAhead,
+            estimatedTime: prev?.estimatedTime || 0,
+            currentlyServing: data.currentlyServing,
+          }));
+        }
+      };
+
+      // Listen for call time updates
+      const handleCallTimeUpdate = (data: {
+        bookingId: string;
+        estimatedCallTime: string;
+        estimatedCallTimeTimestamp: string;
+        patientsAhead: number;
+        estimatedTime: number;
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueuePosition((prev) => ({
+            patientsAhead: data.patientsAhead,
+            estimatedTime: data.estimatedTime,
+            currentlyServing: prev?.currentlyServing || "",
+          }));
+        }
+      };
+
+      // Listen for queue status changes
+      const handleStatusChange = (data: {
+        bookingId: string;
+        queueStatus: "waiting" | "being-served" | "completed" | "cancelled";
+        estimatedCallTime?: string;
+        estimatedCallTimeTimestamp?: string;
+      }) => {
+        if (data.bookingId === bookingId) {
+          // Refresh queues when status changes
+          fetchQueues();
+        }
+      };
+
+      socket.on("queue:position-update", handlePositionUpdate);
+      socket.on("queue:call-time-update", handleCallTimeUpdate);
+      socket.on("queue:status-change", handleStatusChange);
+
+      socketCleanup = () => {
+        socket.off("queue:position-update", handlePositionUpdate);
+        socket.off("queue:call-time-update", handleCallTimeUpdate);
+        socket.off("queue:status-change", handleStatusChange);
+        leaveQueueRoom(bookingId);
+      };
+    });
+
+    return () => {
+      if (socketCleanup) {
+        socketCleanup();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role, currentQueue?.bookingId, currentQueue?.status]);
+
+  const handlePayment = async () => {
+    if (!currentQueue?.invoice?._id) return;
+
+    if (!confirm("Are you sure you want to process this payment?")) {
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) {
+        alert("Please login to process payment");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/patient/invoices/${currentQueue.invoice._id}/pay`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            paymentMethod: "manual",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        alert("Payment processed successfully!");
+        // Refresh queues to get updated invoice status
+        await fetchQueues();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to process payment");
+      }
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      alert("Failed to process payment");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setCancellingId(bookingId);
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) {
+        alert("Please login to cancel booking");
+        return;
+      }
+
+      const response = await fetch(`/api/patient/queue/${bookingId}/cancel`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        alert("Appointment cancelled successfully");
+        await fetchQueues();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to cancel appointment");
+      }
+    } catch (error) {
+      console.error("Error cancelling appointment:", error);
+      alert("Failed to cancel appointment");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const handleMarkComplete = async (bookingId: string) => {
+    if (!confirm("Mark this appointment as completed? This will finalize your visit.")) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) {
+        alert("Please login to mark appointment as complete");
+        return;
+      }
+
+      const response = await fetch(`/api/patient/queue/${bookingId}/complete`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert("Appointment marked as completed successfully");
+        // Refresh queues to get updated status
+        await fetchQueues();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to mark appointment as complete");
+      }
+    } catch (error) {
+      console.error("Error marking appointment as complete:", error);
+      alert("Failed to mark appointment as complete");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -252,9 +516,9 @@ export default function MyQueuePage() {
             <div className="lg:col-span-2 space-y-6">
               {currentQueue && (
                 <QueueCard
-                  currentlyServing={currentQueue.queueNumber || ""}
-                  patientsAhead={0}
-                  estimatedTime={0}
+                  currentlyServing={queuePosition?.currentlyServing || currentQueue.queueNumber || ""}
+                  patientsAhead={queuePosition?.patientsAhead ?? 0}
+                  estimatedTime={queuePosition?.estimatedTime ?? 0}
                   doctorName={currentQueue.doctor?.name || "Doctor"}
                   doctorSpecialization={
                     currentQueue.doctor?.specialization || ""
@@ -282,6 +546,16 @@ export default function MyQueuePage() {
                           setSelectedDoctor(currentQueue.doctor?.name || "");
                           setShowRatingModal(true);
                         }
+                      : undefined
+                  }
+                  onCancel={
+                    currentQueue.status === "confirmed" || currentQueue.status === "in-progress"
+                      ? () => handleCancelBooking(currentQueue.bookingId)
+                      : undefined
+                  }
+                  onMarkComplete={
+                    currentQueue.status === "in-progress"
+                      ? () => handleMarkComplete(currentQueue.bookingId)
                       : undefined
                   }
                 />
@@ -327,7 +601,7 @@ export default function MyQueuePage() {
               )}
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* Patient Profile Card */}
               <Link href="/profile">
                 <Card className="p-6 border border-border/50 shadow-xl bg-card/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 cursor-pointer hover:border-primary/50">
@@ -440,7 +714,7 @@ export default function MyQueuePage() {
               </Link>
 
               {/* Invoice Card */}
-              <Card className="p-6 bg-card/90 border border-border/50 shadow-sm">
+              <Card className="p-6 bg-card/90 border border-border/50 shadow-sm mt-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center ring-2 ring-primary/10">
@@ -485,10 +759,31 @@ export default function MyQueuePage() {
                       {currentQueue.invoice.status === "pending" && (
                         <Button
                           className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-                          onClick={() => alert("Payment flow coming soon")}
+                          onClick={handlePayment}
+                          disabled={isProcessingPayment}
                         >
                           <CreditCard className="w-5 h-5" />
-                          Process Payment
+                          {isProcessingPayment ? "Processing..." : "Process Payment"}
+                        </Button>
+                      )}
+                      {currentQueue.invoice.status === "paid" && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-green-50/80 dark:bg-green-950/30 text-green-700 dark:text-green-300 rounded-xl text-sm font-semibold border border-green-200/50 dark:border-green-800/50">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Payment Completed
+                        </div>
+                      )}
+                      {currentQueue.invoice && (
+                        <Button
+                          variant="outline"
+                          className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300"
+                          onClick={() => {
+                            router.push(
+                              `/patient/invoices?bookingId=${currentQueue.bookingId}&status=${currentQueue.invoice?.status || "pending"}`
+                            );
+                          }}
+                        >
+                          <Receipt className="w-4 h-4 mr-2" />
+                          View Invoice Details
                         </Button>
                       )}
                     </div>
@@ -499,7 +794,7 @@ export default function MyQueuePage() {
           </div>
         )}
 
-        {selectedDoctor && currentQueue && (
+        {selectedDoctor && (
           <ReviewDoctorModal
             isOpen={showRatingModal}
             onClose={() => {
@@ -512,6 +807,16 @@ export default function MyQueuePage() {
                 const token = localStorage.getItem("medqueue_token");
                 if (!token) return;
 
+                // Find the appointment that needs review
+                const appointmentToReview = completedQueues.find(
+                  (q) => q.doctor?.name === selectedDoctor && !q.hasReview
+                );
+
+                if (!appointmentToReview) {
+                  alert("Appointment not found");
+                  return;
+                }
+
                 const response = await fetch("/api/patient/reviews", {
                   method: "POST",
                   headers: {
@@ -519,8 +824,8 @@ export default function MyQueuePage() {
                     Authorization: `Bearer ${token}`,
                   },
                   body: JSON.stringify({
-                    bookingId: currentQueue.bookingId,
-                    doctorId: currentQueue.doctor?._id,
+                    bookingId: appointmentToReview.bookingId,
+                    doctorId: appointmentToReview.doctor?._id,
                     rating,
                     comment: feedback || "",
                   }),
@@ -640,6 +945,51 @@ export default function MyQueuePage() {
                           </div>
                         )}
                       </div>
+                      {/* Action Buttons for Completed Appointments */}
+                      {appointment.status === "completed" && (
+                        <div className="pt-4 border-t border-border/50 space-y-2">
+                          {!appointment.hasReview && appointment.invoice?.status === "paid" && (
+                            <Button
+                              onClick={() => {
+                                setSelectedDoctor(appointment.doctor?.name || "");
+                                setShowRatingModal(true);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              Review Doctor
+                            </Button>
+                          )}
+                          {appointment.hasMedicalRecord && (
+                            <Button
+                              onClick={() => router.push("/patient/medical-record")}
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                            >
+                              <FileText className="w-4 h-4" />
+                              View Medical Record
+                            </Button>
+                          )}
+                          {appointment.hasInvoice && (
+                            <Button
+                              onClick={() => {
+                                router.push(
+                                  `/patient/invoices?bookingId=${appointment.bookingId}&status=${appointment.invoice?.status || "pending"}`
+                                );
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                            >
+                              <Receipt className="w-4 h-4" />
+                              View Invoice
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Card>
                 );

@@ -3,6 +3,8 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
 import DoctorScheduleModel from "@/db/models/DoctorSchedule";
+import MedicalRecordModel from "@/db/models/MedicalRecord";
+import ReviewModel from "@/db/models/Review";
 
 export async function GET(req: Request) {
   try {
@@ -76,6 +78,20 @@ export async function GET(req: Request) {
           }
         );
 
+        // Check for medical record
+        const medicalRecordsCollection = db.collection("medicalrecords");
+        const medicalRecord = await medicalRecordsCollection.findOne({
+          bookingId: booking._id,
+          patientId: patientObjectId,
+        });
+
+        // Check for review
+        const reviewsCollection = db.collection("reviews");
+        const review = await reviewsCollection.findOne({
+          bookingId: booking._id.toString(),
+          patientId: patientObjectId.toString(),
+        });
+
         const scheduleDate = booking.scheduleDate
           ? new Date(booking.scheduleDate).toISOString()
           : booking.appointmentTime
@@ -103,6 +119,8 @@ export async function GET(req: Request) {
                 specialization: doctor.specialization || "",
                 clinic: doctor.clinic || "",
                 image: doctor.image || "",
+                rating: doctor.averageRating || 0,
+                totalReviews: doctor.totalReviews || 0,
               }
             : null,
           invoice: invoice
@@ -113,6 +131,9 @@ export async function GET(req: Request) {
                 total: invoice.total,
               }
             : null,
+          hasMedicalRecord: !!medicalRecord,
+          hasInvoice: !!invoice,
+          hasReview: !!review,
         };
       })
     );

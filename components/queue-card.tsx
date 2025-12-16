@@ -20,11 +20,19 @@ function AIInsights({ bookingId }: { bookingId: string }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Skip if bookingId is empty
+    if (!bookingId) {
+      setIsLoading(false)
+      return
+    }
+
+    let isCancelled = false
+
     const fetchInsights = async () => {
       try {
         const token = localStorage.getItem("medqueue_token")
         if (!token) {
-          setIsLoading(false)
+          if (!isCancelled) setIsLoading(false)
           return
         }
 
@@ -34,25 +42,38 @@ function AIInsights({ bookingId }: { bookingId: string }) {
           },
         })
 
+        if (isCancelled) return
+
         if (response.ok) {
           const data = await response.json()
-          setInsights({
-            insights: data.insights || [],
-            warnings: data.warnings || [],
-            smartSuggestion: data.smartSuggestion || {
-              arrivalTime: "",
-              reason: ""
-            }
-          })
+          if (!isCancelled) {
+            setInsights({
+              insights: data.insights || [],
+              warnings: data.warnings || [],
+              smartSuggestion: data.smartSuggestion || {
+                arrivalTime: "",
+                reason: ""
+              }
+            })
+          }
         }
       } catch (error) {
-        console.error("Error fetching insights:", error)
+        if (!isCancelled) {
+          console.error("Error fetching insights:", error)
+        }
       } finally {
-        setIsLoading(false)
+        if (!isCancelled) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchInsights()
+
+    // Cleanup function to cancel request if component unmounts or bookingId changes
+    return () => {
+      isCancelled = true
+    }
   }, [bookingId])
 
   if (isLoading) {
@@ -217,11 +238,14 @@ export function QueueCard({
     )
   }
 
-  const normalizedBookingId =
-    (bookingId as any)?._id?.toString?.() ||
-    bookingId?.toString?.() ||
-    (bookingId as any)?.id ||
-    ""
+  const normalizedBookingId = useMemo(() => {
+    return (
+      (bookingId as any)?._id?.toString?.() ||
+      bookingId?.toString?.() ||
+      (bookingId as any)?.id ||
+      ""
+    )
+  }, [bookingId])
 
   const initials = doctorName
     .split(" ")
