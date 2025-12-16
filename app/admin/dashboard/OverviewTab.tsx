@@ -117,6 +117,9 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
               const lateMinutes =
                 typeof doctor.timeStatus === "number" ? doctor.timeStatus : 0;
 
+              // Check if doctor is available (from backend: "Available" or "Offline")
+              const isAvailable = doctor.status === "Available";
+
               return (
                 <Card
                   key={doctor._id.toString()}
@@ -178,25 +181,21 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
                       <div className="flex items-center gap-2">
                         <div
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 ${
-                            doctor.status === "online"
+                            isAvailable
                               ? "bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
                               : "bg-gray-50 dark:bg-gray-950/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800"
                           }`}
                         >
                           <div
                             className={`w-2 h-2 rounded-full ${
-                              doctor.status === "online"
-                                ? "bg-green-500"
-                                : "bg-gray-500"
+                              isAvailable ? "bg-green-500" : "bg-gray-500"
                             }`}
                           />
-                          <span>
-                            {doctor.status === "online" ? "Online" : "Offline"}
-                          </span>
+                          <span>{doctor.status}</span>
                         </div>
 
                         {/* Time Status */}
-                        {doctor.status === "online" && (
+                        {isAvailable && (
                           <div
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 ${
                               isOnTime

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import DoctorScheduleModel from "@/db/models/DoctorScheduleModel";
 import DoctorModel from "@/db/models/Doctor";
+import BookingModel from "@/db/models/Booking";
 import { DoctorWithSchedule } from "@/types/scheduleTypes";
 import { DoctorAdmin, Doctor } from "@/types/docterTypes";
 
@@ -23,19 +24,26 @@ function getTodayDayName(): string {
   return days[today.getDay()];
 }
 
-// Convert Doctor to DoctorAdmin format
-function convertToDoctorAdmin(doctor: Doctor): DoctorAdmin {
+// Convert Doctor to DoctorAdmin format with booking stats
+function convertToDoctorAdmin(
+  doctor: Doctor,
+  bookingStats: {
+    todayPatients: number;
+    completedToday: number;
+    currentQueue: number;
+  }
+): DoctorAdmin {
   return {
     _id: doctor._id,
     name: doctor.name,
     specialization: doctor.specialization,
     clinic: doctor.clinic,
-    status: doctor.isActive ? "online" : "Offline",
-    todayPatients: 0, // Will be calculated from bookings
-    currentQueue: 0, // Will be calculated from bookings
+    status: doctor.isActive ? "Available" : "Offline",
+    todayPatients: bookingStats.todayPatients,
+    currentQueue: bookingStats.currentQueue,
     currentlyServing: null,
     avgWaitTime: doctor.averageTimePerPatient || 15, // Default 15 mins
-    completedToday: 0, // Will be calculated from bookings
+    completedToday: bookingStats.completedToday,
     image: doctor.image,
     timeStatus: "onTime",
   };
@@ -71,9 +79,53 @@ export async function GET() {
       doctorIdsWithScheduleToday.includes(doctor._id.toString())
     );
 
-    // Convert to DoctorAdmin format
-    const doctorAdmins: DoctorAdmin[] =
-      doctorsWithScheduleToday.map(convertToDoctorAdmin);
+    // Get today's date range (start and end of day)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Fetch all bookings for today
+    const bookingCollection = await BookingModel.collection();
+    const todayBookings = await bookingCollection
+      .find({
+        scheduleDate: {
+          $gte: todayStart,
+          $lte: todayEnd,
+        },
+      })
+      .toArray();
+
+    // Calculate booking stats for each doctor
+    const doctorAdmins: DoctorAdmin[] = doctorsWithScheduleToday.map(
+      (doctor) => {
+        const doctorId = doctor._id.toString();
+
+        // Filter bookings for this doctor
+        const doctorBookings = todayBookings.filter(
+          (booking) => booking.doctorId.toString() === doctorId
+        );
+
+        // Calculate stats
+        const todayPatients = doctorBookings.filter(
+          (b) => b.status !== "cancelled"
+        ).length;
+
+        const completedToday = doctorBookings.filter(
+          (b) => b.status === "completed"
+        ).length;
+
+        const currentQueue = doctorBookings.filter(
+          (b) => b.status === "confirmed" || b.status === "pending"
+        ).length;
+
+        return convertToDoctorAdmin(doctor, {
+          todayPatients,
+          completedToday,
+          currentQueue,
+        });
+      }
+    );
 
     // Calculate stats from doctors with schedules
     const totalPatients = doctorAdmins.reduce(
