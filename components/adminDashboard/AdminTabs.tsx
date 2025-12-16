@@ -8,6 +8,7 @@ import {
   Calendar,
   ClipboardList,
   Package,
+  Receipt,
 } from "lucide-react";
 
 export function AdminTabs() {
@@ -25,6 +26,12 @@ export function AdminTabs() {
                 label: "Overview",
                 path: "/admin/dashboard",
                 icon: Activity,
+              },
+              {
+                key: "invoices",
+                label: "Invoices",
+                path: "/admin/dashboard/invoices",
+                icon: Receipt,
               },
               {
                 key: "doctors",
