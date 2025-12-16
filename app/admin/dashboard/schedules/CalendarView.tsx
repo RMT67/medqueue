@@ -7,7 +7,15 @@ interface CalendarViewProps {
   schedules: DoctorWithSchedule[];
 }
 
-const DAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 const COLORS = [
   "bg-green-500 border-green-600 text-white hover:bg-green-600",
@@ -20,13 +28,30 @@ const COLORS = [
   "bg-rose-500 border-rose-600 text-white hover:bg-rose-600",
 ];
 
+// Translation mapping for day names
+const DAY_TRANSLATION: Record<string, string> = {
+  Minggu: "Sunday",
+  Senin: "Monday",
+  Selasa: "Tuesday",
+  Rabu: "Wednesday",
+  Kamis: "Thursday",
+  Jumat: "Friday",
+  Sabtu: "Saturday",
+};
+
+const normalizeDay = (day: string): string => {
+  return DAY_TRANSLATION[day] || day;
+};
+
 export function CalendarView({ schedules }: CalendarViewProps) {
   const getColorForDoctor = (index: number) => {
     return COLORS[index % COLORS.length];
   };
 
   const getScheduleForDay = (schedule: DoctorWithSchedule, day: string) => {
-    return schedule.dayOfWeek.find((d) => d.hari === day && d.available);
+    return schedule.dayOfWeek.find(
+      (d) => normalizeDay(d.hari) === day && d.available
+    );
   };
 
   return (

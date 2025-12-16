@@ -65,7 +65,7 @@ export function Navigation({
   const links = getLinks();
   const displayName = userName || authUser?.name || "User";
   const userPhotoUrl = authUser?.photoUrl;
-  
+
   // Get initials for fallback avatar
   const getInitials = (name: string) => {
     return name
@@ -82,7 +82,7 @@ export function Navigation({
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
               <Stethoscope className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
@@ -129,7 +129,7 @@ export function Navigation({
                   href="/profile/edit"
                   className="flex items-center gap-3 group"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shadow-md group-hover:scale-105 transition-transform overflow-hidden">
+                  <div className="w-9 h-9 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shadow-md group-hover:scale-105 transition-transform overflow-hidden">
                     {userPhotoUrl ? (
                       <Image
                         src={userPhotoUrl}
@@ -228,7 +228,7 @@ export function Navigation({
                 <>
                   <div className="border-t border-border my-2 pt-4">
                     <div className="flex items-center gap-3 px-4 py-2">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground overflow-hidden">
+                      <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground overflow-hidden">
                         {userPhotoUrl ? (
                           <Image
                             src={userPhotoUrl}
@@ -300,4 +300,3 @@ export function Navigation({
     </nav>
   );
 }
-

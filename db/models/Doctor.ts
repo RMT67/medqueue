@@ -146,14 +146,22 @@ export default class DoctorModel {
     }) as Promise<Doctor | null>;
   }
 
+  static async getDoctorByUserId(userId: string): Promise<Doctor | null> {
+    const collection = await this.collection();
+    const doctor = await collection.findOne({
+      userId: new ObjectId(userId)
+    });
+    return doctor as Doctor | null;
+  }
+
   static async create(doctorData: Doctor) {
     const collection = await this.collection();
-    
+
     // Generate queueCode automatically if not provided
     if (!doctorData.queueCode) {
       // Count existing doctors to determine the next queueCode
       const doctorCount = await collection.countDocuments();
-      
+
       // Generate queueCode based on alphabet index
       // A=0, B=1, C=2, ..., Z=25
       // If exceeds 26, use AA=26, AB=27, etc.
@@ -163,15 +171,17 @@ export default class DoctorModel {
           return String.fromCharCode(65 + index); // 65 is 'A' in ASCII
         } else {
           // Double letter: AA, AB, AC, ..., AZ, BA, BB, etc.
-          const firstLetter = String.fromCharCode(65 + Math.floor(index / 26) - 1);
+          const firstLetter = String.fromCharCode(
+            65 + Math.floor(index / 26) - 1
+          );
           const secondLetter = String.fromCharCode(65 + (index % 26));
           return firstLetter + secondLetter;
         }
       };
-      
+
       doctorData.queueCode = generateQueueCode(doctorCount);
     }
-    
+
     doctorData = {
       ...doctorData,
       createdAt: new Date(),

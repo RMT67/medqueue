@@ -1,5 +1,6 @@
+import { ObjectId } from "mongodb";
 export type Service = {
-  _id: string;
+  _id: ObjectId;
   code: string;
   name: string;
   category: string;

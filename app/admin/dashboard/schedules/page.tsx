@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { ScheduleTab } from "./ScheduleTab";
 import { DoctorWithSchedule } from "@/types/scheduleTypes";
+import { DoctorScheduleType } from "@/types/doctorScheduleType";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,22 +23,14 @@ interface Doctor {
   image?: string;
 }
 
-interface DayScheduleForm {
-  hari: string;
-  available: boolean;
-  startTime: string;
-  endTime: string;
-}
-
-interface ScheduleFormData {
-  doctorId: string; // String representation of ObjectId for form handling
-  dayOfWeek: DayScheduleForm[];
-  isAvailable: boolean;
-  firstCallTime: string;
-  isOnTime: boolean;
-  delayMinutes: number;
-  maxPatients: number;
-}
+// ScheduleFormData based on DoctorScheduleType, adapted for form handling
+type ScheduleFormData = Omit<
+  DoctorScheduleType,
+  "_id" | "doctorId" | "firstCallTime"
+> & {
+  doctorId: string; // String for form handling (converted to ObjectId on backend)
+  firstCallTime: string; // Non-nullable string for form
+};
 
 // ==================== MAIN COMPONENT ====================
 export default function SchedulePage() {
@@ -55,21 +48,46 @@ export default function SchedulePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<ScheduleFormData>({
-    doctorId: Object(""),
+    doctorId: "",
     dayOfWeek: [
-      { hari: "Senin", available: false, startTime: "09:00", endTime: "17:00" },
       {
-        hari: "Selasa",
+        hari: "Monday",
         available: false,
         startTime: "09:00",
         endTime: "17:00",
       },
-      { hari: "Rabu", available: false, startTime: "09:00", endTime: "17:00" },
-      { hari: "Kamis", available: false, startTime: "09:00", endTime: "17:00" },
-      { hari: "Jumat", available: false, startTime: "09:00", endTime: "17:00" },
-      { hari: "Sabtu", available: false, startTime: "09:00", endTime: "17:00" },
       {
-        hari: "Minggu",
+        hari: "Tuesday",
+        available: false,
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+      {
+        hari: "Wednesday",
+        available: false,
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+      {
+        hari: "Thursday",
+        available: false,
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+      {
+        hari: "Friday",
+        available: false,
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+      {
+        hari: "Saturday",
+        available: false,
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+      {
+        hari: "Sunday",
         available: false,
         startTime: "09:00",
         endTime: "17:00",
@@ -311,43 +329,43 @@ export default function SchedulePage() {
       doctorId: "",
       dayOfWeek: [
         {
-          hari: "Senin",
+          hari: "Monday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
         },
         {
-          hari: "Selasa",
+          hari: "Tuesday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
         },
         {
-          hari: "Rabu",
+          hari: "Wednesday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
         },
         {
-          hari: "Kamis",
+          hari: "Thursday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
         },
         {
-          hari: "Jumat",
+          hari: "Friday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
         },
         {
-          hari: "Sabtu",
+          hari: "Saturday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
         },
         {
-          hari: "Minggu",
+          hari: "Sunday",
           available: false,
           startTime: "09:00",
           endTime: "17:00",
@@ -363,7 +381,7 @@ export default function SchedulePage() {
 
   const updateDaySchedule = (
     index: number,
-    field: keyof DayScheduleForm,
+    field: keyof ScheduleFormData["dayOfWeek"][number],
     value: string | boolean
   ) => {
     setFormData((prev) => ({
