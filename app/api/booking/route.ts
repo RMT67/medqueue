@@ -7,12 +7,22 @@ import DoctorModel from "@/db/models/Doctor";
 import { DoctorScheduleType } from "@/types/doctorScheduleType";
 import { Doctor } from "@/types/docterTypes";
 import { ObjectId } from "mongodb";
+import { verifyToken } from "@/lib/auth-helper";
+import { getDb } from "@/db/config/mongodb";
+
+interface PatientData {
+  _id: ObjectId;
+  fullName: string;
+  gender?: string;
+  dateOfBirth?: Date;
+}
 
 export async function GET(req: Request) {
   try {
-    // Get doctorId from query parameters
+    // Get query parameters
     const { searchParams } = new URL(req.url);
     const doctorId = searchParams.get("doctorId");
+    const populate = searchParams.get("populate");
 
     if (!doctorId) {
       return NextResponse.json(
@@ -29,10 +39,94 @@ export async function GET(req: Request) {
       );
     }
 
+    // Authorization check: ensure requester is a doctor
+    const authHeader = req.headers.get("authorization");
+    if (authHeader) {
+      try {
+        const { userId, role } = verifyToken(authHeader);
+
+        // If authenticated, verify it's a doctor
+        if (role !== "doctor") {
+          return NextResponse.json(
+            { success: false, message: "Unauthorized: Doctor access only" },
+            { status: 403 }
+          );
+        }
+
+        // Verify the doctorId matches the authenticated doctor's doctorId
+        const requestingDoctor = await DoctorModel.getDoctorByUserId(userId);
+        if (
+          !requestingDoctor ||
+          requestingDoctor._id?.toString() !== doctorId
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Unauthorized: Can only access your own bookings",
+            },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        console.log("🚀 ~ GET ~ error:", error);
+        return NextResponse.json(
+          { success: false, message: "Invalid authentication token" },
+          { status: 401 }
+        );
+      }
+    }
+
     // Fetch all bookings for this doctor
     const bookings = await Booking.findByDoctorId(doctorId);
 
-    // Return bookings (empty array if none found)
+    // If populate=patient, fetch patient data
+    if (populate === "patient" && bookings.length > 0) {
+      const db = await getDb();
+      const usersCollection = db.collection<PatientData>("users");
+
+      // Get unique patient IDs
+      const patientIds = [
+        ...new Set(bookings.map((b) => b.patientId.toString())),
+      ];
+
+      // Fetch all patients in one query
+      const patients = await usersCollection
+        .find(
+          { _id: { $in: patientIds.map((id) => new ObjectId(id)) } },
+          { projection: { fullName: 1, gender: 1, dateOfBirth: 1 } }
+        )
+        .toArray();
+
+      // Create a map for quick lookup
+      const patientMap = new Map(
+        patients.map((p: PatientData) => [p._id.toString(), p])
+      );
+
+      // Attach patient data to bookings
+      const bookingsWithPatients = bookings.map((booking) => {
+        const patient = patientMap.get(booking.patientId.toString());
+        return {
+          ...booking,
+          patient: patient
+            ? {
+                fullName: patient.fullName,
+                gender: patient.gender,
+                dateOfBirth: patient.dateOfBirth,
+              }
+            : null,
+        };
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: bookingsWithPatients,
+        },
+        { status: 200 }
+      );
+    }
+
+    // Return bookings without patient data (backward compatibility)
     return NextResponse.json(
       {
         success: true,

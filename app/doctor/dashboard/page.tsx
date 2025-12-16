@@ -31,7 +31,8 @@ interface QueuePatient {
   _id: string;
   queueNo: string;
   patientName: string;
-  patientId: string;
+  patientGender?: string;
+  patientAge?: number;
   status: "being-served" | "waiting" | "completed";
   eta: string;
   timeRange: string;
@@ -47,7 +48,7 @@ export default function DoctorDashboard() {
     null
   );
   const [queue, setQueue] = useState<QueuePatient[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [currentDoctor, setCurrentDoctor] = useState<Doctor | null>(null);
   const [doctorLoading, setDoctorLoading] = useState(true);
   const [doctorError, setDoctorError] = useState<string | null>(null);
   const [bookingsLoading, setBookingsLoading] = useState(true);
@@ -61,7 +62,8 @@ export default function DoctorDashboard() {
 
   // Fetch doctor data for clinic info
   useEffect(() => {
-    async function fetchDoctors() {
+    async function fetchDoctor() {
+      console.log("🚀 ~ fetchDoctor ~ user:", user);
       if (!user || user.role !== "doctor") {
         setDoctorLoading(false);
         return;
@@ -70,26 +72,26 @@ export default function DoctorDashboard() {
       try {
         setDoctorLoading(true);
         setDoctorError(null);
-        const response = await apiFetch<{ doctors: Doctor[] }, void>(
-          "/api/doctor",
+        const response = await apiFetch<{ doctor: Doctor }, void>(
+          `/api/doctor?userId=${user._id}`,
           {
             method: "GET",
             skipAuth: true,
           }
         );
-        setDoctors(response.doctors || []);
+        setCurrentDoctor(response.doctor);
       } catch (err) {
-        console.error("Error fetching doctors:", err);
+        console.error("Error fetching doctor:", err);
         setDoctorError(
           err instanceof Error ? err.message : "Gagal memuat data dokter"
         );
-        setDoctors([]); // Ensure empty array on error
+        setCurrentDoctor(null);
       } finally {
         setDoctorLoading(false);
       }
     }
 
-    fetchDoctors();
+    fetchDoctor();
   }, [user]);
 
   // Fetch bookings for the logged-in doctor
@@ -100,41 +102,37 @@ export default function DoctorDashboard() {
         return;
       }
 
-      // Find the doctor record that matches the logged-in user
-      if (doctors.length === 0) return; // Wait for doctors to load first
-
-      const currentDoctor = doctors.find((d) => d.userId === user._id);
-      if (!currentDoctor) {
-        setBookingsError("Doctor profile not found");
-        setBookingsLoading(false);
-        return;
-      }
+      // Wait for doctor to load first
+      if (!currentDoctor) return;
+      if (doctorLoading) return;
 
       try {
         setBookingsLoading(true);
         setBookingsError(null);
 
-        // Fetch bookings from API
-        const response = await fetch(
-          `/api/booking?doctorId=${currentDoctor._id}`,
+        // Fetch bookings with patient data from API
+        const response = await apiFetch<
           {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
+            success: boolean;
+            data: Array<
+              BookingType & {
+                patient: {
+                  fullName: string;
+                  gender?: string;
+                  dateOfBirth?: string;
+                } | null;
+              }
+            >;
+          },
+          void
+        >(`/api/booking?doctorId=${currentDoctor._id}&populate=patient`, {
+          method: "GET",
+        });
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch bookings");
-        }
-
-        const result = await response.json();
-
-        if (result.success && result.data) {
+        if (response.success && response.data) {
           // Filter today's bookings with status "confirmed"
           const today = new Date();
-          const todayBookings = result.data.filter((booking: BookingType) => {
+          const todayBookings = response.data.filter((booking) => {
             const scheduleDate = new Date(booking.scheduleDate);
             const isSameDate =
               scheduleDate.getFullYear() === today.getFullYear() &&
@@ -144,7 +142,7 @@ export default function DoctorDashboard() {
           });
 
           // Sort by appointmentTime or queueNumber
-          todayBookings.sort((a: BookingType, b: BookingType) => {
+          todayBookings.sort((a, b) => {
             if (a.appointmentTime && b.appointmentTime) {
               return (
                 new Date(a.appointmentTime).getTime() -
@@ -156,23 +154,27 @@ export default function DoctorDashboard() {
           });
 
           // Transform bookings to queue format
-          const queueData: QueuePatient[] = await Promise.all(
-            todayBookings.map(async (booking: BookingType, idx: number) => {
-              // Fetch patient name (you might need to create a patient API endpoint)
-              // For now, using patientId as placeholder
-              let patientName = `Patient ${booking.patientId}`;
+          const queueData: QueuePatient[] = todayBookings.map(
+            (booking, idx) => {
+              // Get patient data from populated field
+              const patientName =
+                booking.patient?.fullName || "Unknown Patient";
+              const patientGender = booking.patient?.gender;
+              let patientAge: number | undefined;
 
-              // Try to fetch patient info if API exists
-              try {
-                const patientRes = await fetch(
-                  `/api/profile?userId=${booking.patientId}`
-                );
-                if (patientRes.ok) {
-                  const patientData = await patientRes.json();
-                  patientName = patientData.name || patientName;
+              // Calculate age from dateOfBirth
+              if (booking.patient?.dateOfBirth) {
+                const birthDate = new Date(booking.patient.dateOfBirth);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+                if (
+                  monthDiff < 0 ||
+                  (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                ) {
+                  age--;
                 }
-              } catch (err) {
-                console.log("Could not fetch patient name:", err);
+                patientAge = age;
               }
 
               // Calculate ETA based on appointment time
@@ -214,14 +216,15 @@ export default function DoctorDashboard() {
                 _id: booking._id?.toString() || "",
                 queueNo: booking.queueNumber || "N/A",
                 patientName,
-                patientId: booking.patientId?.toString() || "",
+                patientGender,
+                patientAge,
                 status: idx === 0 ? "being-served" : "waiting",
                 eta,
                 timeRange,
                 patientComplaint: booking.complaint || "No complaint provided",
                 bookingData: booking,
               } as QueuePatient;
-            })
+            }
           );
 
           // Set first patient as current, rest as queue
@@ -250,7 +253,7 @@ export default function DoctorDashboard() {
     }
 
     fetchBookings();
-  }, [user, doctors]);
+  }, [user, currentDoctor, doctorLoading]);
 
   if (isLoading || doctorLoading || bookingsLoading) {
     return (
@@ -263,9 +266,6 @@ export default function DoctorDashboard() {
   if (!user) {
     return null;
   }
-
-  // Get current doctor info from fetched data (logged-in doctor)
-  const currentDoctor = doctors.find((d) => d.userId === user._id);
 
   const handleStartSession = () => {
     setIsSessionActive(true);
@@ -371,7 +371,7 @@ export default function DoctorDashboard() {
         )}
 
         {/* Empty Doctor State */}
-        {!doctorError && doctors.length === 0 && (
+        {!doctorError && !currentDoctor && (
           <Card className="mb-6 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20">
             <div className="p-12 text-center">
               <Stethoscope className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
@@ -386,7 +386,7 @@ export default function DoctorDashboard() {
         )}
 
         {/* Main Content - Only render if doctor data exists */}
-        {!doctorError && doctors.length > 0 && (
+        {!doctorError && currentDoctor && (
           <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Main Area - Current Patient */}
             <div className="lg:col-span-2 space-y-6">
@@ -419,12 +419,29 @@ export default function DoctorDashboard() {
 
                     <div className="bg-linear-to-br from-muted/50 to-muted/30 rounded-xl p-5 mb-6 border-2 border-border space-y-4">
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                           Patient Information
                         </p>
-                        <p className="text-base font-semibold text-foreground">
-                          {currentPatient?.patientName || "Unknown"}
-                        </p>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">
+                              Gender:
+                            </span>
+                            <span className="text-sm font-semibold text-foreground capitalize">
+                              {currentPatient?.patientGender || "Not available"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">
+                              Age:
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">
+                              {currentPatient?.patientAge
+                                ? `${currentPatient.patientAge} years`
+                                : "Not available"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                       <div className="pt-4 border-t-2 border-border">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -437,13 +454,14 @@ export default function DoctorDashboard() {
                           </p>
                         </div>
                       </div>
-                      {currentPatient?.patientComplaint && (
-                        <div className="pt-4 border-t-2 border-border">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                            Patient Complaint
-                          </p>
-                        </div>
-                      )}
+                      <div className="pt-4 border-t-2 border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Patient Symptom
+                        </p>
+                        <p className="text-sm font-semibold text-foreground bg-muted/50 p-3 rounded-lg">
+                          {currentPatient?.patientComplaint || "No symptoms provided"}
+                        </p>
+                      </div>
                       <div className="pt-4 border-t-2 border-border">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                           Status
@@ -610,11 +628,12 @@ export default function DoctorDashboard() {
                     currentDoctor?.averageTimePerPatient || 15
                   } minutes`,
                   "On schedule today",
-                  `Patient satisfaction: ${
-                    currentDoctor?.averageRating
-                      ? currentDoctor.averageRating.toFixed(1)
-                      : "N/A"
-                  }/5`,
+                  currentDoctor?.averageRating !== undefined &&
+                  currentDoctor.totalReviews > 0
+                    ? `Patient satisfaction: ${currentDoctor.averageRating.toFixed(
+                        1
+                      )}/5 (${currentDoctor.totalReviews} reviews)`
+                    : "Patient satisfaction: No ratings yet",
                 ]}
                 recommendation="Keep up the pace! You're doing great."
               />

@@ -8,6 +8,19 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
 
+    // Check for userId query - returns single doctor
+    const userId = searchParams.get("userId");
+    if (userId) {
+      const doctor = await DoctorModel.getDoctorByUserId(userId);
+      if (!doctor) {
+        return NextResponse.json(
+          { error: "Doctor not found" },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ doctor }, { status: 200 });
+    }
+
     // Extract query parameters
     const q = searchParams.get("q") || undefined;
     const specialization = searchParams.get("specialization") || undefined;
