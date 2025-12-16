@@ -28,4 +28,5 @@ export type Doctor = {
   createdAt?: Date;
   updatedAt?: Date;
   averageTimePerPatient?: number;
+  queueCode?: string;
 };
