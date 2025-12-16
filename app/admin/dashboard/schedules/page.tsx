@@ -24,9 +24,10 @@ interface Doctor {
 }
 
 // ScheduleFormData based on DoctorScheduleType, adapted for form handling
+// isOnTime is excluded because it's calculated automatically based on delayMinutes
 type ScheduleFormData = Omit<
   DoctorScheduleType,
-  "_id" | "doctorId" | "firstCallTime"
+  "_id" | "doctorId" | "firstCallTime" | "isOnTime"
 > & {
   doctorId: string; // String for form handling (converted to ObjectId on backend)
   firstCallTime: string; // Non-nullable string for form
@@ -95,7 +96,6 @@ export default function SchedulePage() {
     ],
     isAvailable: true,
     firstCallTime: "",
-    isOnTime: true,
     delayMinutes: 0,
     maxPatients: 20,
   });
@@ -170,6 +170,18 @@ export default function SchedulePage() {
       return;
     }
 
+    // Validate time ranges
+    for (const day of activeDays) {
+      if (day.startTime >= day.endTime) {
+        Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: `${day.hari}: Start time must be before end time`,
+        });
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
 
@@ -185,8 +197,10 @@ export default function SchedulePage() {
         body: JSON.stringify(payload),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to create schedule");
+        throw new Error(data.error || "Failed to create schedule");
       }
 
       // Close form and show loading state
@@ -204,12 +218,12 @@ export default function SchedulePage() {
         timer: 1500,
         showConfirmButton: false,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating schedule:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Failed to create schedule",
+        text: error.message || "Failed to create schedule",
       });
     } finally {
       setSubmitting(false);
@@ -220,6 +234,19 @@ export default function SchedulePage() {
   const handleUpdate = async () => {
     if (!editingId) return;
 
+    // Validate time ranges
+    const activeDays = formData.dayOfWeek.filter((day) => day.available);
+    for (const day of activeDays) {
+      if (day.startTime >= day.endTime) {
+        Swal.fire({
+          icon: "warning",
+          title: "Validation Error",
+          text: `${day.hari}: Start time must be before end time`,
+        });
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
       const response = await fetch(`/api/schedules`, {
@@ -228,8 +255,10 @@ export default function SchedulePage() {
         body: JSON.stringify({ _id: editingId, ...formData }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to update schedule");
+        throw new Error(data.error || "Failed to update schedule");
       }
 
       // Close form and show loading state
@@ -247,12 +276,12 @@ export default function SchedulePage() {
         timer: 1500,
         showConfirmButton: false,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating schedule:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Failed to update schedule",
+        text: error.message || "Failed to update schedule",
       });
     } finally {
       setSubmitting(false);
@@ -302,20 +331,75 @@ export default function SchedulePage() {
     }
   };
 
+  // Helper function to normalize day names (Indonesian to English)
+  const normalizeDayName = (dayName: string): string => {
+    const dayMap: Record<string, string> = {
+      "Minggu": "Sunday",
+      "Senin": "Monday",
+      "Selasa": "Tuesday",
+      "Rabu": "Wednesday",
+      "Kamis": "Thursday",
+      "Jumat": "Friday",
+      "Sabtu": "Saturday",
+      "Sunday": "Sunday",
+      "Monday": "Monday",
+      "Tuesday": "Tuesday",
+      "Wednesday": "Wednesday",
+      "Thursday": "Thursday",
+      "Friday": "Friday",
+      "Saturday": "Saturday",
+    };
+    return dayMap[dayName] || dayName;
+  };
+
   // ==================== FORM HANDLERS ====================
   const handleEdit = (schedule: DoctorWithSchedule) => {
     setEditingId(schedule._id);
+    
+    // Define all 7 days in order
+    const allDays = [
+      "Monday",
+      "Tuesday", 
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ];
+
+    // Create a map of existing schedule days for quick lookup
+    // Normalize day names for comparison
+    const existingDaysMap = new Map(
+      schedule.dayOfWeek.map((day) => [normalizeDayName(day.hari), day])
+    );
+
+    // Build dayOfWeek array with all 7 days
+    // If day exists in schedule, use its data; otherwise, set as unavailable
+    const dayOfWeek = allDays.map((dayName) => {
+      const existingDay = existingDaysMap.get(dayName);
+      if (existingDay) {
+        return {
+          hari: dayName, // Use normalized name
+          available: existingDay.available,
+          startTime: existingDay.startTime,
+          endTime: existingDay.endTime,
+        };
+      } else {
+        // Day not in schedule, add it as unavailable
+        return {
+          hari: dayName,
+          available: false,
+          startTime: "09:00",
+          endTime: "17:00",
+        };
+      }
+    });
+
     setFormData({
-      doctorId: schedule.doctorId,
-      dayOfWeek: schedule.dayOfWeek.map((day) => ({
-        hari: day.hari,
-        available: day.available,
-        startTime: day.startTime,
-        endTime: day.endTime,
-      })),
+      doctorId: schedule.doctorId.toString(), // Fix: convert to string
+      dayOfWeek,
       isAvailable: schedule.isAvailable,
-      firstCallTime: "",
-      isOnTime: schedule.isOnTime,
+      firstCallTime: schedule.firstCallTime || "", // Fix: populate firstCallTime
       delayMinutes: schedule.delayMinutes,
       maxPatients: schedule.maxPatients,
     });
@@ -373,7 +457,6 @@ export default function SchedulePage() {
       ],
       isAvailable: true,
       firstCallTime: "",
-      isOnTime: true,
       delayMinutes: 0,
       maxPatients: 20,
     });
@@ -547,6 +630,11 @@ export default function SchedulePage() {
                           />
                         </>
                       )}
+                      {!day.available && (
+                        <span className="text-sm text-muted-foreground italic">
+                          Not available
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -618,18 +706,6 @@ export default function SchedulePage() {
                       className="w-5 h-5"
                     />
                     <span className="text-sm font-medium">Available</span>
-                  </label>
-
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.isOnTime}
-                      onChange={(e) =>
-                        setFormData({ ...formData, isOnTime: e.target.checked })
-                      }
-                      className="w-5 h-5"
-                    />
-                    <span className="text-sm font-medium">On Time</span>
                   </label>
                 </div>
               </div>
