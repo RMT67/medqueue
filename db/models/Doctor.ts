@@ -42,7 +42,7 @@ export default class DoctorModel {
     options: FindDoctorsOptions = {}
   ): Promise<Doctor[]> {
     const collection = await this.collection();
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
     // Default to active doctors for public access
     if (filter.isActive !== undefined) {
@@ -85,7 +85,7 @@ export default class DoctorModel {
       "updatedAt",
     ]);
 
-    let sortObj: any = { name: 1 }; // Default: name ascending
+    let sortObj: Record<string, number> = { name: 1 }; // Default: name ascending
     if (options.sort) {
       const [field, direction] = options.sort.split("_");
       if (field && direction && allowedSortFields.has(field)) {
@@ -95,7 +95,7 @@ export default class DoctorModel {
 
     const doctors = await collection
       .find(query)
-      .sort(sortObj)
+      .sort(sortObj as { [key: string]: 1 | -1 })
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -110,7 +110,7 @@ export default class DoctorModel {
    */
   static async countDoctors(filter: FindDoctorsFilter = {}): Promise<number> {
     const collection = await this.collection();
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
     if (filter.isActive !== undefined) {
       query.$or = [
@@ -147,6 +147,31 @@ export default class DoctorModel {
   }
 
   static async create(doctorData: Doctor) {
+    const collection = await this.collection();
+    
+    // Generate queueCode automatically if not provided
+    if (!doctorData.queueCode) {
+      // Count existing doctors to determine the next queueCode
+      const doctorCount = await collection.countDocuments();
+      
+      // Generate queueCode based on alphabet index
+      // A=0, B=1, C=2, ..., Z=25
+      // If exceeds 26, use AA=26, AB=27, etc.
+      const generateQueueCode = (index: number): string => {
+        if (index < 26) {
+          // Single letter: A-Z
+          return String.fromCharCode(65 + index); // 65 is 'A' in ASCII
+        } else {
+          // Double letter: AA, AB, AC, ..., AZ, BA, BB, etc.
+          const firstLetter = String.fromCharCode(65 + Math.floor(index / 26) - 1);
+          const secondLetter = String.fromCharCode(65 + (index % 26));
+          return firstLetter + secondLetter;
+        }
+      };
+      
+      doctorData.queueCode = generateQueueCode(doctorCount);
+    }
+    
     doctorData = {
       ...doctorData,
       createdAt: new Date(),
@@ -154,7 +179,6 @@ export default class DoctorModel {
     };
 
     try {
-      const collection = await this.collection();
       await collection.insertOne(doctorData as Omit<Doctor, "_id">);
       return doctorData;
     } catch (err) {

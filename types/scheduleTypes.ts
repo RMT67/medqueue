@@ -1,6 +1,6 @@
 export type DaySchedule = {
   hari: string;
-  availabel: boolean;
+  available: boolean;
   startTime: string;
   endTime: string;
 };
