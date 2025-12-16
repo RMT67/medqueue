@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { QueueCard } from "@/components/queue-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Star, Clock, Calendar, ArrowRight, User, Mail, Phone, ListOrdered, Receipt, Pill, CreditCard } from "lucide-react"
+import { Star, Clock, Calendar, ArrowRight, User, Mail, Phone, ListOrdered, Receipt, Pill, CreditCard, UserCircle, MapPin } from "lucide-react"
 import { ReviewDoctorModal } from "@/components/review-doctor-modal"
 import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
+import { apiFetch } from "@/lib/api"
+import { ProfileUser } from "@/types/userTypes"
 
 interface QueueData {
   _id?: string
@@ -87,6 +90,7 @@ export default function MyQueuePage() {
   const [pastAppointments, setPastAppointments] = useState<PastAppointment[]>([])
   const [isLoadingQueue, setIsLoadingQueue] = useState(true)
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null)
+  const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(null)
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "patient")) {
@@ -290,6 +294,22 @@ export default function MyQueuePage() {
 
     if (user && user.role === "patient") {
       fetchPastAppointments()
+    }
+  }, [user])
+
+  // ✅ Fetch patient profile data
+  useEffect(() => {
+    const fetchPatientProfile = async () => {
+      try {
+        const data = await apiFetch<{ user: ProfileUser }>("/api/profile")
+        setPatientProfile(data.user)
+      } catch (error) {
+        console.error("Error fetching patient profile:", error)
+      }
+    }
+
+    if (user && user.role === "patient") {
+      fetchPatientProfile()
     }
   }, [user])
 
@@ -498,39 +518,105 @@ export default function MyQueuePage() {
           {/* Sidebar - 1/3 width */}
           <div className="w-full lg:w-1/3 lg:min-w-0 flex flex-col gap-6">
             {/* Patient Profile */}
-            <Card className="p-6 border border-border/50 shadow-xl bg-card/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-2 ring-primary/10">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground">Patient Profile</h3>
-              </div>
-              <div className="space-y-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white font-bold text-2xl shadow-xl ring-4 ring-primary/10">
-                    {user?.name?.charAt(0).toUpperCase() || "P"}
+            <Link href="/profile">
+              <Card className="p-6 border border-border/50 shadow-xl bg-card/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 cursor-pointer hover:border-primary/50">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-2 ring-primary/10">
+                    <User className="w-5 h-5 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-foreground text-lg truncate mb-1">{user?.name || "Patient"}</p>
-                    <p className="text-sm text-muted-foreground capitalize font-medium">{user?.role || "Patient"}</p>
-                  </div>
+                  <h3 className="text-lg font-bold text-foreground">Patient Profile</h3>
                 </div>
-                <div className="pt-5 border-t border-border/50 space-y-4">
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
-                      <Mail className="w-4 h-4 text-primary" />
+                <div className="space-y-5">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 overflow-hidden shadow-xl ring-4 ring-primary/10 flex-shrink-0">
+                      {patientProfile?.photoUrl ? (
+                        <Image
+                          src={patientProfile.photoUrl}
+                          alt={patientProfile.fullName || "Patient"}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            const parent = target.parentElement
+                            if (parent) {
+                              const fallback = parent.querySelector('.image-fallback') as HTMLElement
+                              if (fallback) fallback.style.display = 'flex'
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={`image-fallback ${patientProfile?.photoUrl ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-white font-bold text-2xl`}
+                      >
+                        {patientProfile?.fullName?.charAt(0).toUpperCase() || user?.name?.charAt(0).toUpperCase() || "P"}
+                      </div>
                     </div>
-                    <span className="text-muted-foreground truncate font-medium">{user?.email || "patient@example.com"}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
-                      <Phone className="w-4 h-4 text-primary" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-foreground text-lg truncate mb-1">
+                        {patientProfile?.fullName || user?.name || "Patient"}
+                      </p>
+                      <p className="text-sm text-muted-foreground capitalize font-medium">
+                        {patientProfile?.role || user?.role || "Patient"}
+                      </p>
                     </div>
-                    <span className="text-muted-foreground font-medium">+62 812-3456-7890</span>
+                  </div>
+                  <div className="pt-5 border-t border-border/50 space-y-4">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                        <Mail className="w-4 h-4 text-primary" />
+                      </div>
+                      <span className="text-muted-foreground truncate font-medium">
+                        {patientProfile?.email || user?.email || "patient@example.com"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                        <Phone className="w-4 h-4 text-primary" />
+                      </div>
+                      <span className="text-muted-foreground font-medium">
+                        {patientProfile?.phoneNumber || "Not set"}
+                      </span>
+                    </div>
+                    {patientProfile?.dateOfBirth && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                          <Calendar className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-muted-foreground font-medium">
+                          {new Date(patientProfile.dateOfBirth).toLocaleDateString("id-ID", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric"
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {patientProfile?.gender && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                          <UserCircle className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-muted-foreground font-medium capitalize">
+                          {patientProfile.gender}
+                        </span>
+                      </div>
+                    )}
+                    {patientProfile?.address && (
+                      <div className="flex items-start gap-3 text-sm">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20 mt-0.5">
+                          <MapPin className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-muted-foreground font-medium line-clamp-2">
+                          {patientProfile.address}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </Link>
 
             {/* Invoice & Receipt */}
             {invoiceData && (

@@ -5,7 +5,7 @@ import InvoiceModel from "@/db/models/Invoice";
 import BookingModel from "@/db/models/Booking";
 import DoctorModel from "@/db/models/Doctor";
 import MedicalRecordModel from "@/db/models/MedicalRecord";
-import ServiceModel from "@/db/models/Service";
+import ServiceModel from "@/db/models/ServiceModel";
 import MedicineModel from "@/db/models/Medicine";
 import { generateInvoiceNumber, calculateDueDate } from "@/lib/invoice-utils";
 
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
 
     // ✅ 7. Add Service (Consultation/Check-up/etc) - dari Services collection
     if (medicalRecord.serviceId) {
-      const service = await ServiceModel.getById(medicalRecord.serviceId);
+      const service = await ServiceModel.getServiceById(medicalRecord.serviceId);
       if (service && service.isActive) {
         // Use price from Services collection
         const servicePrice = service.price;

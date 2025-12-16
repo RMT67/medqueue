@@ -24,6 +24,12 @@ interface MedicalRecord {
     clinic: string
     image: string
   } | null
+  service: {
+    serviceId: string
+    name: string
+    category: string
+    price: number
+  } | null
   diagnosis: string
   prescription: string
   prescriptions: Array<{
@@ -245,10 +251,20 @@ export default function MedicalRecordPage() {
                                 <span className="px-4 py-1.5 bg-primary/10 text-primary rounded-xl text-xs font-semibold border border-primary/20 shadow-sm">
                                   {record.formattedDate}
                                 </span>
+                                {record.bookingNumber && (
+                                  <span className="px-4 py-1.5 bg-secondary/10 text-secondary-foreground rounded-xl text-xs font-semibold border border-secondary/20 shadow-sm">
+                                    Booking: {record.bookingNumber}
+                                  </span>
+                                )}
                               </div>
-                              <p className="text-sm text-primary font-semibold mb-3">
+                              <p className="text-sm text-primary font-semibold mb-2">
                                 {record.doctor?.specialization || ""}
                               </p>
+                              {record.service && (
+                                <p className="text-sm text-muted-foreground mb-2 font-medium">
+                                  Service: {record.service.name} {record.service.price > 0 && `(Rp ${record.service.price.toLocaleString("id-ID")})`}
+                                </p>
+                              )}
                               <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                                 <MapPin className="w-4 h-4 flex-shrink-0 text-primary" />
                                 <span className="truncate font-medium">
@@ -321,6 +337,63 @@ export default function MedicalRecordPage() {
                                     </p>
                                   </div>
                                 ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Service Information */}
+                          {record.service && (
+                            <div className="p-5 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/30 dark:to-blue-900/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center ring-1 ring-blue-200 dark:ring-blue-800">
+                                  <Stethoscope className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                  Service Information
+                                </span>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-base font-semibold text-foreground">
+                                  {record.service.name}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Category: {record.service.category}
+                                </p>
+                                {record.service.price > 0 && (
+                                  <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                                    Price: Rp {record.service.price.toLocaleString("id-ID")}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Booking Information */}
+                          {record.bookingNumber && (
+                            <div className="p-5 bg-card/80 rounded-xl border border-border/50 shadow-sm backdrop-blur-sm">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center ring-1 ring-secondary/30">
+                                  <Calendar className="w-5 h-5 text-secondary" />
+                                </div>
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                  Booking Information
+                                </span>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm text-foreground">
+                                  <span className="font-semibold">Booking Number:</span> {record.bookingNumber}
+                                </p>
+                                <p className="text-sm text-foreground">
+                                  <span className="font-semibold">Date:</span> {record.formattedDate}
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => router.push(`/patient/appointments`)}
+                                  className="mt-2 border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                                >
+                                  View Appointment
+                                </Button>
                               </div>
                             </div>
                           )}
