@@ -1,33 +1,23 @@
 import { Card } from "@/components/ui/card";
 import { Calendar, Clock, Users } from "lucide-react";
 import Image from "next/image";
-import { DaySchedule, DoctorWithSchedule } from "@/types/scheduleTypes";
+import { DoctorWithSchedule } from "@/types/scheduleTypes";
 
 interface CalendarViewProps {
   schedules: DoctorWithSchedule[];
 }
 
 const DAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-const TIME_SLOTS = [
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-];
 
 const COLORS = [
-  "bg-green-100 border-green-300 text-green-800",
-  "bg-blue-100 border-blue-300 text-blue-800",
-  "bg-purple-100 border-purple-300 text-purple-800",
-  "bg-yellow-100 border-yellow-300 text-yellow-800",
-  "bg-pink-100 border-pink-300 text-pink-800",
-  "bg-indigo-100 border-indigo-300 text-indigo-800",
+  "bg-green-500 border-green-600 text-white hover:bg-green-600",
+  "bg-blue-500 border-blue-600 text-white hover:bg-blue-600",
+  "bg-purple-500 border-purple-600 text-white hover:bg-purple-600",
+  "bg-amber-500 border-amber-600 text-white hover:bg-amber-600",
+  "bg-pink-500 border-pink-600 text-white hover:bg-pink-600",
+  "bg-indigo-500 border-indigo-600 text-white hover:bg-indigo-600",
+  "bg-teal-500 border-teal-600 text-white hover:bg-teal-600",
+  "bg-rose-500 border-rose-600 text-white hover:bg-rose-600",
 ];
 
 export function CalendarView({ schedules }: CalendarViewProps) {
@@ -35,39 +25,8 @@ export function CalendarView({ schedules }: CalendarViewProps) {
     return COLORS[index % COLORS.length];
   };
 
-  const getScheduleForDayAndTime = (day: string, time: string) => {
-    const results: Array<{
-      schedule: DoctorWithSchedule;
-      daySchedule: DaySchedule;
-      colorClass: string;
-    }> = [];
-
-    schedules.forEach((schedule, index) => {
-      const daySchedule = schedule.dayOfWeek.find(
-        (d) => d.hari === day && d.available
-      );
-
-      if (daySchedule) {
-        const startHour = parseInt(daySchedule.startTime.split(":")[0]);
-        const timeHour = parseInt(time.split(":")[0]);
-
-        if (timeHour === startHour) {
-          results.push({
-            schedule,
-            daySchedule,
-            colorClass: getColorForDoctor(index),
-          });
-        }
-      }
-    });
-
-    return results;
-  };
-
-  const calculateDuration = (startTime: string, endTime: string) => {
-    const start = parseInt(startTime.split(":")[0]);
-    const end = parseInt(endTime.split(":")[0]);
-    return end - start;
+  const getScheduleForDay = (schedule: DoctorWithSchedule, day: string) => {
+    return schedule.dayOfWeek.find((d) => d.hari === day && d.available);
   };
 
   return (
@@ -82,7 +41,7 @@ export function CalendarView({ schedules }: CalendarViewProps) {
               Weekly Schedule
             </h2>
             <p className="text-sm text-muted-foreground">
-              Doctor availability calendar
+              Doctor availability calendar - Each row represents one doctor
             </p>
           </div>
         </div>
@@ -90,128 +49,115 @@ export function CalendarView({ schedules }: CalendarViewProps) {
 
       <Card className="overflow-hidden border-2">
         <div className="overflow-x-auto">
-          <div className="min-w-[1000px]">
+          <div className="min-w-[1200px]">
             {/* Header - Days of Week */}
-            <div className="grid grid-cols-8 border-b-2 bg-muted/30">
-              <div className="p-4 border-r"></div>
+            <div className="grid grid-cols-8 border-b-2 bg-muted/30 sticky top-0 z-20">
+              <div className="p-4 border-r bg-muted/50">
+                <span className="font-bold text-sm">Doctor</span>
+              </div>
               {DAYS.map((day) => (
                 <div
                   key={day}
-                  className="p-4 text-center font-bold text-sm border-r last:border-r-0"
+                  className="p-4 text-center font-bold text-sm border-r last:border-r-0 bg-muted/50"
                 >
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Time Slots Grid */}
-            <div className="relative">
-              {TIME_SLOTS.map((time) => (
-                <div
-                  key={time}
-                  className="grid grid-cols-8 border-b last:border-b-0"
-                >
-                  {/* Time Label */}
-                  <div className="p-4 text-sm text-muted-foreground font-medium border-r bg-muted/20">
-                    {time}
-                  </div>
+            {/* Doctor Rows */}
+            <div>
+              {schedules.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  No schedules available
+                </div>
+              ) : (
+                schedules.map((schedule, doctorIndex) => (
+                  <div
+                    key={schedule._id}
+                    className="grid grid-cols-8 border-b hover:bg-muted/20 transition-colors"
+                  >
+                    {/* Doctor Info Column */}
+                    <div className="p-4 border-r bg-muted/10 flex items-center gap-3">
+                      {schedule.doctorInfo.image && (
+                        <Image
+                          src={schedule.doctorInfo.image}
+                          alt={schedule.doctorInfo.name}
+                          width={40}
+                          height={40}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate">
+                          {schedule.doctorInfo.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {schedule.doctorInfo.specialization}
+                        </p>
+                      </div>
+                    </div>
 
-                  {/* Day Cells */}
-                  {DAYS.map((day) => {
-                    const scheduleItems = getScheduleForDayAndTime(day, time);
+                    {/* Day Columns */}
+                    {DAYS.map((day) => {
+                      const daySchedule = getScheduleForDay(schedule, day);
 
-                    return (
-                      <div
-                        key={`${day}-${time}`}
-                        className="border-r last:border-r-0 min-h-20 p-2 relative"
-                      >
-                        {scheduleItems.map((item, index) => {
-                          const duration = calculateDuration(
-                            item.daySchedule.startTime,
-                            item.daySchedule.endTime
-                          );
-                          const height = duration * 80; // 80px per hour
-
-                          return (
+                      return (
+                        <div
+                          key={`${schedule._id}-${day}`}
+                          className="border-r last:border-r-0 p-2 min-h-20 flex items-center justify-center"
+                        >
+                          {daySchedule ? (
                             <div
-                              key={`${item.schedule._id}-${index}`}
-                              className={`absolute left-2 right-2 p-3 rounded-lg border-2 ${item.colorClass} shadow-sm hover:shadow-md transition-all cursor-pointer`}
-                              style={{
-                                height: `${height - 8}px`,
-                                zIndex: 10,
-                              }}
+                              className={`w-full p-3 rounded-lg border-2 shadow-sm hover:shadow-md transition-all cursor-pointer ${getColorForDoctor(
+                                doctorIndex
+                              )}`}
                             >
-                              <div className="space-y-1">
-                                <p className="font-bold text-sm line-clamp-1">
-                                  {item.schedule.doctorInfo.name}
-                                </p>
-                                <p className="text-xs opacity-80 line-clamp-1">
-                                  {item.schedule.doctorInfo.specialization}
-                                </p>
-                                <div className="flex items-center gap-1 text-xs">
-                                  <Clock className="w-3 h-3" />
-                                  <span>
-                                    {item.daySchedule.startTime} -{" "}
-                                    {item.daySchedule.endTime}
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="text-xs font-bold">
+                                    {daySchedule.startTime} -{" "}
+                                    {daySchedule.endTime}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1 text-xs">
-                                  <Users className="w-3 h-3" />
-                                  <span>Max: {item.schedule.maxPatients}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="text-xs font-medium">
+                                    Max: {schedule.maxPatients}
+                                  </span>
                                 </div>
-                                {item.schedule.doctorInfo.image && (
-                                  <Image
-                                    src={item.schedule.doctorInfo.image}
-                                    alt={item.schedule.doctorInfo.name}
-                                    width={24}
-                                    height={24}
-                                    className="w-6 h-6 rounded-full object-cover mt-2"
-                                  />
+                                {schedule.isOnTime && (
+                                  <div className="text-[10px] font-semibold bg-white/30 rounded px-1.5 py-0.5 inline-block">
+                                    On Time
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+                          ) : (
+                            <div className="text-xs text-muted-foreground/50">
+                              —
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       </Card>
 
       {/* Legend */}
-      <Card className="p-4">
-        <h3 className="font-bold text-sm mb-3">Doctors</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {schedules.map((schedule, index) => (
-            <div
-              key={schedule._id}
-              className="flex items-center gap-2 p-2 rounded-lg border"
-            >
-              <div
-                className={`w-4 h-4 rounded ${
-                  getColorForDoctor(index).split(" ")[0]
-                }`}
-              ></div>
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {schedule.doctorInfo.image && (
-                  <Image
-                    src={schedule.doctorInfo.image}
-                    alt={schedule.doctorInfo.name}
-                    width={24}
-                    height={24}
-                    className="w-6 h-6 rounded-full object-cover"
-                  />
-                )}
-                <span className="text-sm font-medium truncate">
-                  {schedule.doctorInfo.name}
-                </span>
-              </div>
-            </div>
-          ))}
+      <Card className="p-4 bg-muted/30">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Calendar className="w-4 h-4" />
+          <span>
+            Each colored block represents a doctor&apos;s available schedule for
+            that day
+          </span>
         </div>
       </Card>
     </div>

@@ -10,19 +10,7 @@ import { DoctorWithSchedule } from "@/types/scheduleTypes";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Save,
-  X,
-  Clock,
-  Users,
-  Calendar as CalendarIcon,
-  CheckCircle2,
-  AlertCircle,
-  List,
-} from "lucide-react";
+import { Plus, Save, X, Calendar as CalendarIcon, List } from "lucide-react";
 import Swal from "sweetalert2";
 
 // ==================== TYPES ====================
