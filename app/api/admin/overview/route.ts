@@ -19,7 +19,15 @@ interface OverviewResponse {
 }
 
 function getTodayDayName(): string {
-  const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   const today = new Date();
   return days[today.getDay()];
 }
