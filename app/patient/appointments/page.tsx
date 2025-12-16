@@ -6,7 +6,7 @@ import { Navigation } from "@/components/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { Calendar, Clock, MapPin, Stethoscope, Star, CheckCircle2, XCircle, Hourglass, ArrowLeft, MessageSquare } from "lucide-react"
+import { Calendar, Clock, MapPin, Stethoscope, Star, CheckCircle2, XCircle, Hourglass, ArrowLeft, MessageSquare, FileText, Receipt, Trash2 } from "lucide-react"
 import Image from "next/image"
 import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn, StaggerChildren } from "@/components/animations"
@@ -58,6 +58,7 @@ export default function MyAppointmentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   // ✅ Fetch appointments from API
   useEffect(() => {
@@ -93,6 +94,55 @@ export default function MyAppointmentsPage() {
 
     fetchAppointments()
   }, [filter])
+
+  const handleCancelAppointment = async (bookingId: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) {
+      return
+    }
+
+    try {
+      setCancellingId(bookingId)
+      const token = localStorage.getItem("medqueue_token")
+      if (!token) {
+        alert("Authentication required")
+        return
+      }
+
+      const response = await fetch(`/api/patient/queue/${bookingId}/cancel`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cancelReason: "Cancelled by patient from appointments page"
+        }),
+      })
+
+      if (response.ok) {
+        // Refresh appointments
+        const params = new URLSearchParams()
+        if (filter !== "all") params.append("status", filter)
+        const refreshResponse = await fetch(`/api/patient/appointments?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json()
+          setAppointments(data.appointments || [])
+        }
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to cancel appointment")
+      }
+    } catch (error) {
+      console.error("Error cancelling appointment:", error)
+      alert("Failed to cancel appointment")
+    } finally {
+      setCancellingId(null)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -324,37 +374,94 @@ export default function MyAppointmentsPage() {
                               </div>
                             </div>
 
-                            {/* Rating and Review Button for completed appointments */}
-                            {appointment.statusDisplay === "completed" && (
-                              <div className="flex items-center justify-between gap-4">
-                                {appointment.doctor && appointment.doctor.rating > 0 && (
-                                  <div className="flex items-center gap-1.5">
-                                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-base font-bold text-foreground">
-                                      {appointment.doctor.rating.toFixed(1)}
-                                    </span>
-                                    {appointment.doctor.totalReviews > 0 && (
-                                      <span className="text-sm text-muted-foreground">
-                                        ({appointment.doctor.totalReviews})
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {!appointment.hasReview && (
-                                  <Button
-                                    onClick={() => {
-                                      setSelectedAppointment(appointment)
-                                      setShowReviewModal(true)
-                                    }}
-                                    variant="outline"
-                                    className="flex-shrink-0 border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
-                                  >
-                                    <MessageSquare className="w-4 h-4" />
-                                    Review Doctor
-                                  </Button>
-                                )}
+                            {/* Complaint */}
+                            {appointment.complaint && (
+                              <div className="pt-4 border-t border-border/50">
+                                <p className="text-sm text-muted-foreground mb-1 font-semibold">Complaint:</p>
+                                <p className="text-sm text-foreground">{appointment.complaint}</p>
                               </div>
                             )}
+
+                            {/* Action Buttons */}
+                            <div className="pt-4 border-t border-border/50 flex flex-wrap items-center gap-3">
+                              {/* Rating and Review for completed appointments */}
+                              {appointment.statusDisplay === "completed" && (
+                                <>
+                                  {appointment.doctor && appointment.doctor.rating > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                      <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                      <span className="text-base font-bold text-foreground">
+                                        {appointment.doctor.rating.toFixed(1)}
+                                      </span>
+                                      {appointment.doctor.totalReviews > 0 && (
+                                        <span className="text-sm text-muted-foreground">
+                                          ({appointment.doctor.totalReviews})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {!appointment.hasReview && (
+                                    <Button
+                                      onClick={() => {
+                                        setSelectedAppointment(appointment)
+                                        setShowReviewModal(true)
+                                      }}
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                                    >
+                                      <MessageSquare className="w-4 h-4" />
+                                      Review Doctor
+                                    </Button>
+                                  )}
+                                  {appointment.hasMedicalRecord && (
+                                    <Button
+                                      onClick={() => router.push("/patient/medical-record")}
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                                    >
+                                      <FileText className="w-4 h-4" />
+                                      View Medical Record
+                                    </Button>
+                                  )}
+                                  {appointment.hasInvoice && (
+                                    <Button
+                                      onClick={() => router.push(`/patient/dashboard`)}
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                                    >
+                                      <Receipt className="w-4 h-4" />
+                                      View Invoice
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Cancel button for upcoming appointments */}
+                              {appointment.statusDisplay === "upcoming" && (
+                                <Button
+                                  onClick={() => handleCancelAppointment(appointment.bookingId)}
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={cancellingId === appointment.bookingId}
+                                  className="border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 hover:border-red-300 dark:hover:border-red-700 transition-all duration-300 font-semibold gap-2"
+                                >
+                                  {cancellingId === appointment.bookingId ? (
+                                    <>
+                                      <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />
+                                      Cancelling...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash2 className="w-4 h-4" />
+                                      Cancel Appointment
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

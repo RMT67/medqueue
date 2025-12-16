@@ -5,7 +5,7 @@ import { verifyToken } from "@/lib/auth-helper";
 import MedicalRecordModel from "@/db/models/MedicalRecord";
 import DoctorModel from "@/db/models/Doctor";
 import BookingModel from "@/db/models/Booking";
-import ServiceModel from "@/db/models/Service";
+import ServiceModel from "@/db/models/ServiceModel";
 import MedicineModel from "@/db/models/Medicine";
 
 export async function GET(
@@ -78,7 +78,7 @@ export async function GET(
     // ✅ 7. Get service info from Services collection
     let serviceInfo = null;
     if (record.serviceId) {
-      const service = await ServiceModel.getById(record.serviceId);
+      const service = await ServiceModel.getServiceById(record.serviceId);
       if (service) {
         serviceInfo = {
           serviceId: service._id?.toString(),

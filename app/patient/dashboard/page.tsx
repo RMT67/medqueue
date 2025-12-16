@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Navigation } from "@/components/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { Clock, Calendar, FileText, Stethoscope, ArrowRight, Sparkles, TrendingUp, Activity, Receipt, CreditCard, Pill, AlertCircle, User, Star } from "lucide-react"
+import { Clock, Calendar, FileText, Stethoscope, ArrowRight, Sparkles, TrendingUp, Activity, Receipt, CreditCard, Pill, AlertCircle, User, Star, RefreshCw } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn } from "@/components/animations"
 import { DoctorCardGrid } from "@/components/doctor-card-grid"
@@ -71,35 +72,50 @@ export default function PatientDashboardPage() {
   const { user, logout } = useAuth()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const fetchDashboard = async (showRefreshing = false) => {
+    try {
+      if (showRefreshing) {
+        setIsRefreshing(true)
+      } else {
+        setIsLoading(true)
+      }
+      setError(null)
+
+      const token = localStorage.getItem("medqueue_token")
+      if (!token) {
+        setIsLoading(false)
+        setIsRefreshing(false)
+        return
+      }
+
+      const response = await fetch("/api/patient/dashboard", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDashboardData(data)
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setError(errorData.error || "Failed to fetch dashboard data")
+        console.error("Failed to fetch dashboard data:", errorData)
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error fetching dashboard"
+      setError(errorMessage)
+      console.error("Error fetching dashboard:", error)
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const token = localStorage.getItem("medqueue_token")
-        if (!token) {
-          setIsLoading(false)
-          return
-        }
-
-        const response = await fetch("/api/patient/dashboard", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setDashboardData(data)
-        } else {
-          console.error("Failed to fetch dashboard data")
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchDashboard()
   }, [])
 
@@ -168,9 +184,21 @@ export default function PatientDashboardPage() {
                       Dashboard
                     </span>
                   </h1>
-                  <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
-                    Welcome back, <span className="font-semibold text-foreground">{user?.name}</span>! Manage your healthcare journey from here.
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
+                      Welcome back, <span className="font-semibold text-foreground">{user?.name}</span>! Manage your healthcare journey from here.
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fetchDashboard(true)}
+                      disabled={isRefreshing}
+                      className="gap-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
                 
                 {/* Quick Stats */}
@@ -208,6 +236,27 @@ export default function PatientDashboardPage() {
         </section>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14">
+          {/* Error Display */}
+          {error && (
+            <FadeIn direction="up" delay={0}>
+              <Card className="mb-6 p-6 border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <p className="text-red-700 dark:text-red-300 font-semibold">{error}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchDashboard()}
+                    className="ml-auto gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Retry
+                  </Button>
+                </div>
+              </Card>
+            </FadeIn>
+          )}
+
           <FadeIn direction="up" delay={100}>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {menuCards.map((card, index) => {
@@ -375,10 +424,12 @@ export default function PatientDashboardPage() {
                             <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-2 ring-primary/10">
                               {dashboardData.pendingInvoice.doctor.image ? (
                                 <>
-                                  <img
+                                  <Image
                                     src={dashboardData.pendingInvoice.doctor.image}
                                     alt={dashboardData.pendingInvoice.doctor.name}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    className="object-cover"
+                                    unoptimized
                                     onError={(e) => {
                                       const target = e.target as HTMLImageElement
                                       target.style.display = 'none'
@@ -453,7 +504,13 @@ export default function PatientDashboardPage() {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => router.push("/my-queue")}
+                        onClick={() => {
+                          if (dashboardData.pendingInvoice.bookingId) {
+                            router.push(`/my-queue`)
+                          } else {
+                            router.push("/patient/appointments")
+                          }
+                        }}
                         className="w-full h-11 border-2 border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 font-medium"
                       >
                         View Details
@@ -499,6 +556,7 @@ export default function PatientDashboardPage() {
                       rating={doctor.rating}
                       reviews={doctor.totalReviews}
                       image={doctor.image}
+                      onBook={() => router.push(`/booking/${doctor.doctorId}`)}
                     />
                   ))
                 ) : (
