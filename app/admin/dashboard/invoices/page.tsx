@@ -47,114 +47,35 @@ type SerializedInvoice = Omit<
     total: number;
     dosage?: string;
   }>;
+  patientName?: string;
+  doctorName?: string;
 };
 
 async function getInvoices(): Promise<SerializedInvoice[]> {
-  // Dummy data for testing
-  const dummyInvoices: SerializedInvoice[] = [
-    {
-      _id: "1",
-      invoiceNumber: "INV-2025-001",
-      patientId: "patient123",
-      doctorId: "doctor456",
-      bookingId: "booking789",
-      medicalRecordId: "record001",
-      date: new Date("2025-12-15").toISOString(),
-      dueDate: new Date("2025-12-30").toISOString(),
-      items: [
-        {
-          type: "service",
-          serviceId: "service001",
-          serviceCode: "SRV-001",
-          serviceName: "General Consultation",
-          quantity: 1,
-          unitPrice: 150000,
-          total: 150000,
-        },
-        {
-          type: "medicine",
-          medicineId: "med001",
-          medicineCode: "MED-001",
-          medicineName: "Paracetamol 500mg",
-          quantity: 10,
-          unit: "tablet",
-          unitPrice: 2000,
-          total: 20000,
-          dosage: "3x1 daily",
-        },
-      ],
-      subtotal: 170000,
-      total: 170000,
-      paymentStatus: "pending",
-      paymentMethod: null,
-      paymentReference: null,
-      paidAt: null,
-      createdAt: new Date("2025-12-15").toISOString(),
-      updatedAt: new Date("2025-12-15").toISOString(),
-    },
-    {
-      _id: "2",
-      invoiceNumber: "INV-2025-002",
-      patientId: "patient456",
-      doctorId: "doctor789",
-      bookingId: "booking012",
-      medicalRecordId: "record002",
-      date: new Date("2025-12-14").toISOString(),
-      dueDate: new Date("2025-12-29").toISOString(),
-      items: [
-        {
-          type: "service",
-          serviceId: "service002",
-          serviceCode: "SRV-002",
-          serviceName: "Blood Test",
-          quantity: 1,
-          unitPrice: 250000,
-          total: 250000,
-        },
-      ],
-      subtotal: 250000,
-      total: 250000,
-      paymentStatus: "paid",
-      paymentMethod: "Credit Card",
-      paymentReference: "PAY-2025-001",
-      paidAt: new Date("2025-12-14T10:30:00").toISOString(),
-      createdAt: new Date("2025-12-14").toISOString(),
-      updatedAt: new Date("2025-12-14T10:30:00").toISOString(),
-    },
-    {
-      _id: "3",
-      invoiceNumber: "INV-2025-003",
-      patientId: "patient789",
-      doctorId: "doctor123",
-      bookingId: "booking345",
-      medicalRecordId: "record003",
-      date: new Date("2025-12-13").toISOString(),
-      dueDate: new Date("2025-12-28").toISOString(),
-      items: [
-        {
-          type: "medicine",
-          medicineId: "med002",
-          medicineCode: "MED-002",
-          medicineName: "Amoxicillin 500mg",
-          quantity: 15,
-          unit: "capsule",
-          unitPrice: 5000,
-          total: 75000,
-          dosage: "3x1 after meals",
-        },
-      ],
-      subtotal: 75000,
-      total: 75000,
-      paymentStatus: "cancelled",
-      paymentMethod: null,
-      paymentReference: null,
-      paidAt: null,
-      createdAt: new Date("2025-12-13").toISOString(),
-      updatedAt: new Date("2025-12-13T15:20:00").toISOString(),
-    },
-  ];
+  try {
+    const token = localStorage.getItem("medqueue_token");
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
 
-  return dummyInvoices;
+    const response = await fetch("/api/admin/invoices", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to fetch invoices");
+    }
+
+    const data = await response.json();
+    return data.invoices || [];
+  } catch (error) {
+    console.error("Error fetching invoices:", error);
+    throw error;
+  }
 }
 
 export default function InvoicePage() {
@@ -171,15 +92,24 @@ export default function InvoicePage() {
 
   useEffect(() => {
     const loadInvoices = async () => {
-      setLoading(true);
-      const data = await getInvoices();
-      setInvoices(data);
-      setLoading(false);
+      if (!user || user.role !== "admin") {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const data = await getInvoices();
+        setInvoices(data);
+      } catch (error) {
+        console.error("Error loading invoices:", error);
+        // Set empty array on error to show empty state
+        setInvoices([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if (user && user.role === "admin") {
-      loadInvoices();
-    }
+    loadInvoices();
   }, [user]);
 
   if (isLoading || loading) {
