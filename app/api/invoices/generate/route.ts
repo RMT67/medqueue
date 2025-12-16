@@ -70,7 +70,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 5. Check: Apakah invoice sudah ada untuk medical record ini
+    // ✅ 5. Validate: Pastikan medical record terkait dengan booking yang benar
+    const medicalRecordBookingId = medicalRecord.bookingId instanceof ObjectId 
+      ? medicalRecord.bookingId.toString() 
+      : medicalRecord.bookingId?.toString();
+    
+    if (medicalRecordBookingId !== bookingId) {
+      return NextResponse.json(
+        { error: "Medical record does not belong to this booking" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ 6. Check: Apakah invoice sudah ada untuk medical record ini
     const existingInvoice = await InvoiceModel.getByMedicalRecordId(medicalRecordId);
     if (existingInvoice) {
       return NextResponse.json(
@@ -83,7 +95,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 6. Calculate Invoice Items
+    // ✅ 7. Calculate Invoice Items
     const items: Array<{
       type: "consultation" | "medicine" | "service";
       name: string;
@@ -92,7 +104,7 @@ export async function POST(req: Request) {
       total: number;
     }> = [];
 
-    // ✅ 7. Add Service (Consultation/Check-up/etc) - dari Services collection
+    // ✅ 8. Add Service (Consultation/Check-up/etc) - dari Services collection
     if (medicalRecord.serviceId) {
       const service = await ServiceModel.getServiceById(medicalRecord.serviceId);
       if (service && service.isActive) {
@@ -130,7 +142,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // ✅ 8. Add Medicines from prescriptions - dari Medicines collection
+    // ✅ 9. Add Medicines from prescriptions - dari Medicines collection
     if (medicalRecord.prescriptions && medicalRecord.prescriptions.length > 0) {
       for (const prescription of medicalRecord.prescriptions) {
         if (prescription.medicineId) {
@@ -184,18 +196,18 @@ export async function POST(req: Request) {
       }
     }
 
-    // ✅ 9. Calculate Totals
+    // ✅ 10. Calculate Totals
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
     const total = subtotal; // No tax for now, bisa ditambah tax jika perlu
 
-    // ✅ 10. Generate Invoice Number
+    // ✅ 11. Generate Invoice Number
     const invoiceNumber = await generateInvoiceNumber();
 
-    // ✅ 11. Set Dates
+    // ✅ 12. Set Dates
     const invoiceDate = new Date();
     const dueDate = calculateDueDate(invoiceDate, 7); // Due in 7 days
 
-    // ✅ 12. Create Invoice
+    // ✅ 13. Create Invoice
     const invoice = await InvoiceModel.create({
       invoiceNumber,
       patientId: new ObjectId(booking.patientId),

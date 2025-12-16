@@ -32,6 +32,7 @@ import { ProfileUser } from "@/types/userTypes";
 import Link from "next/link";
 import { FadeIn } from "@/components/animations";
 import { getSocket, joinQueueRoom, leaveQueueRoom } from "@/lib/socket-client";
+import { StatusBadge } from "@/components/status-badge";
 
 type QueueDoctor = {
   _id: string;
@@ -80,10 +81,22 @@ export default function MyQueuePage() {
     patientsAhead: number;
     estimatedTime: number;
     currentlyServing: string;
+    estimatedCallTime?: string;
+    estimatedCallTimeTimestamp?: Date | string;
+    averageServiceTime?: number;
   } | null>(null);
   const [isLoadingPosition, setIsLoadingPosition] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  // Countdown timer state
+  const [countdown, setCountdown] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+    isExpired: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "patient")) {
@@ -153,6 +166,9 @@ export default function MyQueuePage() {
             patientsAhead: data.patientsAhead || 0,
             estimatedTime: data.estimatedTime || 0,
             currentlyServing: data.currentlyServing || "",
+            estimatedCallTime: data.estimatedCallTime,
+            estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
+            averageServiceTime: data.averageServiceTime,
           });
         }
       }
@@ -178,9 +194,68 @@ export default function MyQueuePage() {
     }
   }, [user]);
 
-  const currentQueue = useMemo(() => queues[0] || null, [queues]);
+  // Filter active queues (confirmed or in-progress)
+  const activeQueues = useMemo(
+    () => queues.filter((q) => q.status === "confirmed" || q.status === "in-progress"),
+    [queues]
+  );
+
+  // Get current active queue (first active queue)
+  const currentQueue = useMemo(() => activeQueues[0] || null, [activeQueues]);
+
+  // Cancelled appointments
+  const cancelledQueues = useMemo(
+    () => queues.filter((q) => q.status === "cancelled"),
+    [queues]
+  );
+
+  // Past appointments: completed, atau appointmentTime sudah lewat (tapi bukan yang masih active atau cancelled)
+  // Ini untuk counter "Completed" - hanya completed, bukan cancelled
   const completedQueues = useMemo(
-    () => queues.filter((q) => q.status === "completed"),
+    () => queues.filter((q) => {
+      // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk completed
+      if (q.status === "confirmed" || q.status === "in-progress") {
+        return false;
+      }
+      // Exclude cancelled queues - mereka punya counter sendiri
+      if (q.status === "cancelled") {
+        return false;
+      }
+      // Past appointments: completed, atau appointmentTime sudah lewat
+      if (q.status === "completed") {
+        return true;
+      }
+      // Jika appointmentTime sudah lewat, juga termasuk sebagai past (tapi bukan yang masih active atau cancelled)
+      if (q.appointmentTime) {
+        const appointmentDate = new Date(q.appointmentTime);
+        const now = new Date();
+        return appointmentDate < now;
+      }
+      return false;
+    }),
+    [queues]
+  );
+
+  // Past appointments untuk display: semua status past (completed, cancelled, atau appointmentTime sudah lewat)
+  // Tapi exclude yang masih active (confirmed/in-progress)
+  const pastAppointments = useMemo(
+    () => queues.filter((q) => {
+      // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk past
+      if (q.status === "confirmed" || q.status === "in-progress") {
+        return false;
+      }
+      // Include completed dan cancelled
+      if (q.status === "completed" || q.status === "cancelled") {
+        return true;
+      }
+      // Jika appointmentTime sudah lewat, juga termasuk sebagai past
+      if (q.appointmentTime) {
+        const appointmentDate = new Date(q.appointmentTime);
+        const now = new Date();
+        return appointmentDate < now;
+      }
+      return false;
+    }),
     [queues]
   );
 
@@ -192,6 +267,60 @@ export default function MyQueuePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQueue?.bookingId, currentQueue?.status]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!queuePosition?.estimatedCallTimeTimestamp || currentQueue?.status === "completed") {
+      setCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const timestamp = queuePosition.estimatedCallTimeTimestamp;
+      if (!timestamp) {
+        setCountdown(null);
+        return;
+      }
+
+      const callTime = timestamp instanceof Date 
+        ? timestamp 
+        : new Date(timestamp);
+      const now = new Date();
+      const diff = callTime.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setCountdown({
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0,
+          isExpired: true,
+        });
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setCountdown({
+        days,
+        hours,
+        minutes,
+        seconds,
+        isExpired: false,
+      });
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [queuePosition?.estimatedCallTimeTimestamp, currentQueue?.status]);
 
   // Socket.IO real-time updates
   useEffect(() => {
@@ -245,12 +374,16 @@ export default function MyQueuePage() {
         estimatedCallTimeTimestamp: string;
         patientsAhead: number;
         estimatedTime: number;
+        averageServiceTime?: number;
       }) => {
         if (data.bookingId === bookingId) {
           setQueuePosition((prev) => ({
             patientsAhead: data.patientsAhead,
             estimatedTime: data.estimatedTime,
             currentlyServing: prev?.currentlyServing || "",
+            estimatedCallTime: data.estimatedCallTime,
+            estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
+            averageServiceTime: data.averageServiceTime || prev?.averageServiceTime,
           }));
         }
       };
@@ -347,11 +480,21 @@ export default function MyQueuePage() {
         return;
       }
 
+      // Validate bookingId
+      if (!bookingId) {
+        alert("Invalid booking ID");
+        return;
+      }
+
       const response = await fetch(`/api/patient/queue/${bookingId}/cancel`, {
         method: "PATCH",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          cancelReason: "Cancelled by patient from my queue page"
+        }),
       });
 
       if (response.ok) {
@@ -369,39 +512,6 @@ export default function MyQueuePage() {
     }
   };
 
-  const handleMarkComplete = async (bookingId: string) => {
-    if (!confirm("Mark this appointment as completed? This will finalize your visit.")) {
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("medqueue_token");
-      if (!token) {
-        alert("Please login to mark appointment as complete");
-        return;
-      }
-
-      const response = await fetch(`/api/patient/queue/${bookingId}/complete`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert("Appointment marked as completed successfully");
-        // Refresh queues to get updated status
-        await fetchQueues();
-      } else {
-        const error = await response.json();
-        alert(error.error || "Failed to mark appointment as complete");
-      }
-    } catch (error) {
-      console.error("Error marking appointment as complete:", error);
-      alert("Failed to mark appointment as complete");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -473,11 +583,112 @@ export default function MyQueuePage() {
                     </div>
                   </div>
                 </Card>
+                <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/20 dark:to-red-800/10 flex items-center justify-center ring-2 ring-red-200/50 dark:ring-red-800/20">
+                      <CheckCircle2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-semibold uppercase">
+                        Cancelled
+                      </p>
+                      <p className="text-lg font-bold text-foreground">
+                        {cancelledQueues.length}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
               </div>
             </div>
           </FadeIn>
         </div>
       </section>
+
+      {/* Countdown Timer Section */}
+      {currentQueue && currentQueue.status !== "completed" && (
+        <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-8 border-b border-border/50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {countdown && !countdown.isExpired ? (
+              <FadeIn direction="up" delay={0.1}>
+                <Card className="p-6 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border-2 border-primary/20 shadow-lg">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-4 ring-primary/10">
+                        <Clock className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-semibold uppercase tracking-wider mb-1">
+                          Estimated Call Time
+                        </p>
+                        <p className="text-2xl font-bold text-foreground">
+                          {queuePosition?.estimatedCallTime || "Calculating..."}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-6">
+                      {countdown.days > 0 && (
+                        <div className="text-center">
+                          <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                            {countdown.days.toString().padStart(2, "0")}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">
+                            Days
+                          </div>
+                        </div>
+                      )}
+                      {countdown.days > 0 || countdown.hours > 0 ? (
+                        <div className="text-center">
+                          <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                            {countdown.hours.toString().padStart(2, "0")}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">
+                            Hours
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="text-center">
+                        <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                          {countdown.minutes.toString().padStart(2, "0")}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-semibold uppercase">
+                          Minutes
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                          {countdown.seconds.toString().padStart(2, "0")}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-semibold uppercase">
+                          Seconds
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </FadeIn>
+            ) : countdown?.isExpired ? (
+              <FadeIn direction="up" delay={0.1}>
+                <Card className="p-6 bg-gradient-to-br from-green-50/80 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-2 border-green-200/50 dark:border-green-800/50 shadow-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg ring-4 ring-green-200/50">
+                      <CheckCircle2 className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-green-700 dark:text-green-300 mb-1">
+                        It's Your Turn!
+                      </p>
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        Please proceed to the consultation room.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </FadeIn>
+            ) : null}
+          </div>
+        </section>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
 
@@ -499,18 +710,29 @@ export default function MyQueuePage() {
             </div>
           </Card>
         ) : queues.length === 0 ? (
-          <Card className="p-8 text-center border border-border/50 shadow-sm">
-            <p className="text-lg font-semibold text-foreground mb-2">
-              No active bookings yet
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Book a doctor to see your queue and invoices here.
-            </p>
-            <Button onClick={() => router.push("/doctors")}>
-              Find Doctor
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Card>
+          <FadeIn direction="up" delay={0}>
+            <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+              <div className="max-w-md mx-auto">
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                  <ListOrdered className="w-12 h-12 text-muted-foreground" />
+                </div>
+                <h3 className="text-3xl font-bold text-foreground mb-4">
+                  No Active Bookings Yet
+                </h3>
+                <p className="text-muted-foreground mb-8 leading-relaxed text-base">
+                  You don't have any active appointments in queue. Book a doctor to see your queue, track your appointment status, and manage invoices here.
+                </p>
+                <Button
+                  onClick={() => router.push("/doctors")}
+                  size="lg"
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                  Find Doctor
+                </Button>
+              </div>
+            </Card>
+          </FadeIn>
         ) : (
           <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
             <div className="lg:col-span-2 space-y-6">
@@ -539,6 +761,11 @@ export default function MyQueuePage() {
                   timeRange={currentQueue.timeRange || undefined}
                   patientComplaint={currentQueue.complaint}
                   bookingId={currentQueue.bookingId}
+                  estimatedCallTime={queuePosition?.estimatedCallTime}
+                  averageServiceTime={queuePosition?.averageServiceTime}
+                  hasMedicalRecord={currentQueue.hasMedicalRecord}
+                  hasInvoice={currentQueue.hasInvoice}
+                  invoiceStatus={currentQueue.invoice?.status}
                   onRate={
                     currentQueue.status === "completed" &&
                     currentQueue.invoice?.status === "paid"
@@ -553,51 +780,21 @@ export default function MyQueuePage() {
                       ? () => handleCancelBooking(currentQueue.bookingId)
                       : undefined
                   }
-                  onMarkComplete={
-                    currentQueue.status === "in-progress"
-                      ? () => handleMarkComplete(currentQueue.bookingId)
+                  onViewMedicalRecord={
+                    currentQueue.hasMedicalRecord
+                      ? () => router.push("/patient/medical-record")
+                      : undefined
+                  }
+                  onViewInvoice={
+                    currentQueue.hasInvoice
+                      ? () => {
+                          router.push(
+                            `/patient/invoices?bookingId=${currentQueue.bookingId}&status=${currentQueue.invoice?.status || "pending"}`
+                          );
+                        }
                       : undefined
                   }
                 />
-              )}
-
-              {queues.length > 1 && (
-                <Card className="p-6 border border-border/50 shadow-sm space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <ListOrdered className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-muted-foreground font-semibold">
-                        Other Bookings
-                      </p>
-                      <p className="text-lg font-bold text-foreground">
-                        {queues.length - 1} more
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {queues.slice(1).map((q) => (
-                      <div
-                        key={q.bookingId || q._id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            {q.doctor?.name || "Doctor"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {q.doctor?.specialization || ""} -{" "}
-                            {q.status.toUpperCase()}
-                          </p>
-                        </div>
-                        <span className="text-sm font-semibold text-primary">
-                          {q.queueNumber || "-"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
               )}
             </div>
 
@@ -869,8 +1066,8 @@ export default function MyQueuePage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {completedQueues.length > 0 ? (
-              completedQueues.map((appointment) => {
+            {pastAppointments.length > 0 ? (
+              pastAppointments.map((appointment) => {
                 const initials = (appointment.doctor?.name || "D")
                   .split(" ")
                   .map((n) => n[0])
@@ -920,17 +1117,22 @@ export default function MyQueuePage() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-5 border-t border-border/50">
-                        <p className="text-sm font-semibold text-muted-foreground">
-                          {appointment.appointmentTime
-                            ? new Date(
-                                appointment.appointmentTime
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : ""}
-                        </p>
+                        <div className="flex flex-col gap-2">
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            {appointment.appointmentTime
+                              ? new Date(
+                                  appointment.appointmentTime
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : ""}
+                          </p>
+                          <StatusBadge 
+                            status={appointment.status === "cancelled" ? "cancelled" : appointment.status === "completed" ? "completed" : "confirmed"}
+                          />
+                        </div>
                         {appointment.doctor?.rating && appointment.doctor.rating > 0 && (
                           <div className="flex items-center gap-1.5">
                             <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />

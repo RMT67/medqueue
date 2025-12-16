@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useState, useEffect, useMemo } from "react"
-import { Clock, Hourglass, CheckCircle2, User, Star, Calendar, MapPin, Info, Lightbulb, FileText } from "lucide-react"
+import { Clock, Hourglass, CheckCircle2, User, Star, Calendar, MapPin, Info, Lightbulb, FileText, Receipt } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -95,37 +95,66 @@ function AIInsights({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border border-primary/20 rounded-xl p-5 space-y-3 shadow-sm">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md ring-2 ring-primary/20 flex-shrink-0">
-          <Lightbulb className="w-5 h-5 text-white" />
+    <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border-2 border-primary/20 rounded-2xl p-6 space-y-4 shadow-lg">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-2 ring-primary/20 flex-shrink-0">
+          <Lightbulb className="w-6 h-6 text-white" />
         </div>
-        <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">AI Insights</h4>
+        <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">AI Insights</h4>
       </div>
       
+      {/* Warnings */}
       {insights.warnings.length > 0 && (
-        <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/50 rounded-lg mb-3">
+        <div className="p-4 bg-amber-50/90 dark:bg-amber-950/40 border-2 border-amber-300/50 dark:border-amber-700/50 rounded-xl mb-4">
           {insights.warnings.map((warning, index) => (
-            <p key={index} className="text-xs text-amber-700 dark:text-amber-300 font-medium">
-              ⚠️ {warning}
-            </p>
+            <div key={index} className="flex items-start gap-2">
+              <span className="text-amber-600 dark:text-amber-400 text-lg mt-0.5">⚠️</span>
+              <p className="text-sm text-amber-800 dark:text-amber-200 font-semibold leading-relaxed">
+                {warning}
+              </p>
+            </div>
           ))}
         </div>
       )}
 
-      <div className="space-y-2">
+      {/* Insights List */}
+      <div className="space-y-4">
         {insights.insights.map((insight, index) => (
-          <p key={index} className="text-sm text-foreground leading-relaxed">
-            {insight}
-          </p>
+          <div key={index} className="flex items-start gap-3 group">
+            <div className="w-6 h-6 rounded-full bg-primary/20 dark:bg-primary/30 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-primary/30 dark:group-hover:bg-primary/40 transition-colors">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+            </div>
+            <p className="text-sm text-foreground leading-relaxed flex-1 pt-0.5">
+              {insight}
+            </p>
+          </div>
         ))}
       </div>
 
+      {/* Smart Suggestion - Enhanced */}
       {insights.smartSuggestion.reason && (
-        <div className="pt-3 border-t border-primary/20">
-          <p className="text-sm font-semibold text-primary">
-            💡 Smart Suggestion: {insights.smartSuggestion.reason}
-          </p>
+        <div className="pt-5 mt-5 border-t-2 border-primary/30 dark:border-primary/20">
+          <div className="bg-gradient-to-br from-accent/20 via-primary/10 to-accent/20 dark:from-accent/10 dark:via-primary/5 dark:to-accent/10 rounded-xl p-4 border border-primary/30 dark:border-primary/20">
+            <div className="flex items-start gap-3 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                <Lightbulb className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1">
+                <h5 className="text-sm font-bold text-foreground mb-1.5">
+                  Smart Suggestion
+                </h5>
+                {insights.smartSuggestion.arrivalTime && (
+                  <p className="text-xs font-semibold text-primary mb-2">
+                    Arrive by {insights.smartSuggestion.arrivalTime}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-foreground leading-relaxed pl-11">
+              {insights.smartSuggestion.reason}
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -148,9 +177,15 @@ interface QueueCardProps {
   timeRange?: string
   patientComplaint?: string
   bookingId?: string
-  onMarkComplete?: () => void
   onCancel?: () => void
   onRate?: () => void
+  estimatedCallTime?: string
+  averageServiceTime?: number
+  hasMedicalRecord?: boolean
+  hasInvoice?: boolean
+  invoiceStatus?: string
+  onViewMedicalRecord?: () => void
+  onViewInvoice?: () => void
 }
 
 export function QueueCard({
@@ -169,9 +204,15 @@ export function QueueCard({
   timeRange,
   patientComplaint,
   bookingId,
-  onMarkComplete,
   onCancel,
   onRate,
+  estimatedCallTime: propEstimatedCallTime,
+  averageServiceTime,
+  hasMedicalRecord,
+  hasInvoice,
+  invoiceStatus,
+  onViewMedicalRecord,
+  onViewInvoice,
 }: QueueCardProps) {
   const toJakartaDate = (value?: string | Date | null) => {
     if (!value) return null
@@ -285,6 +326,11 @@ export function QueueCard({
   const [estimatedCallTimeFormatted, setEstimatedCallTimeFormatted] = useState<string>("")
 
   useEffect(() => {
+    // Skip calculation if propEstimatedCallTime is provided
+    if (propEstimatedCallTime) {
+      return
+    }
+
     const calculateCallTime = () => {
       const bookingSource = appointmentDate || appointmentTime
       const bookingDate = toJakartaDate(bookingSource)
@@ -348,7 +394,7 @@ export function QueueCard({
     const interval = setInterval(calculateCallTime, 30000) // Update every 30 seconds for more realtime feel
 
     return () => clearInterval(interval)
-  }, [patientsAhead, status, estimatedTime, appointmentTime, appointmentDate, timeRange])
+  }, [propEstimatedCallTime, patientsAhead, status, estimatedTime, appointmentTime, appointmentDate, timeRange])
 
   return (
     <Card className="border border-border/50 rounded-2xl p-8 shadow-2xl bg-card/95 backdrop-blur-md space-y-6 h-full flex flex-col ring-1 ring-primary/5">
@@ -380,7 +426,9 @@ export function QueueCard({
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card/80 rounded-xl p-4 text-center border border-border/50 shadow-sm backdrop-blur-sm">
           <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Serving</p>
-          <p className="font-bold text-xl text-foreground">{currentlyServing}</p>
+          <p className="font-bold text-xl text-foreground">
+            {currentlyServing || "-"}
+          </p>
         </div>
         <div className="bg-card/80 rounded-xl p-4 text-center border border-border/50 shadow-sm backdrop-blur-sm">
           <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Ahead</p>
@@ -388,9 +436,22 @@ export function QueueCard({
         </div>
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-4 text-center border border-primary/20 shadow-md ring-1 ring-primary/10">
           <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Call Time</p>
-          <p className="font-bold text-xl text-primary">{estimatedCallTime}</p>
-          {estimatedCallTime !== "Now" && estimatedCallTime !== "Completed" && (
-            <p className="text-xs text-muted-foreground mt-1.5 font-medium">{estimatedCallTimeFormatted}</p>
+          {propEstimatedCallTime ? (
+            <>
+              <p className="font-bold text-xl text-primary">{propEstimatedCallTime}</p>
+              {averageServiceTime && (
+                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
+                  Avg. service: {averageServiceTime} min
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-xl text-primary">{estimatedCallTime}</p>
+              {estimatedCallTime !== "Now" && estimatedCallTime !== "Completed" && (
+                <p className="text-xs text-muted-foreground mt-1.5 font-medium">{estimatedCallTimeFormatted}</p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -427,7 +488,7 @@ export function QueueCard({
                 <FileText className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1">
-                <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Patient Complaint</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Symptoms / Concerns</p>
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{patientComplaint}</p>
               </div>
             </div>
@@ -504,36 +565,60 @@ export function QueueCard({
       {/* Action Buttons */}
       <div className="mt-auto pt-6 border-t border-border/50">
         {status === "completed" ? (
-          onRate ? (
-            <Button
-              onClick={onRate}
-              className="w-full h-12 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground gap-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
-            >
-              <Star className="w-5 h-5" />
-              Rate Your Experience
-            </Button>
-          ) : (
-            <div className="text-sm text-muted-foreground text-center">
-              Review will be available after payment is completed.
-            </div>
-          )
+          <div className="space-y-3">
+            {onRate && (
+              <Button
+                onClick={onRate}
+                className="w-full h-12 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground gap-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
+              >
+                <Star className="w-5 h-5" />
+                Rate Your Experience
+              </Button>
+            )}
+            {!onRate && (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                Review will be available after payment is completed.
+              </div>
+            )}
+            {(hasMedicalRecord || hasInvoice) && (
+              <div className="flex gap-3">
+                {hasMedicalRecord && onViewMedicalRecord && (
+                  <Button
+                    onClick={onViewMedicalRecord}
+                    variant="outline"
+                    className="flex-1 h-12 border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Medical Record
+                  </Button>
+                )}
+                {hasInvoice && onViewInvoice && (
+                  <Button
+                    onClick={onViewInvoice}
+                    variant="outline"
+                    className="flex-1 h-12 border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                  >
+                    <Receipt className="w-4 h-4" />
+                    Invoice
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         ) : (
+          // Only show Cancel button for waiting/being-served status
+          // Mark Complete can only be done by doctor
           <div className="flex gap-3">
-            <Button 
-              variant="ghost" 
-              onClick={onCancel}
-              className="px-4 h-12 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-300 font-medium"
-              title="Cancel appointment"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={onMarkComplete}
-              className="flex-1 h-12 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground transition-all duration-300 font-semibold shadow-lg hover:shadow-xl hover:scale-105 relative overflow-hidden group"
-            >
-              <span className="relative z-10">Mark Complete</span>
-              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-            </Button>
+            {onCancel && (
+              <Button 
+                variant="ghost" 
+                onClick={onCancel}
+                className="px-4 h-12 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-300 font-medium"
+                title="Cancel appointment"
+              >
+                Cancel
+              </Button>
+            )}
           </div>
         )}
       </div>

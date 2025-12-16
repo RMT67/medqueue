@@ -5,34 +5,133 @@ import DoctorScheduleModel from "@/db/models/DoctorSchedule";
 
 /**
  * Calculate estimated call time based on patients ahead and average service time
+ * Call time starts from schedule startTime, not currentTime
  */
 export function calculateEstimatedCallTime(
   patientsAhead: number,
   averageServiceTime: number, // in minutes
-  currentTime: Date = new Date()
+  scheduleStartTime?: Date | string | null, // Start time from schedule (e.g., "09:00" or Date)
+  scheduleDate?: Date | string | null, // Date for the schedule (to set correct date)
+  actualSessionStartTime?: Date | null // Actual time when doctor started the session (if late)
 ): {
   estimatedTime: number; // total minutes
   estimatedCallTime: string; // HH:mm format
   estimatedCallTimeTimestamp: Date;
   estimatedCallTimeFormatted: string;
 } {
-  if (patientsAhead === 0) {
+  // ✅ If actualSessionStartTime is provided (doctor has started), use it as base time
+  // This handles the case when doctor is late - call time will be adjusted accordingly
+  if (actualSessionStartTime) {
+    // Calculate call time: actualSessionStartTime + (patientsAhead * averageServiceTime)
+    const totalWaitMinutes = patientsAhead * averageServiceTime;
+    const callTime = new Date(actualSessionStartTime.getTime() + totalWaitMinutes * 60 * 1000);
+
+    const hours = callTime.getHours();
+    const minutes = callTime.getMinutes();
+    const displayHours = hours.toString().padStart(2, "0");
+    const displayMinutes = minutes.toString().padStart(2, "0");
+
+    const currentTime = new Date();
+    const minutesUntil = Math.max(0, Math.ceil((callTime.getTime() - currentTime.getTime()) / (60 * 1000)));
+    
+    let formatted: string;
+    if (minutesUntil <= 1) {
+      formatted = "Any moment now";
+    } else if (minutesUntil < 60) {
+      formatted = `In ${minutesUntil} minutes`;
+    } else {
+      const hoursUntil = Math.floor(minutesUntil / 60);
+      const remainingMinutes = minutesUntil % 60;
+      formatted = `In ${hoursUntil}h ${remainingMinutes}m`;
+    }
+
     return {
-      estimatedTime: 0,
-      estimatedCallTime: currentTime.toTimeString().slice(0, 5),
-      estimatedCallTimeTimestamp: currentTime,
-      estimatedCallTimeFormatted: "Any moment now"
+      estimatedTime: totalWaitMinutes,
+      estimatedCallTime: `${displayHours}:${displayMinutes}`,
+      estimatedCallTimeTimestamp: callTime,
+      estimatedCallTimeFormatted: formatted
     };
   }
 
+  // Parse schedule startTime (used when doctor hasn't started yet)
+  let startTime: Date;
+  
+  if (scheduleStartTime) {
+    if (scheduleStartTime instanceof Date) {
+      startTime = scheduleStartTime;
+    } else if (typeof scheduleStartTime === "string") {
+      // Parse "09:00" format
+      const [hours, minutes] = scheduleStartTime.split(":").map(Number);
+      
+      // ✅ FIX: Use scheduleDate properly, ensuring correct date handling
+      let baseDate: Date;
+      if (scheduleDate) {
+        // If scheduleDate is a string, parse it
+        if (typeof scheduleDate === "string") {
+          baseDate = new Date(scheduleDate);
+        } else {
+          baseDate = new Date(scheduleDate);
+        }
+        // Ensure we use the date part only (reset time to avoid timezone issues)
+        baseDate = new Date(
+          baseDate.getFullYear(),
+          baseDate.getMonth(),
+          baseDate.getDate()
+        );
+      } else {
+        // Use today's date if scheduleDate not provided
+        const today = new Date();
+        baseDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      }
+      
+      // Create startTime with correct date and time (local timezone)
+      startTime = new Date(
+        baseDate.getFullYear(),
+        baseDate.getMonth(),
+        baseDate.getDate(),
+        hours,
+        minutes,
+        0,
+        0
+      );
+    } else {
+      // Invalid scheduleStartTime format, use today with default 09:00
+      const today = new Date();
+      startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0, 0, 0);
+    }
+  } else {
+    // ✅ FIX: If no scheduleStartTime, use scheduleDate with default 09:00 instead of current time
+    if (scheduleDate) {
+      const baseDate = typeof scheduleDate === "string" 
+        ? new Date(scheduleDate) 
+        : new Date(scheduleDate);
+      // Use 09:00 as default start time
+      startTime = new Date(
+        baseDate.getFullYear(),
+        baseDate.getMonth(),
+        baseDate.getDate(),
+        9, // Default to 09:00
+        0,
+        0,
+        0
+      );
+    } else {
+      // Last resort: use today at 09:00
+      const today = new Date();
+      startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0, 0, 0);
+    }
+  }
+
+  // Calculate call time: startTime + (patientsAhead * averageServiceTime)
   const totalWaitMinutes = patientsAhead * averageServiceTime;
-  const callTime = new Date(currentTime.getTime() + totalWaitMinutes * 60 * 1000);
+  const callTime = new Date(startTime.getTime() + totalWaitMinutes * 60 * 1000);
 
   const hours = callTime.getHours();
   const minutes = callTime.getMinutes();
   const displayHours = hours.toString().padStart(2, "0");
   const displayMinutes = minutes.toString().padStart(2, "0");
 
+  const currentTime = new Date();
   const minutesUntil = Math.max(0, Math.ceil((callTime.getTime() - currentTime.getTime()) / (60 * 1000)));
   
   let formatted: string;

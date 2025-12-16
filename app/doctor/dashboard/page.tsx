@@ -281,8 +281,160 @@ export default function DoctorDashboard() {
     }
   };
 
-  const handleSkip = () => {
-    console.log("Patient skipped");
+  const handleSkip = async () => {
+    if (!currentPatient || !user) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("Authentication required");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/doctor/queue/${currentPatient._id}/skip`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || "Failed to skip patient");
+        return;
+      }
+
+      // Refresh bookings to get updated queue (exclude cancelled/skipped)
+      const currentDoctor = doctors.find((d) => d.userId === user._id);
+      if (!currentDoctor) {
+        alert("Doctor profile not found");
+        return;
+      }
+
+      const bookingsResponse = await fetch(
+        `/api/booking?doctorId=${currentDoctor._id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!bookingsResponse.ok) {
+        throw new Error("Failed to refresh bookings");
+      }
+
+      const result = await bookingsResponse.json();
+
+      if (result.success && result.data) {
+        // Filter today's bookings with status "confirmed" (exclude cancelled)
+        const today = new Date();
+        const todayBookings = result.data.filter((booking: BookingType) => {
+          const scheduleDate = new Date(booking.scheduleDate);
+          const isSameDate =
+            scheduleDate.getFullYear() === today.getFullYear() &&
+            scheduleDate.getMonth() === today.getMonth() &&
+            scheduleDate.getDate() === today.getDate();
+          return isSameDate && booking.status === "confirmed";
+        });
+
+        // Sort by appointmentTime or queueNumber
+        todayBookings.sort((a: BookingType, b: BookingType) => {
+          if (a.appointmentTime && b.appointmentTime) {
+            return (
+              new Date(a.appointmentTime).getTime() -
+              new Date(b.appointmentTime).getTime()
+            );
+          }
+          return (a.queueNumber || "").localeCompare(b.queueNumber || "");
+        });
+
+        // Transform bookings to queue format
+        const queueData: QueuePatient[] = await Promise.all(
+          todayBookings.map(async (booking: BookingType, idx: number) => {
+            let patientName = `Patient ${booking.patientId}`;
+
+            try {
+              const patientRes = await fetch(
+                `/api/profile?userId=${booking.patientId}`
+              );
+              if (patientRes.ok) {
+                const patientData = await patientRes.json();
+                patientName = patientData.name || patientName;
+              }
+            } catch (err) {
+              console.log("Could not fetch patient name:", err);
+            }
+
+            let eta = "Waiting";
+            if (booking.appointmentTime) {
+              const appointmentTime = new Date(booking.appointmentTime);
+              const now = new Date();
+              const diffMinutes = Math.floor(
+                (appointmentTime.getTime() - now.getTime()) / 60000
+              );
+
+              if (diffMinutes <= 0) {
+                eta = "Now";
+              } else if (diffMinutes < 60) {
+                eta = `${diffMinutes} min`;
+              } else {
+                const hours = Math.floor(diffMinutes / 60);
+                const mins = diffMinutes % 60;
+                eta = `${hours}h ${mins}m`;
+              }
+            }
+
+            let timeRange = "09:00 - 12:00";
+            if (booking.appointmentTime) {
+              const appointmentTime = new Date(booking.appointmentTime);
+              const startHour = appointmentTime
+                .getHours()
+                .toString()
+                .padStart(2, "0");
+              const startMin = appointmentTime
+                .getMinutes()
+                .toString()
+                .padStart(2, "0");
+              timeRange = `${startHour}:${startMin}`;
+            }
+
+            return {
+              _id: booking._id?.toString() || "",
+              queueNo: booking.queueNumber || "N/A",
+              patientName,
+              patientId: booking.patientId?.toString() || "",
+              status: idx === 0 ? "being-served" : "waiting",
+              eta,
+              timeRange,
+              patientComplaint: booking.complaint || "No complaint provided",
+              bookingData: booking,
+            } as QueuePatient;
+          })
+        );
+
+        // Update queue - set first patient as current, rest as queue
+        if (queueData.length > 0) {
+          setCurrentPatient(queueData[0]);
+          setQueue(queueData.slice(1));
+        } else {
+          setCurrentPatient(null);
+          setQueue([]);
+        }
+      } else {
+        // No bookings left
+        setCurrentPatient(null);
+        setQueue([]);
+      }
+    } catch (error) {
+      console.error("Error skipping patient:", error);
+      alert("Failed to skip patient");
+    }
   };
 
   const handleFinish = () => {
@@ -440,7 +592,7 @@ export default function DoctorDashboard() {
                       {currentPatient?.patientComplaint && (
                         <div className="pt-4 border-t-2 border-border">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                            Patient Complaint
+                            Symptoms / Concerns
                           </p>
                         </div>
                       )}
