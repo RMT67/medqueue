@@ -15,7 +15,8 @@ export default class BookingModel {
     bookingData: BookingType,
     averageTimePerPatient: number,
     existingBookingsOnDate?: WithId<Document>[], // optional: bookings already filtered by date
-    selectedDaySchedule?: { startTime: string; endTime: string } // pass the day schedule from route
+    selectedDaySchedule?: { startTime: string; endTime: string }, // pass the day schedule from route
+    doctorQueueCode?: string // queue code from doctor, fallback to Z if not provided
   ) {
     // get last booking number
     const collection = await this.collection();
@@ -125,7 +126,7 @@ export default class BookingModel {
         0
       );
     } else {
-      // get last booking appointmentTime
+      // get last booking appointmentTime on THE SAME DATE
       const lastBookingOnDate = bookingsOnDate.reduce((latest, current) => {
         const latestTime = new Date(
           (latest.appointmentTime as Date) || (latest.scheduleDate as Date)
@@ -135,30 +136,58 @@ export default class BookingModel {
         ).getTime();
         return currentTime > latestTime ? current : latest;
       });
+      
       const lastAppointmentTime = new Date(
         (lastBookingOnDate.appointmentTime as Date) || 
         (lastBookingOnDate.scheduleDate as Date)
       );
-      lastAppointmentTime.setMinutes(
-        lastAppointmentTime.getMinutes() + averageTimePerPatient
+      
+      // Extract hour and minute from last appointment time
+      const lastHour = lastAppointmentTime.getHours();
+      const lastMinute = lastAppointmentTime.getMinutes();
+      
+      // Calculate new time by adding average time per patient
+      const totalMinutes = lastHour * 60 + lastMinute + averageTimePerPatient;
+      const newHour = Math.floor(totalMinutes / 60);
+      const newMinute = totalMinutes % 60;
+      
+      // Create new appointmentTime with scheduleDate's date but calculated time
+      const scheduleDate = new Date(bookingData.scheduleDate);
+      bookingData.appointmentTime = new Date(
+        scheduleDate.getFullYear(),
+        scheduleDate.getMonth(),
+        scheduleDate.getDate(),
+        newHour,
+        newMinute,
+        0,
+        0
       );
-      bookingData.appointmentTime = lastAppointmentTime;
     }
     // 4. make real time, if previous booking got cancelled, skip that time slot
 
-    // get last queue number
+    // get last queue number for this specific doctor on this date
+    const queuePrefix = (doctorQueueCode || "Z").toUpperCase();
+    
+    // Get the last booking for THIS DOCTOR on THIS DATE
+    const lastDoctorBookingOnDate = await collection
+      .find({
+        doctorId: bookingData.doctorId,
+        bookingNumber: { $regex: `^MQ-${year}-${month}-${day}` }
+      })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .toArray();
+    
     let queueNumber;
-    if (lastBooking.length === 0) {
-      queueNumber = `A-001`;
-    } else if (
-      !lastBooking[0].bookingNumber!.includes(`MQ-${year}-${month}-${day}`)
-    ) {
-      queueNumber = `A-001`;
+    if (lastDoctorBookingOnDate.length === 0) {
+      // First booking for this doctor on this date
+      queueNumber = `${queuePrefix}-001`;
     } else {
-      const lastQueueNumber = lastBooking[0].queueNumber!;
+      // Get the last queue number for this doctor and increment
+      const lastQueueNumber = lastDoctorBookingOnDate[0].queueNumber as string;
       const lastQueueNumPart = parseInt(lastQueueNumber.split("-")[1], 10);
       const newQueueNumPart = lastQueueNumPart + 1;
-      queueNumber = `A-${newQueueNumPart.toString().padStart(3, "0")}`;
+      queueNumber = `${queuePrefix}-${newQueueNumPart.toString().padStart(3, "0")}`;
     }
 
     bookingData = {
