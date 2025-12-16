@@ -56,6 +56,7 @@ export async function GET() {
 
     // Fetch all schedules with doctor info
     const allSchedules = await DoctorScheduleModel.getSchedulesWithDoctorInfo();
+    console.log("🚀 ~ GET ~ allSchedules:", allSchedules);
 
     // Filter schedules for today
     const todaySchedules = allSchedules.filter(
