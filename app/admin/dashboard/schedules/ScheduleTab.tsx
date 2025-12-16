@@ -12,6 +12,28 @@ import {
   XCircle,
 } from "lucide-react";
 
+// Translation mapping for day names
+const DAY_TRANSLATION: Record<string, string> = {
+  Minggu: "Sunday",
+  Senin: "Monday",
+  Selasa: "Tuesday",
+  Rabu: "Wednesday",
+  Kamis: "Thursday",
+  Jumat: "Friday",
+  Sabtu: "Saturday",
+  Sunday: "Sunday",
+  Monday: "Monday",
+  Tuesday: "Tuesday",
+  Wednesday: "Wednesday",
+  Thursday: "Thursday",
+  Friday: "Friday",
+  Saturday: "Saturday",
+};
+
+const translateDay = (day: string): string => {
+  return DAY_TRANSLATION[day] || day;
+};
+
 interface ScheduleTabProps {
   schedules: DoctorWithSchedule[];
   viewMode: "calendar" | "list";
@@ -77,7 +99,9 @@ export function ScheduleTab({
                       key={index}
                       className="flex justify-between items-center p-3 bg-muted/30 rounded-lg"
                     >
-                      <span className="text-sm font-medium">{day.hari}</span>
+                      <span className="text-sm font-medium">
+                        {translateDay(day.hari)}
+                      </span>
                       <span className="text-sm text-muted-foreground">
                         {day.startTime} - {day.endTime}
                       </span>
