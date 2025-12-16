@@ -8,8 +8,8 @@ interface DayOfWeek {
 }
 
 export interface DoctorScheduleType {
-  _id: string | ObjectId;
-  doctorId: string | ObjectId;
+  _id: ObjectId;
+  doctorId: ObjectId;
   dayOfWeek: DayOfWeek[];
   isAvailable: boolean;
   firstCallTime: string | null;

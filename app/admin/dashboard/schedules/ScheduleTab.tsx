@@ -1,17 +1,30 @@
-import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, List } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CalendarView } from "./CalendarView";
 import Image from "next/image";
 import { DoctorWithSchedule } from "@/types/scheduleTypes";
+import {
+  Pencil,
+  Trash2,
+  Users,
+  Clock,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 interface ScheduleTabProps {
   schedules: DoctorWithSchedule[];
+  viewMode: "calendar" | "list";
+  onEdit: (schedule: DoctorWithSchedule) => void;
+  onDelete: (scheduleId: string) => void;
 }
 
-export function ScheduleTab({ schedules }: ScheduleTabProps) {
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
-
+export function ScheduleTab({
+  schedules,
+  viewMode,
+  onEdit,
+  onDelete,
+}: ScheduleTabProps) {
   if (schedules.length === 0) {
     return (
       <Card className="p-8 text-center">
@@ -22,32 +35,6 @@ export function ScheduleTab({ schedules }: ScheduleTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* View Toggle */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setViewMode("calendar")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
-            viewMode === "calendar"
-              ? "bg-primary text-white border-primary"
-              : "bg-card border-border hover:border-primary/50"
-          }`}
-        >
-          <CalendarIcon className="w-4 h-4" />
-          <span className="text-sm font-medium">Calendar View</span>
-        </button>
-        <button
-          onClick={() => setViewMode("list")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
-            viewMode === "list"
-              ? "bg-primary text-white border-primary"
-              : "bg-card border-border hover:border-primary/50"
-          }`}
-        >
-          <List className="w-4 h-4" />
-          <span className="text-sm font-medium">List View</span>
-        </button>
-      </div>
-
       {/* Content */}
       {viewMode === "calendar" ? (
         <CalendarView schedules={schedules} />
@@ -81,9 +68,10 @@ export function ScheduleTab({ schedules }: ScheduleTabProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {/* Schedule Days */}
+              <div className="space-y-2 mb-4">
                 {schedule.dayOfWeek
-                  .filter((day) => day.availabel)
+                  .filter((day) => day.available)
                   .map((day, index) => (
                     <div
                       key={index}
@@ -97,9 +85,63 @@ export function ScheduleTab({ schedules }: ScheduleTabProps) {
                   ))}
               </div>
 
-              <div className="mt-4 pt-4 border-t flex justify-between text-sm">
-                <span className="text-muted-foreground">Max Patients:</span>
-                <span className="font-bold">{schedule.maxPatients}</span>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3 mb-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Max Patients
+                    </p>
+                    <p className="font-bold">{schedule.maxPatients}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Delay</p>
+                    <p className="font-bold">{schedule.delayMinutes} min</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center justify-between mb-4 pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  {schedule.isAvailable ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {schedule.isAvailable ? "Available" : "Unavailable"}
+                  </span>
+                </div>
+                {schedule.isOnTime && (
+                  <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                    On Time
+                  </span>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => onEdit(schedule)}
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => onDelete(schedule._id)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
               </div>
             </Card>
           ))}
