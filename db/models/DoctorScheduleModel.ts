@@ -71,16 +71,29 @@ export default class DoctorScheduleModel {
 
   static async create(scheduleData: Partial<DoctorSchedule>) {
     const collection = await this.collection();
+
+    // Ensure doctorId is converted to ObjectId
+    const doctorIdValue =
+      typeof scheduleData.doctorId === "string"
+        ? new ObjectId(scheduleData.doctorId)
+        : scheduleData.doctorId;
+
     const newSchedule = {
-      ...scheduleData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      doctorId: doctorIdValue as ObjectId,
+      dayOfWeek: scheduleData.dayOfWeek || [],
+      isAvailable: scheduleData.isAvailable ?? true,
+      firstCallTime: scheduleData.firstCallTime || null,
+      isOnTime: scheduleData.isOnTime ?? true,
+      delayMinutes: scheduleData.delayMinutes || 0,
+      maxPatients: scheduleData.maxPatients || 20,
     };
 
-    const result = await collection.insertOne(
-      newSchedule as Omit<DoctorSchedule, "_id">
-    );
-    return { ...newSchedule, _id: result.insertedId.toString() };
+    const result = await collection.insertOne(newSchedule);
+
+    return {
+      ...newSchedule,
+      _id: result.insertedId,
+    };
   }
 
   static async update(
@@ -88,8 +101,13 @@ export default class DoctorScheduleModel {
     scheduleData: Partial<DoctorSchedule>
   ) {
     const collection = await this.collection();
+    const doctorIdValue =
+      typeof scheduleData.doctorId === "string"
+        ? new ObjectId(scheduleData.doctorId)
+        : scheduleData.doctorId;
     const updateData = {
       ...scheduleData,
+      doctorId: doctorIdValue,
       updatedAt: new Date(),
     };
 

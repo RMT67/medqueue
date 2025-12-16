@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       const filteredSchedules = schedulesWithDoctorInfo.filter((schedule) => {
         return schedule.dayOfWeek.some(
           (daySchedule: DaySchedule) =>
-            daySchedule.hari === day && daySchedule.availabel
+            daySchedule.hari === day && daySchedule.available
         );
       });
       return NextResponse.json(filteredSchedules);
