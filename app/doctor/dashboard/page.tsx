@@ -24,55 +24,34 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Doctor } from "@/types/docterTypes";
+import { BookingType } from "@/types/bookingType";
 
-// Mock queue data (temporary until queue API is available)
-const QUEUE_DATA = [
-  {
-    queueNo: "A-023",
-    patientName: "John Smith",
-    status: "being-served",
-    eta: "In progress",
-    timeRange: "09:00 - 12:00",
-    patientComplaint:
-      "Experiencing persistent headaches for the past week, especially in the morning. Also feeling fatigued.",
-  },
-  {
-    queueNo: "A-024",
-    patientName: "Emma Wilson",
-    status: "waiting",
-    eta: "5 min",
-    timeRange: "09:00 - 12:00",
-    patientComplaint:
-      "Chest pain and shortness of breath during physical activities.",
-  },
-  {
-    queueNo: "A-025",
-    patientName: "Michael Brown",
-    status: "waiting",
-    eta: "12 min",
-    timeRange: "09:00 - 12:00",
-    patientComplaint: "Persistent cough and sore throat for 3 days.",
-  },
-  {
-    queueNo: "A-026",
-    patientName: "Sarah Davis",
-    status: "waiting",
-    eta: "18 min",
-    timeRange: "09:00 - 12:00",
-    patientComplaint:
-      "Lower back pain that started after lifting heavy objects.",
-  },
-];
+// Transform booking data to queue format for UI
+interface QueuePatient {
+  _id: string;
+  queueNo: string;
+  patientName: string;
+  patientId: string;
+  status: "being-served" | "waiting" | "completed";
+  eta: string;
+  timeRange: string;
+  patientComplaint: string;
+  bookingData: BookingType;
+}
 
 export default function DoctorDashboard() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [currentPatient, setCurrentPatient] = useState(QUEUE_DATA[0]);
-  const [queue, setQueue] = useState(QUEUE_DATA.slice(1));
+  const [currentPatient, setCurrentPatient] = useState<QueuePatient | null>(
+    null
+  );
+  const [queue, setQueue] = useState<QueuePatient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorLoading, setDoctorLoading] = useState(true);
   const [doctorError, setDoctorError] = useState<string | null>(null);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "doctor")) {
@@ -113,7 +92,167 @@ export default function DoctorDashboard() {
     fetchDoctors();
   }, [user]);
 
-  if (isLoading || doctorLoading) {
+  // Fetch bookings for the logged-in doctor
+  useEffect(() => {
+    async function fetchBookings() {
+      if (!user || user.role !== "doctor") {
+        setBookingsLoading(false);
+        return;
+      }
+
+      // Find the doctor record that matches the logged-in user
+      if (doctors.length === 0) return; // Wait for doctors to load first
+
+      const currentDoctor = doctors.find((d) => d.userId === user._id);
+      if (!currentDoctor) {
+        setBookingsError("Doctor profile not found");
+        setBookingsLoading(false);
+        return;
+      }
+
+      try {
+        setBookingsLoading(true);
+        setBookingsError(null);
+
+        // Fetch bookings from API
+        const response = await fetch(
+          `/api/booking?doctorId=${currentDoctor._id}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch bookings");
+        }
+
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          // Filter today's bookings with status "confirmed"
+          const today = new Date();
+          const todayBookings = result.data.filter((booking: BookingType) => {
+            const scheduleDate = new Date(booking.scheduleDate);
+            const isSameDate =
+              scheduleDate.getFullYear() === today.getFullYear() &&
+              scheduleDate.getMonth() === today.getMonth() &&
+              scheduleDate.getDate() === today.getDate();
+            return isSameDate && booking.status === "confirmed";
+          });
+
+          // Sort by appointmentTime or queueNumber
+          todayBookings.sort((a: BookingType, b: BookingType) => {
+            if (a.appointmentTime && b.appointmentTime) {
+              return (
+                new Date(a.appointmentTime).getTime() -
+                new Date(b.appointmentTime).getTime()
+              );
+            }
+            // Fallback to queue number sorting
+            return (a.queueNumber || "").localeCompare(b.queueNumber || "");
+          });
+
+          // Transform bookings to queue format
+          const queueData: QueuePatient[] = await Promise.all(
+            todayBookings.map(async (booking: BookingType, idx: number) => {
+              // Fetch patient name (you might need to create a patient API endpoint)
+              // For now, using patientId as placeholder
+              let patientName = `Patient ${booking.patientId}`;
+
+              // Try to fetch patient info if API exists
+              try {
+                const patientRes = await fetch(
+                  `/api/profile?userId=${booking.patientId}`
+                );
+                if (patientRes.ok) {
+                  const patientData = await patientRes.json();
+                  patientName = patientData.name || patientName;
+                }
+              } catch (err) {
+                console.log("Could not fetch patient name:", err);
+              }
+
+              // Calculate ETA based on appointment time
+              let eta = "Waiting";
+              if (booking.appointmentTime) {
+                const appointmentTime = new Date(booking.appointmentTime);
+                const now = new Date();
+                const diffMinutes = Math.floor(
+                  (appointmentTime.getTime() - now.getTime()) / 60000
+                );
+
+                if (diffMinutes <= 0) {
+                  eta = "Now";
+                } else if (diffMinutes < 60) {
+                  eta = `${diffMinutes} min`;
+                } else {
+                  const hours = Math.floor(diffMinutes / 60);
+                  const mins = diffMinutes % 60;
+                  eta = `${hours}h ${mins}m`;
+                }
+              }
+
+              // Get time range from appointmentTime
+              let timeRange = "09:00 - 12:00"; // default
+              if (booking.appointmentTime) {
+                const appointmentTime = new Date(booking.appointmentTime);
+                const startHour = appointmentTime
+                  .getHours()
+                  .toString()
+                  .padStart(2, "0");
+                const startMin = appointmentTime
+                  .getMinutes()
+                  .toString()
+                  .padStart(2, "0");
+                timeRange = `${startHour}:${startMin}`;
+              }
+
+              return {
+                _id: booking._id?.toString() || "",
+                queueNo: booking.queueNumber || "N/A",
+                patientName,
+                patientId: booking.patientId?.toString() || "",
+                status: idx === 0 ? "being-served" : "waiting",
+                eta,
+                timeRange,
+                patientComplaint: booking.complaint || "No complaint provided",
+                bookingData: booking,
+              } as QueuePatient;
+            })
+          );
+
+          // Set first patient as current, rest as queue
+          if (queueData.length > 0) {
+            setCurrentPatient(queueData[0]);
+            setQueue(queueData.slice(1));
+          } else {
+            setCurrentPatient(null);
+            setQueue([]);
+          }
+        } else {
+          setBookingsError("No bookings found");
+          setCurrentPatient(null);
+          setQueue([]);
+        }
+      } catch (err) {
+        console.error("Error fetching bookings:", err);
+        setBookingsError(
+          err instanceof Error ? err.message : "Failed to load bookings"
+        );
+        setCurrentPatient(null);
+        setQueue([]);
+      } finally {
+        setBookingsLoading(false);
+      }
+    }
+
+    fetchBookings();
+  }, [user, doctors]);
+
+  if (isLoading || doctorLoading || bookingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -137,6 +276,8 @@ export default function DoctorDashboard() {
       const next = queue[0];
       setCurrentPatient(next);
       setQueue(queue.slice(1));
+    } else {
+      setCurrentPatient(null);
     }
   };
 
@@ -150,7 +291,7 @@ export default function DoctorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <Navigation
         isAuthenticated={true}
         userRole="doctor"
@@ -159,7 +300,7 @@ export default function DoctorDashboard() {
       />
 
       {/* Hero Header */}
-      <section className="relative bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/5 py-8 lg:py-10 border-b border-border overflow-hidden">
+      <section className="relative bg-linear-to-br from-primary/10 via-accent/5 to-secondary/5 py-8 lg:py-10 border-b border-border overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div
@@ -183,7 +324,7 @@ export default function DoctorDashboard() {
             </div>
             <Card className="p-4 md:p-5 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-lg shadow-md">
+                <div className="w-14 h-14 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-lg shadow-md">
                   {user.name
                     .split(" ")
                     .map((name) => name[0])
@@ -204,11 +345,11 @@ export default function DoctorDashboard() {
       </section>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-        {/* Error State */}
+        {/* Error States */}
         {doctorError && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20">
             <div className="p-6 flex items-center gap-3 text-red-600 dark:text-red-400">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <AlertCircle className="w-5 h-5 shrink-0" />
               <div>
                 <p className="font-semibold">Gagal memuat data dokter</p>
                 <p className="text-sm">{doctorError}</p>
@@ -217,7 +358,19 @@ export default function DoctorDashboard() {
           </Card>
         )}
 
-        {/* Empty State */}
+        {bookingsError && (
+          <Card className="mb-6 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20">
+            <div className="p-6 flex items-center gap-3 text-orange-600 dark:text-orange-400">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Gagal memuat data booking</p>
+                <p className="text-sm">{bookingsError}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Empty Doctor State */}
         {!doctorError && doctors.length === 0 && (
           <Card className="mb-6 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20">
             <div className="p-12 text-center">
@@ -237,159 +390,162 @@ export default function DoctorDashboard() {
           <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Main Area - Current Patient */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Current Patient Card - Mock Data (until queue API available) */}
-              <Card className="p-6 lg:p-8 border-2 shadow-xl bg-card/80 backdrop-blur-sm border-dashed border-yellow-400/30">
-                <div className="mb-4 pb-4 border-b border-yellow-400/20">
-                  <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide">
-                    ⚠️ Data Antrian (Mock - API belum tersedia)
+              {/* No Patients Today State */}
+              {!currentPatient && queue.length === 0 ? (
+                <Card className="p-12 text-center border-2 shadow-xl bg-card/80 backdrop-blur-sm">
+                  <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h3 className="text-xl font-bold text-foreground mb-2">
+                    No Patients Today
+                  </h3>
+                  <p className="text-muted-foreground">
+                    There are no confirmed bookings for today. Enjoy your day!
                   </p>
-                </div>
-                <div className="text-center mb-6 pb-6 border-b-2 border-primary/20">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Currently Serving
-                  </p>
-                  <h2 className="text-5xl lg:text-6xl font-bold text-primary font-mono mb-2">
-                    {currentPatient.queueNo}
-                  </h2>
-                  <p className="text-lg font-semibold text-foreground">
-                    {currentPatient.patientName}
-                  </p>
-                </div>
-
-                <div className="bg-gradient-to-br from-muted/50 to-muted/30 rounded-xl p-5 mb-6 border-2 border-border space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Patient Information
-                    </p>
-                    <p className="text-base font-semibold text-foreground">
-                      {currentPatient.patientName}
-                    </p>
-                  </div>
-                  <div className="pt-4 border-t-2 border-border">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Available Time
-                    </p>
-                    <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg border border-primary/20">
-                      <Clock className="w-4 h-4 text-primary" />
-                      <p className="text-sm font-semibold text-primary">
-                        {currentPatient.timeRange}
+                </Card>
+              ) : (
+                <>
+                  {/* Current Patient Card */}
+                  <Card className="p-6 lg:p-8 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
+                    <div className="text-center mb-6 pb-6 border-b-2 border-primary/20">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                        Currently Serving
+                      </p>
+                      <h2 className="text-5xl lg:text-6xl font-bold text-primary font-mono mb-2">
+                        {currentPatient?.queueNo || "N/A"}
+                      </h2>
+                      <p className="text-lg font-semibold text-foreground">
+                        {currentPatient?.patientName || "Unknown"}
                       </p>
                     </div>
-                  </div>
-                  {currentPatient.patientComplaint && (
-                    <div className="pt-4 border-t-2 border-border">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Patient Complaint
-                      </p>
-                      <div className="flex items-start gap-2 p-3 bg-card/50 rounded-lg border border-border">
-                        <FileText className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-foreground whitespace-pre-wrap">
-                          {currentPatient.patientComplaint}
+
+                    <div className="bg-linear-to-br from-muted/50 to-muted/30 rounded-xl p-5 mb-6 border-2 border-border space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Patient Information
+                        </p>
+                        <p className="text-base font-semibold text-foreground">
+                          {currentPatient?.patientName || "Unknown"}
                         </p>
                       </div>
+                      <div className="pt-4 border-t-2 border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Appointment Time
+                        </p>
+                        <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg border border-primary/20">
+                          <Clock className="w-4 h-4 text-primary" />
+                          <p className="text-sm font-semibold text-primary">
+                            {currentPatient?.timeRange || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      {currentPatient?.patientComplaint && (
+                        <div className="pt-4 border-t-2 border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                            Patient Complaint
+                          </p>
+                        </div>
+                      )}
+                      <div className="pt-4 border-t-2 border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Status
+                        </p>
+                        <StatusBadge status="being-served" />
+                      </div>
                     </div>
-                  )}
-                  <div className="pt-4 border-t-2 border-border">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Status
-                    </p>
-                    <StatusBadge status="being-served" />
-                  </div>
-                </div>
 
-                {/* Session Timer */}
-                <Card className="p-6 mb-6 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border-2 border-primary/20 shadow-lg">
-                  <SessionTimer duration={600} />
-                </Card>
+                    {/* Session Timer */}
+                    {isSessionActive && (
+                      <Card className="p-6 mb-6 bg-linear-to-br from-primary/10 via-accent/5 to-primary/10 border-2 border-primary/20 shadow-lg">
+                        <SessionTimer duration={600} />
+                      </Card>
+                    )}
 
-                {/* Action Buttons */}
-                {!isSessionActive ? (
-                  <div className="space-y-3">
-                    <Button
-                      onClick={handleStartSession}
-                      className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground gap-2 shadow-lg hover:shadow-xl transition-all font-medium"
-                    >
-                      <CheckCircle2 className="w-5 h-5" />
-                      Start Session
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleSkip}
-                      className="w-full h-12 border-2 hover:bg-muted hover:border-primary/30 transition-all gap-2 font-medium"
-                    >
-                      <SkipForward className="w-5 h-5" />
-                      Skip Patient
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={handleSkip}
-                      className="flex-1 h-12 border-2 hover:bg-muted hover:border-primary/30 transition-all font-medium"
-                    >
-                      Skip
-                    </Button>
-                    <Button
-                      onClick={handleFinish}
-                      className="flex-1 h-12 bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg hover:shadow-xl transition-all font-medium"
-                    >
-                      Finish & Call Next
-                    </Button>
-                  </div>
-                )}
-              </Card>
+                    {/* Action Buttons */}
+                    {!isSessionActive ? (
+                      <div className="space-y-3">
+                        <Button
+                          onClick={handleStartSession}
+                          className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground gap-2 shadow-lg hover:shadow-xl transition-all font-medium"
+                        >
+                          <CheckCircle2 className="w-5 h-5" />
+                          Start Session
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleSkip}
+                          className="w-full h-12 border-2 hover:bg-muted hover:border-primary/30 transition-all gap-2 font-medium"
+                        >
+                          <SkipForward className="w-5 h-5" />
+                          Skip Patient
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={handleSkip}
+                          className="flex-1 h-12 border-2 hover:bg-muted hover:border-primary/30 transition-all font-medium"
+                        >
+                          Skip
+                        </Button>
+                        <Button
+                          onClick={handleFinish}
+                          className="flex-1 h-12 bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg hover:shadow-xl transition-all font-medium"
+                        >
+                          Finish & Call Next
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
 
-              {/* Today's Statistics */}
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-5 lg:p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
-                      <Users className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Patients Today
-                      </p>
-                      <p className="text-2xl lg:text-3xl font-bold text-foreground">
-                        24
-                      </p>
-                    </div>
+                  {/* Today's Statistics */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card className="p-5 lg:p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
+                          <Users className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Patients Today
+                          </p>
+                          <p className="text-2xl lg:text-3xl font-bold text-foreground">
+                            {currentPatient ? queue.length + 1 : 0}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                    <Card className="p-5 lg:p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-linear-to-br from-accent to-secondary flex items-center justify-center shadow-md">
+                          <Clock className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Avg Service Time
+                          </p>
+                          <p className="text-2xl lg:text-3xl font-bold text-foreground">
+                            {currentDoctor?.averageTimePerPatient || 15} min
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
-                </Card>
-                <Card className="p-5 lg:p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-secondary flex items-center justify-center shadow-md">
-                      <Clock className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Avg Service Time
-                      </p>
-                      <p className="text-2xl lg:text-3xl font-bold text-foreground">
-                        7 min
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
+                </>
+              )}
             </div>
 
             {/* Right Sidebar */}
             <div className="space-y-6">
-              {/* Today's Queue Table - Mock Data */}
-              <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm border-dashed border-yellow-400/30">
+              {/* Today's Queue Table */}
+              <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center shadow-md">
                     <Activity className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-foreground">
                       Today&apos;s Queue
                     </h3>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                      Mock data (API belum tersedia)
-                    </p>
                   </div>
                 </div>
 
@@ -425,7 +581,7 @@ export default function DoctorDashboard() {
                             </div>
                             {patient.patientComplaint && (
                               <div className="flex items-start gap-2">
-                                <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
                                 <p className="text-xs text-muted-foreground line-clamp-2">
                                   {patient.patientComplaint}
                                 </p>
@@ -450,9 +606,15 @@ export default function DoctorDashboard() {
               <AIInsightCard
                 title="Performance Insights"
                 insights={[
-                  "Average service: 7 minutes",
+                  `Average service: ${
+                    currentDoctor?.averageTimePerPatient || 15
+                  } minutes`,
                   "On schedule today",
-                  "Patient satisfaction: 4.8/5",
+                  `Patient satisfaction: ${
+                    currentDoctor?.averageRating
+                      ? currentDoctor.averageRating.toFixed(1)
+                      : "N/A"
+                  }/5`,
                 ]}
                 recommendation="Keep up the pace! You're doing great."
               />
@@ -460,7 +622,7 @@ export default function DoctorDashboard() {
               {/* Clinic Info */}
               <Card className="p-6 border-2 shadow-xl bg-card/80 backdrop-blur-sm">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-secondary flex items-center justify-center shadow-md">
+                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-accent to-secondary flex items-center justify-center shadow-md">
                     <MapPin className="w-5 h-5 text-white" />
                   </div>
                   <h3 className="text-lg font-bold text-foreground">

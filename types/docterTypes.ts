@@ -21,7 +21,7 @@ export type Doctor = {
   clinic: string;
   image: string;
   consultationFee: number;
-  averageRating: number;
+  averageRating?: number;
   totalReviews: number;
   isActive: boolean;
   defaultSchedule?: string;

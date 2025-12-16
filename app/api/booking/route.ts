@@ -6,6 +6,48 @@ import ScheduleModel from "@/db/models/Schedule";
 import DoctorModel from "@/db/models/Doctor";
 import { DoctorScheduleType } from "@/types/doctorScheduleType";
 import { Doctor } from "@/types/docterTypes";
+import { ObjectId } from "mongodb";
+
+export async function GET(req: Request) {
+  try {
+    // Get doctorId from query parameters
+    const { searchParams } = new URL(req.url);
+    const doctorId = searchParams.get("doctorId");
+
+    if (!doctorId) {
+      return NextResponse.json(
+        { success: false, message: "Doctor ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate ObjectId format
+    if (!ObjectId.isValid(doctorId)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid Doctor ID format" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch all bookings for this doctor
+    const bookings = await Booking.findByDoctorId(doctorId);
+
+    // Return bookings (empty array if none found)
+    return NextResponse.json(
+      {
+        success: true,
+        data: bookings,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error fetching bookings:", error);
+    return NextResponse.json(
+      { success: false, message: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req: Request) {
   try {
