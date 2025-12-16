@@ -42,3 +42,6 @@ next-env.d.ts
 
 # database seeding (local development only)
 db/seed/
+
+# others
+prompt.md
