@@ -30,7 +30,7 @@ function convertToDoctorAdmin(doctor: Doctor): DoctorAdmin {
     name: doctor.name,
     specialization: doctor.specialization,
     clinic: doctor.clinic,
-    status: doctor.isActive ? "Available" : "Offline",
+    status: doctor.isActive ? "online" : "Offline",
     todayPatients: 0, // Will be calculated from bookings
     currentQueue: 0, // Will be calculated from bookings
     currentlyServing: null,
