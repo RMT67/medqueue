@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "../config/mongodb";
+import InvoiceModel from "./Invoice";
 
 export interface Prescription {
   medicineId: string; // ✅ Reference ke Medicines collection
@@ -73,6 +74,19 @@ export default class MedicalRecordModel {
   }
 
   static async update(recordId: string, updateData: Partial<MedicalRecord>) {
+    // ✅ Security: Prevent update of invoice-related fields if invoice already exists
+    const existingInvoice = await InvoiceModel.getByMedicalRecordId(recordId);
+    
+    if (existingInvoice) {
+      // Fields that affect invoice calculation - cannot be updated after invoice is created
+      const invoiceRelatedFields = ['prescriptions', 'serviceId', 'serviceName', 'servicePrice'];
+      const hasInvoiceRelatedUpdate = invoiceRelatedFields.some(field => field in updateData);
+      
+      if (hasInvoiceRelatedUpdate) {
+        throw new Error("Cannot update prescriptions or service information after invoice has been generated");
+      }
+    }
+    
     const collection = await this.collection();
     await collection.updateOne(
       { _id: new ObjectId(recordId) },

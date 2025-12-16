@@ -48,7 +48,12 @@ interface Appointment {
   hasMedicalRecord: boolean
   hasInvoice: boolean
   invoiceId: string | null
-  invoiceStatus: string | null
+  invoice: {
+    _id: string
+    status: string
+    invoiceNumber: string
+    total: number
+  } | null
 }
 
 export default function MyAppointmentsPage() {
@@ -378,7 +383,7 @@ export default function MyAppointmentsPage() {
                             {/* Complaint */}
                             {appointment.complaint && (
                               <div className="pt-4 border-t border-border/50">
-                                <p className="text-sm text-muted-foreground mb-1 font-semibold">Complaint:</p>
+                                <p className="text-sm text-muted-foreground mb-1 font-semibold">Symptoms / Concerns:</p>
                                 <p className="text-sm text-foreground">{appointment.complaint}</p>
                               </div>
                             )}
@@ -386,7 +391,7 @@ export default function MyAppointmentsPage() {
                             {/* Action Buttons */}
                             <div className="pt-4 border-t border-border/50 flex flex-wrap items-center gap-3">
                               {/* Rating and Review for completed appointments */}
-                              {appointment.statusDisplay === "completed" && appointment.invoiceStatus === "paid" && (
+                              {appointment.statusDisplay === "completed" && (
                                 <>
                                   {appointment.doctor && appointment.doctor.rating > 0 && (
                                     <div className="flex items-center gap-1.5">
@@ -401,7 +406,7 @@ export default function MyAppointmentsPage() {
                                       )}
                                     </div>
                                   )}
-                                  {!appointment.hasReview && (
+                                  {!appointment.hasReview && appointment.invoice?.status === "paid" && (
                                     <Button
                                       onClick={() => {
                                         setSelectedAppointment(appointment)
@@ -565,3 +570,4 @@ export default function MyAppointmentsPage() {
     </ProtectedRoute>
   )
 }
+

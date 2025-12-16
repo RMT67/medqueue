@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import InvoiceModel from "@/db/models/Invoice";
+import BookingModel from "@/db/models/Booking";
+import DoctorModel from "@/db/models/Doctor";
+import MedicalRecordModel from "@/db/models/MedicalRecord";
 import ServiceModel from "@/db/models/ServiceModel";
 import MedicineModel from "@/db/models/Medicine";
 import { generateInvoiceNumber, calculateDueDate } from "@/lib/invoice-utils";
@@ -26,11 +29,10 @@ export async function POST(req: Request) {
     const db = await getDb();
     const medicalRecordsCollection = db.collection("medicalrecords");
     const bookingsCollection = db.collection("bookings");
-    const invoicesCollection = db.collection("invoices");
 
-    // バ. 1. Get Medical Record
+    // ✅ 1. Get Medical Record
     const medicalRecord = await medicalRecordsCollection.findOne({
-      _id: new ObjectId(medicalRecordId),
+      _id: new ObjectId(medicalRecordId)
     });
 
     if (!medicalRecord) {
@@ -40,24 +42,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // バ. 2. Validate: Pastikan medical record punya prescriptions atau service
-    if (
-      (!medicalRecord.prescriptions ||
-        medicalRecord.prescriptions.length === 0) &&
-      !medicalRecord.serviceId
-    ) {
+    // ✅ 2. Validate: Pastikan medical record punya prescriptions atau service
+    if ((!medicalRecord.prescriptions || medicalRecord.prescriptions.length === 0) && !medicalRecord.serviceId) {
       return NextResponse.json(
-        {
-          error:
-            "Medical record must have service or prescriptions to generate invoice",
-        },
+        { error: "Medical record must have service or prescriptions to generate invoice" },
         { status: 400 }
       );
     }
 
-    // バ. 3. Get Booking
+    // ✅ 3. Get Booking
     const booking = await bookingsCollection.findOne({
-      _id: new ObjectId(bookingId),
+      _id: new ObjectId(bookingId)
     });
 
     if (!booking) {
@@ -67,7 +62,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // バ. 4. Validate: Pastikan booking sudah completed
+    // ✅ 4. Validate: Pastikan booking sudah completed
     if (booking.status !== "completed") {
       return NextResponse.json(
         { error: "Booking must be completed to generate invoice" },
@@ -75,27 +70,32 @@ export async function POST(req: Request) {
       );
     }
 
-    // バ. 5. Check: Apakah invoice sudah ada (idempotent guard)
-    const existingInvoiceByMR = await InvoiceModel.getByMedicalRecordId(
-      medicalRecordId
-    );
-    const existingInvoiceByBooking = await invoicesCollection.findOne({
-      bookingId: new ObjectId(bookingId),
-      status: { $in: ["pending", "paid"] },
-    });
-    const existingInvoice = existingInvoiceByMR || existingInvoiceByBooking;
+    // ✅ 5. Validate: Pastikan medical record terkait dengan booking yang benar
+    const medicalRecordBookingId = medicalRecord.bookingId instanceof ObjectId 
+      ? medicalRecord.bookingId.toString() 
+      : medicalRecord.bookingId?.toString();
+    
+    if (medicalRecordBookingId !== bookingId) {
+      return NextResponse.json(
+        { error: "Medical record does not belong to this booking" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ 6. Check: Apakah invoice sudah ada untuk medical record ini
+    const existingInvoice = await InvoiceModel.getByMedicalRecordId(medicalRecordId);
     if (existingInvoice) {
       return NextResponse.json(
-        {
-          error: "Invoice already exists for this booking/medical record",
+        { 
+          error: "Invoice already exists for this medical record",
           invoiceId: existingInvoice._id?.toString(),
-          invoiceNumber: existingInvoice.invoiceNumber,
+          invoiceNumber: existingInvoice.invoiceNumber
         },
         { status: 409 } // Conflict
       );
     }
 
-    // バ. 6. Calculate Invoice Items
+    // ✅ 7. Calculate Invoice Items
     const items: Array<{
       type: "consultation" | "medicine" | "service";
       name: string;
@@ -104,128 +104,110 @@ export async function POST(req: Request) {
       total: number;
     }> = [];
 
-    // バ. 7. Add Service (Consultation/Check-up/etc) - dari Services collection (no doctor fee fallback)
-    let hasServiceCharge = false;
+    // ✅ 8. Add Service (Consultation/Check-up/etc) - dari Services collection
     if (medicalRecord.serviceId) {
-      const service = await ServiceModel.getServiceById(
-        medicalRecord.serviceId
-      );
+      const service = await ServiceModel.getServiceById(medicalRecord.serviceId);
       if (service && service.isActive) {
+        // Use price from Services collection
         const servicePrice = service.price;
         items.push({
           type: "service",
           name: service.name,
           quantity: 1,
           unitPrice: servicePrice,
-          total: servicePrice,
+          total: servicePrice
         });
-        hasServiceCharge = true;
       } else if (medicalRecord.servicePrice) {
+        // Fallback to snapshot price if service not found
         items.push({
           type: "service",
           name: medicalRecord.serviceName || "Medical Service",
           quantity: 1,
           unitPrice: medicalRecord.servicePrice,
-          total: medicalRecord.servicePrice,
+          total: medicalRecord.servicePrice
         });
-        hasServiceCharge = true;
-      } else {
-        return NextResponse.json(
-          { error: "Service not found or inactive for this medical record" },
-          { status: 400 }
-        );
       }
     } else {
-      return NextResponse.json(
-        {
-          error:
-            "Medical record must include serviceId/service snapshot before generating invoice",
-        },
-        { status: 400 }
-      );
+      // ✅ Fallback: Use doctor consultation fee if no serviceId
+      const doctor = await DoctorModel.getDoctorById(booking.doctorId);
+      const consultationFee = doctor?.consultationFee || 0;
+      if (consultationFee > 0) {
+        items.push({
+          type: "consultation",
+          name: "Consultation Fee",
+          quantity: 1,
+          unitPrice: consultationFee,
+          total: consultationFee
+        });
+      }
     }
 
-    // バ. 8. Add Medicines from prescriptions - dari Medicines collection
+    // ✅ 9. Add Medicines from prescriptions - dari Medicines collection
     if (medicalRecord.prescriptions && medicalRecord.prescriptions.length > 0) {
       for (const prescription of medicalRecord.prescriptions) {
         if (prescription.medicineId) {
           // Get medicine from Medicines collection
           const medicine = await MedicineModel.getById(prescription.medicineId);
-
+          
           if (medicine && medicine.isActive) {
-            // バ. Use price from Medicines collection (packPrice if quantity is per pack)
+            // ✅ Use price from Medicines collection (packPrice if quantity is per pack)
             let unitPrice = prescription.unitPrice; // Default to snapshot price
-
+            
             // If quantity matches pack unit, use packPrice
-            if (
-              medicine.packaging &&
-              prescription.quantity >= medicine.packaging.unitPerPack
-            ) {
-              const packsNeeded = Math.ceil(
-                prescription.quantity / medicine.packaging.unitPerPack
-              );
+            if (medicine.packaging && prescription.quantity >= medicine.packaging.unitPerPack) {
+              const packsNeeded = Math.ceil(prescription.quantity / medicine.packaging.unitPerPack);
               unitPrice = medicine.packaging.packPrice * packsNeeded;
             } else {
               // Use per unit price
               unitPrice = medicine.price * prescription.quantity;
             }
-
+            
             const medicineTotal = unitPrice;
-
+            
             items.push({
               type: "medicine",
               name: medicine.name, // Use current name from collection
               quantity: prescription.quantity,
               unitPrice: unitPrice / prescription.quantity, // Per unit price
-              total: medicineTotal,
+              total: medicineTotal
             });
           } else {
-            // バ. Fallback: Use snapshot data if medicine not found
-            const medicineTotal =
-              prescription.unitPrice * prescription.quantity;
+            // ✅ Fallback: Use snapshot data if medicine not found
+            const medicineTotal = prescription.unitPrice * prescription.quantity;
             items.push({
               type: "medicine",
               name: prescription.medicineName,
               quantity: prescription.quantity,
               unitPrice: prescription.unitPrice,
-              total: medicineTotal,
+              total: medicineTotal
             });
           }
         } else {
-          // バ. Fallback: Use snapshot data if no medicineId
-          const medicineTotal =
-            prescription.unitPrice * prescription.quantity;
+          // ✅ Fallback: Use snapshot data if no medicineId
+          const medicineTotal = prescription.unitPrice * prescription.quantity;
           items.push({
             type: "medicine",
             name: prescription.medicineName,
             quantity: prescription.quantity,
             unitPrice: prescription.unitPrice,
-            total: medicineTotal,
+            total: medicineTotal
           });
         }
       }
     }
 
-    // Pastikan ada service charge
-    if (!hasServiceCharge) {
-      return NextResponse.json(
-        { error: "Service charge is required to generate invoice" },
-        { status: 400 }
-      );
-    }
-
-    // バ. 9. Calculate Totals
+    // ✅ 10. Calculate Totals
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
     const total = subtotal; // No tax for now, bisa ditambah tax jika perlu
 
-    // バ. 10. Generate Invoice Number
+    // ✅ 11. Generate Invoice Number
     const invoiceNumber = await generateInvoiceNumber();
 
-    // バ. 11. Set Dates
+    // ✅ 12. Set Dates
     const invoiceDate = new Date();
     const dueDate = calculateDueDate(invoiceDate, 7); // Due in 7 days
 
-    // バ. 12. Create Invoice
+    // ✅ 13. Create Invoice
     const invoice = await InvoiceModel.create({
       invoiceNumber,
       patientId: new ObjectId(booking.patientId),
@@ -237,7 +219,7 @@ export async function POST(req: Request) {
       items: items,
       subtotal: subtotal,
       total: total,
-      status: "pending",
+      status: "pending"
     });
 
     return NextResponse.json(
@@ -248,8 +230,8 @@ export async function POST(req: Request) {
           invoiceNumber: invoice.invoiceNumber,
           total: invoice.total,
           dueDate: invoice.dueDate,
-          status: invoice.status,
-        },
+          status: invoice.status
+        }
       },
       { status: 201 }
     );
@@ -261,3 +243,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

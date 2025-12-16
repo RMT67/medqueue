@@ -63,7 +63,6 @@ export default function DoctorDashboard() {
   // Fetch doctor data for clinic info
   useEffect(() => {
     async function fetchDoctor() {
-      console.log("🚀 ~ fetchDoctor ~ user:", user);
       if (!user || user.role !== "doctor") {
         setDoctorLoading(false);
         return;
@@ -282,24 +281,165 @@ export default function DoctorDashboard() {
   };
 
   const handleSkip = async () => {
-    if (!currentPatient) return;
+    if (!currentPatient || !user) return;
 
     try {
-      // Update booking status to cancelled
-      const response = await apiFetch<
-        { success: boolean; message: string },
-        { bookingId: string; status: string }
-      >("/api/booking", {
-        method: "PATCH",
-        body: { bookingId: currentPatient._id, status: "cancelled" },
-      });
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("Authentication required");
+        return;
+      }
 
-      if (response.success) {
-        // Move to next patient
-        handleCallNext();
+      const response = await fetch(
+        `/api/doctor/queue/${currentPatient._id}/skip`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || "Failed to skip patient");
+        return;
+      }
+
+      // Refresh bookings to get updated queue (exclude cancelled/skipped)
+      if (!currentDoctor) {
+        alert("Doctor profile not found");
+        return;
+      }
+
+      const bookingsResponse = await fetch(
+        `/api/booking?doctorId=${currentDoctor._id}&populate=patient`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!bookingsResponse.ok) {
+        throw new Error("Failed to refresh bookings");
+      }
+
+      const result = await bookingsResponse.json();
+
+      if (result.success && result.data) {
+        // Filter today's bookings with status "confirmed" (exclude cancelled)
+        const today = new Date();
+        const todayBookings = result.data.filter((booking: BookingType) => {
+          const scheduleDate = new Date(booking.scheduleDate);
+          const isSameDate =
+            scheduleDate.getFullYear() === today.getFullYear() &&
+            scheduleDate.getMonth() === today.getMonth() &&
+            scheduleDate.getDate() === today.getDate();
+          return isSameDate && booking.status === "confirmed";
+        });
+
+        // Sort by appointmentTime or queueNumber
+        todayBookings.sort((a: BookingType, b: BookingType) => {
+          if (a.appointmentTime && b.appointmentTime) {
+            return (
+              new Date(a.appointmentTime).getTime() -
+              new Date(b.appointmentTime).getTime()
+            );
+          }
+          return (a.queueNumber || "").localeCompare(b.queueNumber || "");
+        });
+
+        // Transform bookings to queue format
+        const queueData: QueuePatient[] = todayBookings.map(
+          (booking: BookingType, idx: number) => {
+            // Get patient data from populated field
+            const patientName =
+              booking.patient?.fullName || "Unknown Patient";
+            const patientGender = booking.patient?.gender;
+            let patientAge: number | undefined;
+
+            // Calculate age from dateOfBirth
+            if (booking.patient?.dateOfBirth) {
+              const birthDate = new Date(booking.patient.dateOfBirth);
+              const today = new Date();
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const monthDiff = today.getMonth() - birthDate.getMonth();
+              if (
+                monthDiff < 0 ||
+                (monthDiff === 0 && today.getDate() < birthDate.getDate())
+              ) {
+                age--;
+              }
+              patientAge = age;
+            }
+
+            let eta = "Waiting";
+            if (booking.appointmentTime) {
+              const appointmentTime = new Date(booking.appointmentTime);
+              const now = new Date();
+              const diffMinutes = Math.floor(
+                (appointmentTime.getTime() - now.getTime()) / 60000
+              );
+
+              if (diffMinutes <= 0) {
+                eta = "Now";
+              } else if (diffMinutes < 60) {
+                eta = `${diffMinutes} min`;
+              } else {
+                const hours = Math.floor(diffMinutes / 60);
+                const mins = diffMinutes % 60;
+                eta = `${hours}h ${mins}m`;
+              }
+            }
+
+            let timeRange = "09:00 - 12:00";
+            if (booking.appointmentTime) {
+              const appointmentTime = new Date(booking.appointmentTime);
+              const startHour = appointmentTime
+                .getHours()
+                .toString()
+                .padStart(2, "0");
+              const startMin = appointmentTime
+                .getMinutes()
+                .toString()
+                .padStart(2, "0");
+              timeRange = `${startHour}:${startMin}`;
+            }
+
+            return {
+              _id: booking._id?.toString() || "",
+              queueNo: booking.queueNumber || "N/A",
+              patientName,
+              patientGender,
+              patientAge,
+              status: idx === 0 ? "being-served" : "waiting",
+              eta,
+              timeRange,
+              patientComplaint: booking.complaint || "No complaint provided",
+              bookingData: booking,
+            } as QueuePatient;
+          }
+        );
+
+        // Update queue - set first patient as current, rest as queue
+        if (queueData.length > 0) {
+          setCurrentPatient(queueData[0]);
+          setQueue(queueData.slice(1));
+        } else {
+          setCurrentPatient(null);
+          setQueue([]);
+        }
+      } else {
+        // No bookings left
+        setCurrentPatient(null);
+        setQueue([]);
       }
     } catch (error) {
       console.error("Error skipping patient:", error);
+      alert("Failed to skip patient");
     }
   };
 
@@ -472,14 +612,16 @@ export default function DoctorDashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="pt-4 border-t-2 border-border">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                          Patient Symptom
-                        </p>
-                        <p className="text-sm font-semibold text-foreground bg-muted/50 p-3 rounded-lg">
-                          {currentPatient?.patientComplaint || "No symptoms provided"}
-                        </p>
-                      </div>
+                      {currentPatient?.patientComplaint && (
+                        <div className="pt-4 border-t-2 border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                            Symptoms / Concerns
+                          </p>
+                          <p className="text-sm font-semibold text-foreground bg-muted/50 p-3 rounded-lg">
+                            {currentPatient.patientComplaint}
+                          </p>
+                        </div>
+                      )}
                       <div className="pt-4 border-t-2 border-border">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                           Status

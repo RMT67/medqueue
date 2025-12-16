@@ -21,6 +21,9 @@ import {
   CreditCard,
   UserCircle,
   MapPin,
+  CheckCircle2,
+  MessageSquare,
+  FileText,
 } from "lucide-react";
 import { ReviewDoctorModal } from "@/components/review-doctor-modal";
 import { useAuth } from "@/lib/auth-context";
@@ -28,6 +31,8 @@ import { apiFetch } from "@/lib/api";
 import { ProfileUser } from "@/types/userTypes";
 import Link from "next/link";
 import { FadeIn } from "@/components/animations";
+import { getSocket, joinQueueRoom, leaveQueueRoom } from "@/lib/socket-client";
+import { StatusBadge } from "@/components/status-badge";
 
 type QueueDoctor = {
   _id: string;
@@ -58,6 +63,9 @@ type QueueItem = {
   complaint?: string;
   doctor: QueueDoctor | null;
   invoice: QueueInvoice | null;
+  hasMedicalRecord?: boolean;
+  hasInvoice?: boolean;
+  hasReview?: boolean;
 };
 
 export default function MyQueuePage() {
@@ -68,34 +76,27 @@ export default function MyQueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
-
-  const MIDTRANS_CLIENT_KEY =
-    process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
-  const MIDTRANS_SNAP_URL =
-    process.env.NEXT_PUBLIC_MIDTRANS_SNAP_URL ||
-    "https://app.sandbox.midtrans.com/snap/snap.js";
-
-  // Load snap.js once
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!MIDTRANS_CLIENT_KEY) {
-      console.warn("Midtrans client key is not set; snap.js not loaded");
-      return;
-    }
-    if ((window as any).snap) return;
-    const script = document.createElement("script");
-    script.src = `${MIDTRANS_SNAP_URL}?client-key=${MIDTRANS_CLIENT_KEY}`;
-    script.async = true;
-    script.onload = () => {
-      console.log("Midtrans snap.js loaded");
-    };
-    script.onerror = () => {
-      console.error("Failed to load Midtrans snap.js");
-    };
-    document.body.appendChild(script);
-  }, [MIDTRANS_CLIENT_KEY, MIDTRANS_SNAP_URL]);
   const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(null);
+  const [queuePosition, setQueuePosition] = useState<{
+    patientsAhead: number;
+    estimatedTime: number;
+    currentlyServing: string;
+    estimatedCallTime?: string;
+    estimatedCallTimeTimestamp?: Date | string;
+    averageServiceTime?: number;
+  } | null>(null);
+  const [isLoadingPosition, setIsLoadingPosition] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  // Countdown timer state
+  const [countdown, setCountdown] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+    isExpired: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "patient")) {
@@ -143,82 +144,40 @@ export default function MyQueuePage() {
     if (user && user.role === "patient") {
       fetchQueues();
     }
-  }, [user, fetchQueues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  const handlePayInvoice = useCallback(
-    async (invoiceId: string | undefined | null) => {
-      if (!invoiceId) return;
-      if (!MIDTRANS_CLIENT_KEY) {
-        alert("Midtrans client key not configured");
-        return;
+  const fetchQueuePosition = useCallback(async (bookingId: string) => {
+    try {
+      setIsLoadingPosition(true);
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) return;
+
+      const res = await fetch("/api/patient/queue/active", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.bookingId === bookingId) {
+          setQueuePosition({
+            patientsAhead: data.patientsAhead || 0,
+            estimatedTime: data.estimatedTime || 0,
+            currentlyServing: data.currentlyServing || "",
+            estimatedCallTime: data.estimatedCallTime,
+            estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
+            averageServiceTime: data.averageServiceTime,
+          });
+        }
       }
-      try {
-        setIsPaying(true);
-        const token = localStorage.getItem("medqueue_token");
-        if (!token) {
-          alert("Authentication required");
-          return;
-        }
-
-        const snapRes = await fetch("/api/payments/snap-token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ invoiceId }),
-        });
-
-        if (!snapRes.ok) {
-          const err = await snapRes.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to create snap token");
-        }
-
-        const { token: snapToken } = await snapRes.json();
-        const snap = (window as any).snap;
-        if (!snap) {
-          throw new Error("Midtrans snap is not loaded");
-        }
-
-        snap.pay(snapToken, {
-          onSuccess: async () => {
-            if (
-              process.env.NODE_ENV !== "production" &&
-              process.env.NEXT_PUBLIC_DEV_ALLOW_STATUS_PATCH === "true"
-            ) {
-              await fetch("/api/payments/update-status", {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ invoiceId, status: "paid" }),
-              });
-            }
-            await fetchQueues();
-          },
-          onPending: async () => {
-            await fetchQueues();
-          },
-          onError: (err: unknown) => {
-            console.error("Snap error", err);
-            alert("Payment failed. Please try again.");
-          },
-          onClose: async () => {
-            await fetchQueues();
-          },
-        });
-      } catch (err) {
-        console.error(err);
-        alert(
-          err instanceof Error ? err.message : "Failed to start payment session"
-        );
-      } finally {
-        setIsPaying(false);
-      }
-    },
-    [MIDTRANS_CLIENT_KEY, fetchQueues]
-  );
+    } catch (error) {
+      console.error("Error fetching queue position:", error);
+    } finally {
+      setIsLoadingPosition(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchPatientProfile = async () => {
@@ -235,11 +194,324 @@ export default function MyQueuePage() {
     }
   }, [user]);
 
-  const currentQueue = useMemo(() => queues[0] || null, [queues]);
-  const completedQueues = useMemo(
-    () => queues.filter((q) => q.status === "completed"),
+  // Filter active queues (confirmed or in-progress)
+  const activeQueues = useMemo(
+    () => queues.filter((q) => q.status === "confirmed" || q.status === "in-progress"),
     [queues]
   );
+
+  // Get current active queue (first active queue)
+  const currentQueue = useMemo(() => activeQueues[0] || null, [activeQueues]);
+
+  // Cancelled appointments
+  const cancelledQueues = useMemo(
+    () => queues.filter((q) => q.status === "cancelled"),
+    [queues]
+  );
+
+  // Past appointments: completed, atau appointmentTime sudah lewat (tapi bukan yang masih active atau cancelled)
+  // Ini untuk counter "Completed" - hanya completed, bukan cancelled
+  const completedQueues = useMemo(
+    () => queues.filter((q) => {
+      // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk completed
+      if (q.status === "confirmed" || q.status === "in-progress") {
+        return false;
+      }
+      // Exclude cancelled queues - mereka punya counter sendiri
+      if (q.status === "cancelled") {
+        return false;
+      }
+      // Past appointments: completed, atau appointmentTime sudah lewat
+      if (q.status === "completed") {
+        return true;
+      }
+      // Jika appointmentTime sudah lewat, juga termasuk sebagai past (tapi bukan yang masih active atau cancelled)
+      if (q.appointmentTime) {
+        const appointmentDate = new Date(q.appointmentTime);
+        const now = new Date();
+        return appointmentDate < now;
+      }
+      return false;
+    }),
+    [queues]
+  );
+
+  // Past appointments untuk display: semua status past (completed, cancelled, atau appointmentTime sudah lewat)
+  // Tapi exclude yang masih active (confirmed/in-progress)
+  const pastAppointments = useMemo(
+    () => queues.filter((q) => {
+      // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk past
+      if (q.status === "confirmed" || q.status === "in-progress") {
+        return false;
+      }
+      // Include completed dan cancelled
+      if (q.status === "completed" || q.status === "cancelled") {
+        return true;
+      }
+      // Jika appointmentTime sudah lewat, juga termasuk sebagai past
+      if (q.appointmentTime) {
+        const appointmentDate = new Date(q.appointmentTime);
+        const now = new Date();
+        return appointmentDate < now;
+      }
+      return false;
+    }),
+    [queues]
+  );
+
+  useEffect(() => {
+    if (currentQueue && currentQueue.status !== "completed") {
+      fetchQueuePosition(currentQueue.bookingId);
+    } else {
+      setQueuePosition(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQueue?.bookingId, currentQueue?.status]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!queuePosition?.estimatedCallTimeTimestamp || currentQueue?.status === "completed") {
+      setCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const timestamp = queuePosition.estimatedCallTimeTimestamp;
+      if (!timestamp) {
+        setCountdown(null);
+        return;
+      }
+
+      const callTime = timestamp instanceof Date 
+        ? timestamp 
+        : new Date(timestamp);
+      const now = new Date();
+      const diff = callTime.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setCountdown({
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0,
+          isExpired: true,
+        });
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setCountdown({
+        days,
+        hours,
+        minutes,
+        seconds,
+        isExpired: false,
+      });
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [queuePosition?.estimatedCallTimeTimestamp, currentQueue?.status]);
+
+  // Socket.IO real-time updates
+  useEffect(() => {
+    if (!user || user.role !== "patient" || !currentQueue || currentQueue.status === "completed") {
+      return;
+    }
+
+    let socketCleanup: (() => void) | null = null;
+    const bookingId = currentQueue.bookingId;
+
+    // Dynamic import untuk client-side only
+    import("@/lib/socket-client").then(({ getSocket, joinQueueRoom, leaveQueueRoom }) => {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn("⚠️ Socket not available - token may be missing");
+        return;
+      }
+
+      console.log("🔌 Setting up Socket.IO for booking:", bookingId);
+
+      // Wait for socket to connect before joining room
+      if (socket.connected) {
+        joinQueueRoom(bookingId);
+      } else {
+        socket.once("connect", () => {
+          console.log("✅ Socket connected, joining queue room");
+          joinQueueRoom(bookingId);
+        });
+      }
+
+      // Listen for queue position updates
+      const handlePositionUpdate = (data: {
+        bookingId: string;
+        currentlyServing: string;
+        patientsAhead: number;
+        queueNumber: string;
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueuePosition((prev) => ({
+            patientsAhead: data.patientsAhead,
+            estimatedTime: prev?.estimatedTime || 0,
+            currentlyServing: data.currentlyServing,
+          }));
+        }
+      };
+
+      // Listen for call time updates
+      const handleCallTimeUpdate = (data: {
+        bookingId: string;
+        estimatedCallTime: string;
+        estimatedCallTimeTimestamp: string;
+        patientsAhead: number;
+        estimatedTime: number;
+        averageServiceTime?: number;
+      }) => {
+        if (data.bookingId === bookingId) {
+          setQueuePosition((prev) => ({
+            patientsAhead: data.patientsAhead,
+            estimatedTime: data.estimatedTime,
+            currentlyServing: prev?.currentlyServing || "",
+            estimatedCallTime: data.estimatedCallTime,
+            estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
+            averageServiceTime: data.averageServiceTime || prev?.averageServiceTime,
+          }));
+        }
+      };
+
+      // Listen for queue status changes
+      const handleStatusChange = (data: {
+        bookingId: string;
+        queueStatus: "waiting" | "being-served" | "completed" | "cancelled";
+        estimatedCallTime?: string;
+        estimatedCallTimeTimestamp?: string;
+      }) => {
+        if (data.bookingId === bookingId) {
+          // Refresh queues when status changes
+          fetchQueues();
+        }
+      };
+
+      socket.on("queue:position-update", handlePositionUpdate);
+      socket.on("queue:call-time-update", handleCallTimeUpdate);
+      socket.on("queue:status-change", handleStatusChange);
+
+      socketCleanup = () => {
+        socket.off("queue:position-update", handlePositionUpdate);
+        socket.off("queue:call-time-update", handleCallTimeUpdate);
+        socket.off("queue:status-change", handleStatusChange);
+        leaveQueueRoom(bookingId);
+      };
+    });
+
+    return () => {
+      if (socketCleanup) {
+        socketCleanup();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role, currentQueue?.bookingId, currentQueue?.status]);
+
+  const handlePayment = async () => {
+    if (!currentQueue?.invoice?._id) return;
+
+    if (!confirm("Are you sure you want to process this payment?")) {
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) {
+        alert("Please login to process payment");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/patient/invoices/${currentQueue.invoice._id}/pay`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            paymentMethod: "manual",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        alert("Payment processed successfully!");
+        // Refresh queues to get updated invoice status
+        await fetchQueues();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to process payment");
+      }
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      alert("Failed to process payment");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setCancellingId(bookingId);
+      const token = localStorage.getItem("medqueue_token");
+      if (!token) {
+        alert("Please login to cancel booking");
+        return;
+      }
+
+      // Validate bookingId
+      if (!bookingId) {
+        alert("Invalid booking ID");
+        return;
+      }
+
+      const response = await fetch(`/api/patient/queue/${bookingId}/cancel`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cancelReason: "Cancelled by patient from my queue page"
+        }),
+      });
+
+      if (response.ok) {
+        alert("Appointment cancelled successfully");
+        await fetchQueues();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to cancel appointment");
+      }
+    } catch (error) {
+      console.error("Error cancelling appointment:", error);
+      alert("Failed to cancel appointment");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -311,11 +583,112 @@ export default function MyQueuePage() {
                     </div>
                   </div>
                 </Card>
+                <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/20 dark:to-red-800/10 flex items-center justify-center ring-2 ring-red-200/50 dark:ring-red-800/20">
+                      <CheckCircle2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-semibold uppercase">
+                        Cancelled
+                      </p>
+                      <p className="text-lg font-bold text-foreground">
+                        {cancelledQueues.length}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
               </div>
             </div>
           </FadeIn>
         </div>
       </section>
+
+      {/* Countdown Timer Section */}
+      {currentQueue && currentQueue.status !== "completed" && (
+        <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-8 border-b border-border/50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {countdown && !countdown.isExpired ? (
+              <FadeIn direction="up" delay={0.1}>
+                <Card className="p-6 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border-2 border-primary/20 shadow-lg">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-4 ring-primary/10">
+                        <Clock className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-semibold uppercase tracking-wider mb-1">
+                          Estimated Call Time
+                        </p>
+                        <p className="text-2xl font-bold text-foreground">
+                          {queuePosition?.estimatedCallTime || "Calculating..."}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-6">
+                      {countdown.days > 0 && (
+                        <div className="text-center">
+                          <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                            {countdown.days.toString().padStart(2, "0")}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">
+                            Days
+                          </div>
+                        </div>
+                      )}
+                      {countdown.days > 0 || countdown.hours > 0 ? (
+                        <div className="text-center">
+                          <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                            {countdown.hours.toString().padStart(2, "0")}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">
+                            Hours
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="text-center">
+                        <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                          {countdown.minutes.toString().padStart(2, "0")}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-semibold uppercase">
+                          Minutes
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-4xl md:text-5xl font-bold text-primary mb-1">
+                          {countdown.seconds.toString().padStart(2, "0")}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-semibold uppercase">
+                          Seconds
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </FadeIn>
+            ) : countdown?.isExpired ? (
+              <FadeIn direction="up" delay={0.1}>
+                <Card className="p-6 bg-gradient-to-br from-green-50/80 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-2 border-green-200/50 dark:border-green-800/50 shadow-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg ring-4 ring-green-200/50">
+                      <CheckCircle2 className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-green-700 dark:text-green-300 mb-1">
+                        It's Your Turn!
+                      </p>
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        Please proceed to the consultation room.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </FadeIn>
+            ) : null}
+          </div>
+        </section>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
 
@@ -337,26 +710,37 @@ export default function MyQueuePage() {
             </div>
           </Card>
         ) : queues.length === 0 ? (
-          <Card className="p-8 text-center border border-border/50 shadow-sm">
-            <p className="text-lg font-semibold text-foreground mb-2">
-              No active bookings yet
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Book a doctor to see your queue and invoices here.
-            </p>
-            <Button onClick={() => router.push("/doctors")}>
-              Find Doctor
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Card>
+          <FadeIn direction="up" delay={0}>
+            <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
+              <div className="max-w-md mx-auto">
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                  <ListOrdered className="w-12 h-12 text-muted-foreground" />
+                </div>
+                <h3 className="text-3xl font-bold text-foreground mb-4">
+                  No Active Bookings Yet
+                </h3>
+                <p className="text-muted-foreground mb-8 leading-relaxed text-base">
+                  You don't have any active appointments in queue. Book a doctor to see your queue, track your appointment status, and manage invoices here.
+                </p>
+                <Button
+                  onClick={() => router.push("/doctors")}
+                  size="lg"
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                  Find Doctor
+                </Button>
+              </div>
+            </Card>
+          </FadeIn>
         ) : (
           <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
             <div className="lg:col-span-2 space-y-6">
               {currentQueue && (
                 <QueueCard
-                  currentlyServing={currentQueue.queueNumber || ""}
-                  patientsAhead={0}
-                  estimatedTime={0}
+                  currentlyServing={queuePosition?.currentlyServing || currentQueue.queueNumber || ""}
+                  patientsAhead={queuePosition?.patientsAhead ?? 0}
+                  estimatedTime={queuePosition?.estimatedTime ?? 0}
                   doctorName={currentQueue.doctor?.name || "Doctor"}
                   doctorSpecialization={
                     currentQueue.doctor?.specialization || ""
@@ -377,6 +761,11 @@ export default function MyQueuePage() {
                   timeRange={currentQueue.timeRange || undefined}
                   patientComplaint={currentQueue.complaint}
                   bookingId={currentQueue.bookingId}
+                  estimatedCallTime={queuePosition?.estimatedCallTime}
+                  averageServiceTime={queuePosition?.averageServiceTime}
+                  hasMedicalRecord={currentQueue.hasMedicalRecord}
+                  hasInvoice={currentQueue.hasInvoice}
+                  invoiceStatus={currentQueue.invoice?.status}
                   onRate={
                     currentQueue.status === "completed" &&
                     currentQueue.invoice?.status === "paid"
@@ -386,50 +775,30 @@ export default function MyQueuePage() {
                         }
                       : undefined
                   }
+                  onCancel={
+                    currentQueue.status === "confirmed" || currentQueue.status === "in-progress"
+                      ? () => handleCancelBooking(currentQueue.bookingId)
+                      : undefined
+                  }
+                  onViewMedicalRecord={
+                    currentQueue.hasMedicalRecord
+                      ? () => router.push("/patient/medical-record")
+                      : undefined
+                  }
+                  onViewInvoice={
+                    currentQueue.hasInvoice
+                      ? () => {
+                          router.push(
+                            `/patient/invoices?bookingId=${currentQueue.bookingId}&status=${currentQueue.invoice?.status || "pending"}`
+                          );
+                        }
+                      : undefined
+                  }
                 />
-              )}
-
-              {queues.length > 1 && (
-                <Card className="p-6 border border-border/50 shadow-sm space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <ListOrdered className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-muted-foreground font-semibold">
-                        Other Bookings
-                      </p>
-                      <p className="text-lg font-bold text-foreground">
-                        {queues.length - 1} more
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {queues.slice(1).map((q) => (
-                      <div
-                        key={q.bookingId || q._id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            {q.doctor?.name || "Doctor"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {q.doctor?.specialization || ""} -{" "}
-                            {q.status.toUpperCase()}
-                          </p>
-                        </div>
-                        <span className="text-sm font-semibold text-primary">
-                          {q.queueNumber || "-"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
               )}
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* Patient Profile Card */}
               <Link href="/profile">
                 <Card className="p-6 border border-border/50 shadow-xl bg-card/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 cursor-pointer hover:border-primary/50">
@@ -542,7 +911,7 @@ export default function MyQueuePage() {
               </Link>
 
               {/* Invoice Card */}
-              <Card className="p-6 bg-card/90 border border-border/50 shadow-sm">
+              <Card className="p-6 bg-card/90 border border-border/50 shadow-sm mt-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center ring-2 ring-primary/10">
@@ -587,11 +956,31 @@ export default function MyQueuePage() {
                       {currentQueue.invoice.status === "pending" && (
                         <Button
                           className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-                          disabled={isPaying}
-                          onClick={() => handlePayInvoice(currentQueue.invoice?._id)}
+                          onClick={handlePayment}
+                          disabled={isProcessingPayment}
                         >
                           <CreditCard className="w-5 h-5" />
-                          {isPaying ? "Processing..." : "Process Payment"}
+                          {isProcessingPayment ? "Processing..." : "Process Payment"}
+                        </Button>
+                      )}
+                      {currentQueue.invoice.status === "paid" && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-green-50/80 dark:bg-green-950/30 text-green-700 dark:text-green-300 rounded-xl text-sm font-semibold border border-green-200/50 dark:border-green-800/50">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Payment Completed
+                        </div>
+                      )}
+                      {currentQueue.invoice && (
+                        <Button
+                          variant="outline"
+                          className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300"
+                          onClick={() => {
+                            router.push(
+                              `/patient/invoices?bookingId=${currentQueue.bookingId}&status=${currentQueue.invoice?.status || "pending"}`
+                            );
+                          }}
+                        >
+                          <Receipt className="w-4 h-4 mr-2" />
+                          View Invoice Details
                         </Button>
                       )}
                     </div>
@@ -602,7 +991,7 @@ export default function MyQueuePage() {
           </div>
         )}
 
-        {selectedDoctor && currentQueue && (
+        {selectedDoctor && (
           <ReviewDoctorModal
             isOpen={showRatingModal}
             onClose={() => {
@@ -615,6 +1004,16 @@ export default function MyQueuePage() {
                 const token = localStorage.getItem("medqueue_token");
                 if (!token) return;
 
+                // Find the appointment that needs review
+                const appointmentToReview = completedQueues.find(
+                  (q) => q.doctor?.name === selectedDoctor && !q.hasReview
+                );
+
+                if (!appointmentToReview) {
+                  alert("Appointment not found");
+                  return;
+                }
+
                 const response = await fetch("/api/patient/reviews", {
                   method: "POST",
                   headers: {
@@ -622,8 +1021,8 @@ export default function MyQueuePage() {
                     Authorization: `Bearer ${token}`,
                   },
                   body: JSON.stringify({
-                    bookingId: currentQueue.bookingId,
-                    doctorId: currentQueue.doctor?._id,
+                    bookingId: appointmentToReview.bookingId,
+                    doctorId: appointmentToReview.doctor?._id,
                     rating,
                     comment: feedback || "",
                   }),
@@ -667,8 +1066,8 @@ export default function MyQueuePage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {completedQueues.length > 0 ? (
-              completedQueues.map((appointment) => {
+            {pastAppointments.length > 0 ? (
+              pastAppointments.map((appointment) => {
                 const initials = (appointment.doctor?.name || "D")
                   .split(" ")
                   .map((n) => n[0])
@@ -718,17 +1117,22 @@ export default function MyQueuePage() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-5 border-t border-border/50">
-                        <p className="text-sm font-semibold text-muted-foreground">
-                          {appointment.appointmentTime
-                            ? new Date(
-                                appointment.appointmentTime
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : ""}
-                        </p>
+                        <div className="flex flex-col gap-2">
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            {appointment.appointmentTime
+                              ? new Date(
+                                  appointment.appointmentTime
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : ""}
+                          </p>
+                          <StatusBadge 
+                            status={appointment.status === "cancelled" ? "cancelled" : appointment.status === "completed" ? "completed" : "confirmed"}
+                          />
+                        </div>
                         {appointment.doctor?.rating && appointment.doctor.rating > 0 && (
                           <div className="flex items-center gap-1.5">
                             <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
@@ -743,6 +1147,51 @@ export default function MyQueuePage() {
                           </div>
                         )}
                       </div>
+                      {/* Action Buttons for Completed Appointments */}
+                      {appointment.status === "completed" && (
+                        <div className="pt-4 border-t border-border/50 space-y-2">
+                          {!appointment.hasReview && appointment.invoice?.status === "paid" && (
+                            <Button
+                              onClick={() => {
+                                setSelectedDoctor(appointment.doctor?.name || "");
+                                setShowRatingModal(true);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              Review Doctor
+                            </Button>
+                          )}
+                          {appointment.hasMedicalRecord && (
+                            <Button
+                              onClick={() => router.push("/patient/medical-record")}
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                            >
+                              <FileText className="w-4 h-4" />
+                              View Medical Record
+                            </Button>
+                          )}
+                          {appointment.hasInvoice && (
+                            <Button
+                              onClick={() => {
+                                router.push(
+                                  `/patient/invoices?bookingId=${appointment.bookingId}&status=${appointment.invoice?.status || "pending"}`
+                                );
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                            >
+                              <Receipt className="w-4 h-4" />
+                              View Invoice
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Card>
                 );

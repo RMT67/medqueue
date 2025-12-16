@@ -8,7 +8,7 @@ import { Navigation } from "@/components/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { Clock, Calendar, FileText, Stethoscope, ArrowRight, Sparkles, TrendingUp, Activity, Receipt, CreditCard, Pill, AlertCircle, User, Star, RefreshCw } from "lucide-react"
+import { Clock, Calendar, FileText, Stethoscope, ArrowRight, Sparkles, TrendingUp, Activity, Receipt, CreditCard, Pill, AlertCircle, User, Star } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn } from "@/components/animations"
 import { DoctorCardGrid } from "@/components/doctor-card-grid"
@@ -73,21 +73,15 @@ export default function PatientDashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const fetchDashboard = async (showRefreshing = false) => {
+  const fetchDashboard = async () => {
     try {
-      if (showRefreshing) {
-        setIsRefreshing(true)
-      } else {
-        setIsLoading(true)
-      }
+      setIsLoading(true)
       setError(null)
 
       const token = localStorage.getItem("medqueue_token")
       if (!token) {
         setIsLoading(false)
-        setIsRefreshing(false)
         return
       }
 
@@ -111,7 +105,6 @@ export default function PatientDashboardPage() {
       console.error("Error fetching dashboard:", error)
     } finally {
       setIsLoading(false)
-      setIsRefreshing(false)
     }
   }
 
@@ -184,21 +177,9 @@ export default function PatientDashboardPage() {
                       Dashboard
                     </span>
                   </h1>
-                  <div className="flex items-center gap-3">
-                    <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
-                      Welcome back, <span className="font-semibold text-foreground">{user?.name}</span>! Manage your healthcare journey from here.
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => fetchDashboard(true)}
-                      disabled={isRefreshing}
-                      className="gap-2 text-muted-foreground hover:text-foreground"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                      Refresh
-                    </Button>
-                  </div>
+                  <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
+                    Welcome back, <span className="font-semibold text-foreground">{user?.name}</span>! Manage your healthcare journey from here.
+                  </p>
                 </div>
                 
                 {/* Quick Stats */}
@@ -243,15 +224,6 @@ export default function PatientDashboardPage() {
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
                   <p className="text-red-700 dark:text-red-300 font-semibold">{error}</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => fetchDashboard()}
-                    className="ml-auto gap-2"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Retry
-                  </Button>
                 </div>
               </Card>
             </FadeIn>

@@ -55,12 +55,29 @@ export async function GET(
       );
     }
 
-    // ✅ 4. Get schedule
+    // ✅ 4. Get schedule and extract startTime
     let schedule = null;
+    let scheduleStartTime: string | null = null;
     if (booking.scheduleId) {
       schedule = await DoctorScheduleModel.getById(booking.scheduleId);
     } else {
       schedule = await DoctorScheduleModel.getDefaultSchedule(booking.doctorId);
+    }
+
+    // Extract startTime from schedule
+    if (schedule?.dayOfWeek && schedule.dayOfWeek.length > 0) {
+      const scheduleDate = booking.scheduleDate 
+        ? new Date(booking.scheduleDate) 
+        : booking.appointmentTime 
+        ? new Date(booking.appointmentTime) 
+        : new Date();
+      const dayIndex = scheduleDate.getDay();
+      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const dayName = dayNames[dayIndex];
+      const daySchedule = schedule.dayOfWeek.find((d) => d.hari === dayName);
+      if (daySchedule && daySchedule.startTime) {
+        scheduleStartTime = daySchedule.startTime;
+      }
     }
 
     // ✅ 5. Calculate queue position
@@ -83,8 +100,19 @@ export async function GET(
     // ✅ 6. Get average service time
     const averageServiceTime = doctor.averageServiceTime || 10;
 
-    // ✅ 7. Calculate estimated call time
-    const callTimeData = calculateEstimatedCallTime(patientsAhead, averageServiceTime);
+    // ✅ 7. Calculate estimated call time with schedule startTime
+    const scheduleDate = booking.scheduleDate 
+      ? new Date(booking.scheduleDate) 
+      : booking.appointmentTime 
+      ? new Date(booking.appointmentTime) 
+      : new Date();
+
+    const callTimeData = calculateEstimatedCallTime(
+      patientsAhead,
+      averageServiceTime,
+      scheduleStartTime, // Pass schedule startTime
+      scheduleDate // Pass schedule date
+    );
 
     // ✅ 8. Calculate clinic traffic
     const trafficData = await calculateClinicTraffic(
