@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Clock, Hourglass, CheckCircle2, User, Star, Calendar, MapPin, Info, Lightbulb, FileText } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -152,6 +152,71 @@ export function QueueCard({
   onCancel,
   onRate,
 }: QueueCardProps) {
+  const toJakartaDate = (value?: string | Date | null) => {
+    if (!value) return null
+    const localString = new Date(value).toLocaleString("en-US", {
+      timeZone: "Asia/Jakarta",
+    })
+    const parsed = new Date(localString)
+    return isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const getJakartaYMD = (value: Date | null) => {
+    if (!value) return null
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(value)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
+    const year = Number(get("year"))
+    const month = Number(get("month"))
+    const day = Number(get("day"))
+    return {
+      year,
+      month,
+      day,
+      key: `${year}-${month}-${day}`,
+      asUTC: Date.UTC(year, month - 1, day),
+    }
+  }
+
+  const formatDisplayDate = (value?: string | Date | null) => {
+    const date = toJakartaDate(value)
+    if (!date) return "-"
+
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jakarta",
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).formatToParts(date)
+
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
+    const weekday = get("weekday")
+    const day = get("day")
+    const month = get("month")
+    const year = get("year")
+
+    return `${weekday}, ${day} ${month} ${year}`
+  }
+
+  const formatDisplayTime = (value?: string | Date | null) => {
+    const date = toJakartaDate(value)
+    if (!date) return "-"
+
+    return (
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Jakarta",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(date) + " WIB"
+    )
+  }
+
   const normalizedBookingId =
     (bookingId as any)?._id?.toString?.() ||
     bookingId?.toString?.() ||
@@ -164,12 +229,44 @@ export function QueueCard({
     .join("")
     .toUpperCase()
 
-  // Calculate estimated call time (realtime)
+  const formattedAppointmentDate = useMemo(
+    () => formatDisplayDate(appointmentDate || appointmentTime),
+    [appointmentDate, appointmentTime]
+  )
+
+  const formattedAvailableTime = useMemo(() => {
+    if (timeRange) return timeRange
+    if (appointmentTime) return formatDisplayTime(appointmentTime)
+    if (appointmentDate) return formatDisplayTime(appointmentDate)
+    return "-"
+  }, [timeRange, appointmentTime, appointmentDate])
+
+  const getPracticeStartTime = (baseDate: Date | null, range?: string | null) => {
+    if (!baseDate) return null
+
+    const parsedRange = (range || "").split("-")[0]?.trim()
+    const [h, m] = (parsedRange || "").split(":").map((v) => Number(v))
+
+    // Fallback: if timeRange missing, try appointmentTime; else midnight Jakarta
+    const hours = Number.isInteger(h) ? h : baseDate.getHours()
+    const minutes = Number.isInteger(m) ? m : baseDate.getMinutes()
+
+    const target = new Date(baseDate.getTime())
+    target.setHours(hours || 0, minutes || 0, 0, 0)
+    return target
+  }
+
+  // Calculate estimated call time (realtime) with Jakarta timezone
   const [estimatedCallTime, setEstimatedCallTime] = useState<string>("")
   const [estimatedCallTimeFormatted, setEstimatedCallTimeFormatted] = useState<string>("")
 
   useEffect(() => {
     const calculateCallTime = () => {
+      const bookingSource = appointmentDate || appointmentTime
+      const bookingDate = toJakartaDate(bookingSource)
+      const now = toJakartaDate(new Date())
+      const practiceStart = getPracticeStartTime(bookingDate, timeRange) || bookingDate
+
       if (status === "completed") {
         setEstimatedCallTime("Completed")
         setEstimatedCallTimeFormatted("Appointment finished")
@@ -182,53 +279,61 @@ export function QueueCard({
         return
       }
 
-      if (patientsAhead === 0) {
-        setEstimatedCallTime("Now")
-        setEstimatedCallTimeFormatted("Ready to be called")
+      if (!practiceStart || !now) {
+        setEstimatedCallTime("-")
+        setEstimatedCallTimeFormatted("Schedule not available")
         return
       }
 
-      // Calculate total wait time in minutes
-      // estimatedTime is total estimated wait time, but we need to calculate based on patients ahead
-      // Assuming average 7 minutes per patient service time
-      const averageServiceTime = 7 // minutes per patient
-      const totalWaitMinutes = patientsAhead * averageServiceTime
-      const now = new Date()
-      const callTime = new Date(now.getTime() + totalWaitMinutes * 60 * 1000)
+      const targetDay = getJakartaYMD(practiceStart)
+      const nowDay = getJakartaYMD(now)
+      const dayDiff =
+        targetDay && nowDay
+          ? Math.round((targetDay.asUTC - nowDay.asUTC) / (1000 * 60 * 60 * 24))
+          : 0
 
-      // Format time (24-hour format)
-      const hours = callTime.getHours()
-      const minutes = callTime.getMinutes()
-      const displayHours = hours.toString().padStart(2, "0")
-      const displayMinutes = minutes.toString().padStart(2, "0")
-
-      setEstimatedCallTime(`${displayHours}:${displayMinutes}`)
-      
-      // Calculate minutes until call
-      const minutesUntil = Math.max(0, Math.ceil((callTime.getTime() - now.getTime()) / (60 * 1000)))
-      if (minutesUntil <= 1) {
-        setEstimatedCallTimeFormatted("Any moment now")
-      } else if (minutesUntil < 60) {
-        setEstimatedCallTimeFormatted(`In ${minutesUntil} minutes`)
-      } else {
-        const hoursUntil = Math.floor(minutesUntil / 60)
-        const minsRemaining = minutesUntil % 60
-        setEstimatedCallTimeFormatted(`In ${hoursUntil}h ${minsRemaining}m`)
+      if (dayDiff > 0) {
+        const days = Math.round(dayDiff)
+        if (days === 1) {
+          setEstimatedCallTime("Tomorrow")
+        } else {
+          setEstimatedCallTime(`In ${days} days`)
+        }
+        setEstimatedCallTimeFormatted(`at ${formatDisplayTime(practiceStart)}`)
+        return
       }
+
+      const diffMs = practiceStart.getTime() - now.getTime()
+      if (diffMs <= 0) {
+        setEstimatedCallTime("Now")
+        setEstimatedCallTimeFormatted(formatDisplayTime(practiceStart))
+        return
+      }
+
+      const totalMinutes = Math.max(1, Math.round(diffMs / (1000 * 60)))
+      const hours = Math.floor(totalMinutes / 60)
+      const minutes = totalMinutes % 60
+      const label =
+        hours > 0 ? `In ${hours}h ${minutes}m` : `In ${minutes}m`
+
+      setEstimatedCallTime(label)
+      setEstimatedCallTimeFormatted(`at ${formatDisplayTime(practiceStart)}`)
     }
 
     calculateCallTime()
     const interval = setInterval(calculateCallTime, 30000) // Update every 30 seconds for more realtime feel
 
     return () => clearInterval(interval)
-  }, [patientsAhead, status, estimatedTime])
+  }, [patientsAhead, status, estimatedTime, appointmentTime, appointmentDate, timeRange])
 
   return (
     <Card className="border border-border/50 rounded-2xl p-8 shadow-2xl bg-card/95 backdrop-blur-md space-y-6 h-full flex flex-col ring-1 ring-primary/5">
       {/* Queue Number & Status */}
       <div className="text-center pb-6 border-b border-border/50">
         <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Queue Number</p>
-        <p className="text-5xl lg:text-6xl font-bold text-primary font-mono mb-4 tracking-tight">A-023</p>
+        <p className="text-5xl lg:text-6xl font-bold text-primary font-mono mb-4 tracking-tight">
+          {currentlyServing || "-"}
+        </p>
         <div
           className={cn("inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-semibold border shadow-sm", {
             "bg-gray-50/80 dark:bg-gray-950/30 text-gray-700 dark:text-gray-300 border-gray-200/50 dark:border-gray-800/50 ring-1 ring-gray-200/50": status === "waiting",
@@ -276,7 +381,7 @@ export function QueueCard({
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Date</p>
-              <p className="text-sm font-semibold text-foreground">{appointmentDate}</p>
+              <p className="text-sm font-semibold text-foreground">{formattedAppointmentDate}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 p-4 bg-card/80 rounded-xl border border-border/50 shadow-sm backdrop-blur-sm">
@@ -285,7 +390,7 @@ export function QueueCard({
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Available Time</p>
-              <p className="text-sm font-semibold text-foreground">{timeRange || appointmentTime}</p>
+              <p className="text-sm font-semibold text-foreground">{formattedAvailableTime}</p>
             </div>
           </div>
         </div>
@@ -375,13 +480,19 @@ export function QueueCard({
       {/* Action Buttons */}
       <div className="mt-auto pt-6 border-t border-border/50">
         {status === "completed" ? (
-          <Button
-            onClick={onRate}
-            className="w-full h-12 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground gap-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
-          >
-            <Star className="w-5 h-5" />
-            Rate Your Experience
-          </Button>
+          onRate ? (
+            <Button
+              onClick={onRate}
+              className="w-full h-12 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground gap-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
+            >
+              <Star className="w-5 h-5" />
+              Rate Your Experience
+            </Button>
+          ) : (
+            <div className="text-sm text-muted-foreground text-center">
+              Review will be available after payment is completed.
+            </div>
+          )
         ) : (
           <div className="flex gap-3">
             <Button 
