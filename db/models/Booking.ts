@@ -218,4 +218,78 @@ export default class BookingModel {
       .toArray();
     return bookings;
   }
+
+  static async updateStatus(bookingId: string, status: string) {
+    const collection = await this.collection();
+    const result = await collection.updateOne(
+      { _id: new ObjectId(bookingId) },
+      { 
+        $set: { 
+          status, 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+    return result;
+  }
+
+  static async cancelAndAdjustTimes(bookingId: string, averageTimePerPatient: number) {
+    const collection = await this.collection();
+    
+    // Get the booking that will be cancelled
+    const cancelledBooking = await collection.findOne({ _id: new ObjectId(bookingId) });
+    
+    if (!cancelledBooking) {
+      throw new Error("Booking not found");
+    }
+
+    // Cancel the booking
+    await collection.updateOne(
+      { _id: new ObjectId(bookingId) },
+      { 
+        $set: { 
+          status: "cancelled", 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+
+    // Get all confirmed bookings for the same doctor on the same date with later appointment times
+    const scheduleDate = new Date(cancelledBooking.scheduleDate);
+    const cancelledAppointmentTime = cancelledBooking.appointmentTime 
+      ? new Date(cancelledBooking.appointmentTime) 
+      : null;
+
+    if (!cancelledAppointmentTime) {
+      return; // No need to adjust if cancelled booking has no appointment time
+    }
+
+    const bookingsToAdjust = await collection.find({
+      doctorId: cancelledBooking.doctorId,
+      scheduleDate: {
+        $gte: new Date(scheduleDate.setHours(0, 0, 0, 0)),
+        $lt: new Date(scheduleDate.setHours(23, 59, 59, 999))
+      },
+      status: "confirmed",
+      appointmentTime: { $gt: cancelledAppointmentTime }
+    }).sort({ appointmentTime: 1 }).toArray();
+
+    // Adjust appointment times by moving them earlier
+    const adjustmentMs = averageTimePerPatient * 60 * 1000; // Convert minutes to milliseconds
+
+    for (const booking of bookingsToAdjust) {
+      const currentTime = new Date(booking.appointmentTime);
+      const newTime = new Date(currentTime.getTime() - adjustmentMs);
+      
+      await collection.updateOne(
+        { _id: booking._id },
+        { 
+          $set: { 
+            appointmentTime: newTime,
+            updatedAt: new Date() 
+          } 
+        }
+      );
+    }
+  }
 }
