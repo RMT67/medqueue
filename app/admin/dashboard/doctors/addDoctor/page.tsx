@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
-import Image from "next/image";
+// import Image from "next/image";
 import Swal from "sweetalert2";
 import { apiFetch } from "@/lib/api";
 
@@ -312,7 +312,7 @@ export default function AddDoctorPage() {
               </div>
 
               {/* Image URL */}
-              <div className="md:col-span-2">
+              {/* <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-foreground mb-2">
                   Image URL
                 </label>
@@ -324,7 +324,7 @@ export default function AddDoctorPage() {
                   placeholder="https://example.com/image.jpg"
                   className="h-11 border-2 focus:border-primary"
                 />
-              </div>
+              </div> */}
 
               {/* Active Status */}
               <div className="md:col-span-2">
@@ -344,7 +344,7 @@ export default function AddDoctorPage() {
             </div>
 
             {/* Image Preview */}
-            {formData.image && (
+            {/* {formData.image && (
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">
                   Image Preview
@@ -361,7 +361,7 @@ export default function AddDoctorPage() {
                   height={128}
                 />
               </div>
-            )}
+            )} */}
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4">

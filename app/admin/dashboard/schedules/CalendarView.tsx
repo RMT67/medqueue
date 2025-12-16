@@ -44,7 +44,7 @@ export function CalendarView({ schedules }: CalendarViewProps) {
 
     schedules.forEach((schedule, index) => {
       const daySchedule = schedule.dayOfWeek.find(
-        (d) => d.hari === day && d.availabel
+        (d) => d.hari === day && d.available
       );
 
       if (daySchedule) {
