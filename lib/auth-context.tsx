@@ -470,6 +470,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Clear state
     setUser(null);
+
+    // Force redirect to homepage for all roles/callers
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
   };
 
   return (
