@@ -223,29 +223,16 @@ export function OverviewTab({ stats, doctors }: OverviewTabProps) {
 
                   {/* Queue Information */}
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                          Queue
-                        </p>
-                        <p className="text-2xl font-bold text-primary">
-                          {doctor.currentQueue ?? 0}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          patients waiting
-                        </p>
-                      </div>
-                      <div className="p-3 bg-primary/10 rounded-lg border-2 border-primary/20">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                          Serving
-                        </p>
-                        <p className="text-2xl font-bold text-primary">
-                          {doctor.currentlyServing || "N/A"}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          current patient
-                        </p>
-                      </div>
+                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                        Queue
+                      </p>
+                      <p className="text-2xl font-bold text-primary">
+                        {doctor.currentQueue ?? 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        patients waiting
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

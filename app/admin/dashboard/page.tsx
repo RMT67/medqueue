@@ -35,102 +35,42 @@ export default function AdminDashboard() {
     }
   }, [user, isLoading, router]);
 
-  const getTodayDayName = (): string => {
-    const days = [
-      "Minggu",
-      "Senin",
-      "Selasa",
-      "Rabu",
-      "Kamis",
-      "Jumat",
-      "Sabtu",
-    ];
-    const today = new Date();
-    return days[today.getDay()];
-  };
-
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Get today's day name in Indonesian
-      const todayDay = getTodayDayName();
+      // Fetch all dashboard data from overview API
+      const response = await fetch("/api/admin/overview");
 
-      // Fetch schedules filtered by today's day from API
-      const schedulesResponse = await fetch(
-        `/api/schedules?day=${encodeURIComponent(todayDay)}`
-      );
+      if (response.ok) {
+        const data = await response.json();
 
-      if (schedulesResponse.ok) {
-        const todaySchedules = await schedulesResponse.json();
-
-        // Ensure data is array
-        const schedulesArray = Array.isArray(todaySchedules)
-          ? todaySchedules
-          : [];
-
-        setSchedules(schedulesArray);
-
-        // Get doctor IDs who have schedules today
-        const doctorIdsWithScheduleToday = schedulesArray.map(
-          (schedule: DoctorWithSchedule) => schedule.doctorId
-        );
-
-        if (doctorIdsWithScheduleToday.length > 0) {
-          // Fetch only doctors who have schedules today
-          const doctorsResponse = await fetch(
-            `/api/doctor?doctorIds=${doctorIdsWithScheduleToday.join(",")}`
-          );
-
-          if (doctorsResponse.ok) {
-            const doctorsData = await doctorsResponse.json();
-            const doctorsArray = Array.isArray(doctorsData.doctors)
-              ? doctorsData.doctors
-              : [];
-
-            setDoctors(doctorsArray);
-
-            // Calculate stats from active doctors with schedules
-            const totalPatients = doctorsArray.reduce(
-              (sum: number, d: DoctorAdmin) => sum + (d.todayPatients || 0),
-              0
-            );
-            const completedVisits = doctorsArray.reduce(
-              (sum: number, d: DoctorAdmin) => sum + (d.completedToday || 0),
-              0
-            );
-            const avgWait =
-              doctorsArray.length > 0
-                ? Math.round(
-                    doctorsArray.reduce(
-                      (sum: number, d: DoctorAdmin) =>
-                        sum + (d.avgWaitTime || 0),
-                      0
-                    ) / doctorsArray.length
-                  )
-                : 0;
-
-            setStats({
-              totalPatients,
-              avgWaitTime: `${avgWait} min`,
-              activeDoctors: doctorsArray.length,
-              completedVisits,
-            });
-          }
-        } else {
-          // No schedules for today
-          setDoctors([]);
-          setSchedules([]);
-          setStats({
-            totalPatients: 0,
-            avgWaitTime: "0 min",
-            activeDoctors: 0,
-            completedVisits: 0,
-          });
-        }
+        // Set stats, doctors, and schedules from the API response
+        setStats(data.stats);
+        setDoctors(data.doctors || []);
+        setSchedules(data.schedules || []);
+      } else {
+        // Reset to default values if request fails
+        setStats({
+          totalPatients: 0,
+          avgWaitTime: "0 min",
+          activeDoctors: 0,
+          completedVisits: 0,
+        });
+        setDoctors([]);
+        setSchedules([]);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      // Reset to default values on error
+      setStats({
+        totalPatients: 0,
+        avgWaitTime: "0 min",
+        activeDoctors: 0,
+        completedVisits: 0,
+      });
+      setDoctors([]);
+      setSchedules([]);
     } finally {
       setLoading(false);
     }
