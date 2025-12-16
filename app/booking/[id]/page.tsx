@@ -59,6 +59,53 @@ function buildApiUrl(path: string) {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
+// Helper function to normalize day names (handle both English and Indonesian)
+function normalizeDayName(dayName: string): string {
+  const dayMap: Record<string, string> = {
+    "Minggu": "Sunday",
+    "Senin": "Monday",
+    "Selasa": "Tuesday",
+    "Rabu": "Wednesday",
+    "Kamis": "Thursday",
+    "Jumat": "Friday",
+    "Sabtu": "Saturday",
+    "Sunday": "Sunday",
+    "Monday": "Monday",
+    "Tuesday": "Tuesday",
+    "Wednesday": "Wednesday",
+    "Thursday": "Thursday",
+    "Friday": "Friday",
+    "Saturday": "Saturday",
+  };
+  return dayMap[dayName] || dayName;
+}
+
+// Helper function to get day name in both formats
+function getDayNames(dayIndex: number): { english: string; indonesian: string } {
+  const dayOfWeekMapEnglish: { [key: number]: string } = {
+    0: "Sunday",
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
+  };
+  const dayOfWeekMapIndonesian: { [key: number]: string } = {
+    0: "Minggu",
+    1: "Senin",
+    2: "Selasa",
+    3: "Rabu",
+    4: "Kamis",
+    5: "Jumat",
+    6: "Sabtu",
+  };
+  return {
+    english: dayOfWeekMapEnglish[dayIndex],
+    indonesian: dayOfWeekMapIndonesian[dayIndex],
+  };
+}
+
 export default function BookingPage({
   params,
 }: {
@@ -200,21 +247,20 @@ export default function BookingPage({
     if (selectedDate && doctorSchedule) {
       const selected = new Date(selectedDate);
       const dayOfWeekIndex = selected.getDay();
-      const dayOfWeekMap: { [key: number]: string } = {
-        0: "Minggu",
-        1: "Senin",
-        2: "Selasa",
-        3: "Rabu",
-        4: "Kamis",
-        5: "Jumat",
-        6: "Sabtu",
-      };
-      const selectedDayName = dayOfWeekMap[dayOfWeekIndex];
+      const dayNames = getDayNames(dayOfWeekIndex);
 
-      // Find schedule for selected day
-      const daySchedule = doctorSchedule.dayOfWeek.find(
-        (day) => day.hari === selectedDayName && day.available
-      );
+      // Find schedule for selected day - try both English and Indonesian formats
+      const daySchedule = doctorSchedule.dayOfWeek.find((day) => {
+        const hariNormalized = normalizeDayName(day.hari);
+        const isAvailable = day.available !== undefined ? day.available : (day.availabel !== undefined ? day.availabel : false);
+        return (
+          (hariNormalized === dayNames.english || 
+           hariNormalized === dayNames.indonesian ||
+           day.hari === dayNames.english ||
+           day.hari === dayNames.indonesian) && 
+          isAvailable
+        );
+      });
 
       if (daySchedule) {
         setTimeRange(`${daySchedule.startTime} - ${daySchedule.endTime}`);
@@ -385,26 +431,26 @@ export default function BookingPage({
     // Check if doctor is available on selected day
     if (doctorSchedule) {
       const dayOfWeekIndex = selected.getDay();
-      const dayOfWeekMap: { [key: number]: string } = {
-        0: "Minggu",
-        1: "Senin",
-        2: "Selasa",
-        3: "Rabu",
-        4: "Kamis",
-        5: "Jumat",
-        6: "Sabtu",
-      };
-      const selectedDayName = dayOfWeekMap[dayOfWeekIndex];
+      const dayNames = getDayNames(dayOfWeekIndex);
 
-      const daySchedule = doctorSchedule.dayOfWeek.find(
-        (day) => day.hari === selectedDayName && day.available
-      );
+      // Find schedule - try both English and Indonesian formats
+      const daySchedule = doctorSchedule.dayOfWeek.find((day) => {
+        const hariNormalized = normalizeDayName(day.hari);
+        const isAvailable = day.available !== undefined ? day.available : (day.availabel !== undefined ? day.availabel : false);
+        return (
+          (hariNormalized === dayNames.english || 
+           hariNormalized === dayNames.indonesian ||
+           day.hari === dayNames.english ||
+           day.hari === dayNames.indonesian) && 
+          isAvailable
+        );
+      });
 
       if (!daySchedule) {
         return Swal.fire({
           icon: "error",
           title: "Doctor Not Available",
-          text: `Doctor is not available on ${selectedDayName}. Please select another date.`,
+          text: `Doctor is not available on ${dayNames.english}. Please select another date.`,
         });
       }
 
