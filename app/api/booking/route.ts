@@ -110,7 +110,8 @@ export async function POST(req: Request) {
       },
       averageTimePerPatient,
       bookingsOnDate, // pass existing bookings to avoid re-querying
-      daySchedule // pass the selected day schedule for startTime/endTime
+      daySchedule, // pass the selected day schedule for startTime/endTime
+      doctor.queueCode // pass doctor's queueCode, will fallback to Z if undefined
     );
     return NextResponse.json(
       {
