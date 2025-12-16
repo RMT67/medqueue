@@ -19,9 +19,15 @@ import {
   Receipt,
   Pill,
   CreditCard,
+  UserCircle,
+  MapPin,
 } from "lucide-react";
 import { ReviewDoctorModal } from "@/components/review-doctor-modal";
 import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api";
+import { ProfileUser } from "@/types/userTypes";
+import Link from "next/link";
+import { FadeIn } from "@/components/animations";
 
 type QueueDoctor = {
   _id: string;
@@ -62,6 +68,7 @@ export default function MyQueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "patient")) {
@@ -111,6 +118,21 @@ export default function MyQueuePage() {
     }
   }, [user, fetchQueues]);
 
+  useEffect(() => {
+    const fetchPatientProfile = async () => {
+      try {
+        const data = await apiFetch<{ user: ProfileUser }>("/api/profile");
+        setPatientProfile(data.user);
+      } catch (error) {
+        console.error("Error fetching patient profile:", error);
+      }
+    };
+
+    if (user && user.role === "patient") {
+      fetchPatientProfile();
+    }
+  }, [user]);
+
   const currentQueue = useMemo(() => queues[0] || null, [queues]);
   const completedQueues = useMemo(
     () => queues.filter((q) => q.status === "completed"),
@@ -126,50 +148,74 @@ export default function MyQueuePage() {
         onLogout={logout}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-primary uppercase tracking-wide">
-              My Queue
-            </p>
-            <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
-              Track your visit in real-time
-            </h1>
-            <p className="text-muted-foreground max-w-2xl">
-              See your active bookings, queue position, and invoices. Payment
-              and review will appear when available.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4 w-full lg:w-auto">
-            <div className="flex items-center gap-3 bg-card/80 border border-border/50 rounded-2xl p-4 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase">
-                  Active
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {currentQueue ? 1 : 0}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 bg-card/80 border border-border/50 rounded-2xl p-4 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <ListOrdered className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase">
-                  Completed
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {completedQueues.length}
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* Hero Header */}
+      <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-12 lg:py-16 border-b border-border/50 overflow-hidden">
+        {/* Subtle Background Pattern */}
+        <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05]">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 60 0 L 0 0 0 60' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='60' height='60' fill='url(%23grid)'/%3E%3C/svg%3E")`,
+            }}
+          />
         </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeIn direction="up" delay={0}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-3">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground flex items-center gap-4">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg ring-4 ring-primary/10">
+                    <ListOrdered className="w-6 h-6 md:w-7 md:h-7 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    My Queue
+                  </span>
+                </h1>
+                <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
+                  Monitor your queue position in real-time, manage appointments, and handle payments seamlessly. Everything you need for your visit is right here.
+                </p>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="flex gap-4 flex-shrink-0">
+                <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center ring-2 ring-primary/10">
+                      <Clock className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-semibold uppercase">
+                        Active
+                      </p>
+                      <p className="text-lg font-bold text-foreground">
+                        {currentQueue ? 1 : 0}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center ring-2 ring-primary/10">
+                      <ListOrdered className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-semibold uppercase">
+                        Completed
+                      </p>
+                      <p className="text-lg font-bold text-foreground">
+                        {completedQueues.length}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
 
         {isLoadingQueue ? (
           <div className="min-h-[320px] flex items-center justify-center">
@@ -282,6 +328,118 @@ export default function MyQueuePage() {
             </div>
 
             <div className="space-y-6">
+              {/* Patient Profile Card */}
+              <Link href="/profile">
+                <Card className="p-6 border border-border/50 shadow-xl bg-card/95 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 cursor-pointer hover:border-primary/50">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-2 ring-primary/10">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                    <h3 className="text-lg font-bold text-foreground">Patient Profile</h3>
+                  </div>
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 overflow-hidden shadow-xl ring-4 ring-primary/10 flex-shrink-0">
+                        {patientProfile?.photoUrl ? (
+                          <>
+                            <Image
+                              src={patientProfile.photoUrl}
+                              alt={patientProfile.fullName || "Patient"}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = "none";
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const fallback = parent.querySelector(
+                                    ".image-fallback"
+                                  ) as HTMLElement;
+                                  if (fallback) fallback.style.display = "flex";
+                                }
+                              }}
+                            />
+                            <div className="image-fallback hidden w-full h-full items-center justify-center text-white font-bold text-2xl">
+                              {patientProfile?.fullName?.charAt(0).toUpperCase() ||
+                                user?.name?.charAt(0).toUpperCase() ||
+                                "P"}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white font-bold text-2xl">
+                            {patientProfile?.fullName?.charAt(0).toUpperCase() ||
+                              user?.name?.charAt(0).toUpperCase() ||
+                              "P"}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-foreground text-lg truncate mb-1">
+                          {patientProfile?.fullName || user?.name || "Patient"}
+                        </p>
+                        <p className="text-sm text-muted-foreground capitalize font-medium">
+                          {patientProfile?.role || user?.role || "Patient"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-5 border-t border-border/50 space-y-4">
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                          <Mail className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-muted-foreground truncate font-medium">
+                          {patientProfile?.email || user?.email || "patient@example.com"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                          <Phone className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-muted-foreground font-medium">
+                          {patientProfile?.phoneNumber || "Not set"}
+                        </span>
+                      </div>
+                      {patientProfile?.dateOfBirth && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                            <Calendar className="w-4 h-4 text-primary" />
+                          </div>
+                          <span className="text-muted-foreground font-medium">
+                            {new Date(patientProfile.dateOfBirth).toLocaleDateString("id-ID", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {patientProfile?.gender && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                            <UserCircle className="w-4 h-4 text-primary" />
+                          </div>
+                          <span className="text-muted-foreground font-medium capitalize">
+                            {patientProfile.gender}
+                          </span>
+                        </div>
+                      )}
+                      {patientProfile?.address && (
+                        <div className="flex items-start gap-3 text-sm">
+                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20 mt-0.5">
+                            <MapPin className="w-4 h-4 text-primary" />
+                          </div>
+                          <span className="text-muted-foreground font-medium line-clamp-2">
+                            {patientProfile.address}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+
+              {/* Invoice Card */}
               <Card className="p-6 bg-card/90 border border-border/50 shadow-sm">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
@@ -468,13 +626,13 @@ export default function MyQueuePage() {
                               })
                             : ""}
                         </p>
-                        {appointment.doctor?.rating > 0 && (
+                        {appointment.doctor?.rating && appointment.doctor.rating > 0 && (
                           <div className="flex items-center gap-1.5">
                             <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                             <span className="text-base font-bold text-foreground">
                               {appointment.doctor.rating.toFixed(1)}
                             </span>
-                            {appointment.doctor.totalReviews > 0 && (
+                            {appointment.doctor.totalReviews && appointment.doctor.totalReviews > 0 && (
                               <span className="text-sm text-muted-foreground">
                                 ({appointment.doctor.totalReviews})
                               </span>
