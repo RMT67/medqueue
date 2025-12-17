@@ -86,6 +86,8 @@ export default function DoctorDashboard() {
       medicineCode: string;
       quantity: number;
       dosage: string;
+      unitPrice: number;
+      price: number;
     }>
   >([]);
   const [selectedService, setSelectedService] = useState<{
@@ -404,6 +406,8 @@ export default function DoctorDashboard() {
         medicineCode: medicine.code,
         quantity: 1,
         dosage: "1x per day",
+        unitPrice: medicine.price,
+        price: medicine.price * 1, // unitPrice * quantity
       },
     ]);
   };
@@ -420,7 +424,9 @@ export default function DoctorDashboard() {
   ) => {
     setPrescribedMedicines(
       prescribedMedicines.map((pm) =>
-        pm.medicineId === medicineId ? { ...pm, quantity } : pm
+        pm.medicineId === medicineId
+          ? { ...pm, quantity, price: pm.unitPrice * quantity }
+          : pm
       )
     );
   };
@@ -461,38 +467,23 @@ export default function DoctorDashboard() {
   };
 
   const handleSkip = async () => {
-    if (!currentPatient || !user) return;
+    if (!currentPatient || !user || !currentDoctor) return;
 
     try {
-      const token = localStorage.getItem("medqueue_token");
-      if (!token) {
-        Swal.fire("Authentication required", "Please log in again.", "warning");
-        return;
-      }
-
-      const response = await fetch(
-        `/api/doctor/queue/${currentPatient._id}/skip`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        Swal.fire("Error", error.error || "Failed to skip patient", "error");
-        return;
-      }
+      // Update booking status to cancelled using PATCH /api/booking
+      // This will trigger cancelAndAdjustTimes logic
+      await apiFetch<
+        { success: boolean; message: string },
+        { bookingId: string; status: string }
+      >("/api/booking", {
+        method: "PATCH",
+        body: {
+          bookingId: currentPatient._id,
+          status: "cancelled",
+        },
+      });
 
       // Refresh bookings to get updated queue (exclude cancelled/skipped)
-      if (!currentDoctor) {
-        Swal.fire("Error", "Doctor profile not found", "error");
-        return;
-      }
-
       const bookingsResponse = await fetch(
         `/api/booking?doctorId=${currentDoctor._id}&populate=patient`,
         {
@@ -625,6 +616,8 @@ export default function DoctorDashboard() {
         setCurrentPatient(null);
         setQueue([]);
       }
+
+      Swal.fire("Success", "Patient skipped successfully", "success");
     } catch (error) {
       console.error("Error skipping patient:", error);
       Swal.fire("Error", "Failed to skip patient", "error");
@@ -648,7 +641,7 @@ export default function DoctorDashboard() {
       // Calculate consultation duration in minutes
       const endTime = new Date();
       const durationMs = endTime.getTime() - sessionStartTime.getTime();
-      const durationMinutes = Math.round(durationMs / 60000);
+      const durationMinutes = Math.ceil(durationMs / 60000);
 
       // Calculate new average time per patient
       let newAverageTime: number;
@@ -678,6 +671,8 @@ export default function DoctorDashboard() {
               medicineCode: string;
               quantity: number;
               dosage: string;
+              unitPrice: number;
+              price: number;
             }>;
             serviceProvided?: {
               serviceId: string;
@@ -720,12 +715,141 @@ export default function DoctorDashboard() {
         ...currentDoctor,
         averageTimePerPatient: newAverageTime,
       });
+
+      // Refresh queue to reflect updated times
+      const bookingsResponse = await fetch(
+        `/api/booking?doctorId=${currentDoctor._id}&populate=patient`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (bookingsResponse.ok) {
+        const result = await bookingsResponse.json();
+
+        if (result.success && result.data) {
+          // Filter today's bookings with status "confirmed"
+          const today = new Date();
+          const todayBookings = result.data.filter((booking: BookingType) => {
+            const scheduleDate = new Date(booking.scheduleDate);
+            const isSameDate =
+              scheduleDate.getFullYear() === today.getFullYear() &&
+              scheduleDate.getMonth() === today.getMonth() &&
+              scheduleDate.getDate() === today.getDate();
+            return isSameDate && booking.status === "confirmed";
+          });
+
+          // Sort by appointmentTime or queueNumber
+          todayBookings.sort((a: BookingType, b: BookingType) => {
+            if (a.appointmentTime && b.appointmentTime) {
+              return (
+                new Date(a.appointmentTime).getTime() -
+                new Date(b.appointmentTime).getTime()
+              );
+            }
+            return (a.queueNumber || "").localeCompare(b.queueNumber || "");
+          });
+
+          // Transform bookings to queue format
+          const queueData: QueuePatient[] = todayBookings.map(
+            (
+              booking: BookingType & {
+                patient?: {
+                  fullName: string;
+                  gender?: string;
+                  dateOfBirth?: string;
+                } | null;
+              },
+              idx: number
+            ) => {
+              const patientName =
+                booking.patient?.fullName || "Unknown Patient";
+              const patientGender = booking.patient?.gender;
+              let patientAge: number | undefined;
+
+              if (booking.patient?.dateOfBirth) {
+                const birthDate = new Date(booking.patient.dateOfBirth);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+                if (
+                  monthDiff < 0 ||
+                  (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                ) {
+                  age--;
+                }
+                patientAge = age;
+              }
+
+              let eta = "Waiting";
+              if (booking.appointmentTime) {
+                const appointmentTime = new Date(booking.appointmentTime);
+                const now = new Date();
+                const diffMinutes = Math.floor(
+                  (appointmentTime.getTime() - now.getTime()) / 60000
+                );
+
+                if (diffMinutes <= 0) {
+                  eta = "Now";
+                } else if (diffMinutes < 60) {
+                  eta = `${diffMinutes} min`;
+                } else {
+                  const hours = Math.floor(diffMinutes / 60);
+                  const mins = diffMinutes % 60;
+                  eta = `${hours}h ${mins}m`;
+                }
+              }
+
+              let timeRange = "09:00 - 12:00";
+              if (booking.appointmentTime) {
+                const appointmentTime = new Date(booking.appointmentTime);
+                const startHour = appointmentTime
+                  .getHours()
+                  .toString()
+                  .padStart(2, "0");
+                const startMin = appointmentTime
+                  .getMinutes()
+                  .toString()
+                  .padStart(2, "0");
+                timeRange = `${startHour}:${startMin}`;
+              }
+
+              return {
+                _id: booking._id?.toString() || "",
+                queueNo: booking.queueNumber || "N/A",
+                patientName,
+                patientGender,
+                patientAge,
+                status: idx === 0 ? "being-served" : "waiting",
+                eta,
+                timeRange,
+                patientComplaint: booking.complaint || "No complaint provided",
+                bookingData: booking,
+              } as QueuePatient;
+            }
+          );
+
+          // Update queue
+          if (queueData.length > 0) {
+            setCurrentPatient(queueData[0]);
+            setQueue(queueData.slice(1));
+          } else {
+            setCurrentPatient(null);
+            setQueue([]);
+          }
+        }
+      }
+
+      Swal.fire("Success", "Consultation completed successfully", "success");
     } catch (error) {
       console.error("Error finishing consultation:", error);
+      Swal.fire("Error", "Failed to complete consultation", "error");
     } finally {
       setIsSessionActive(false);
       setSessionStartTime(null);
-      handleCallNext();
     }
   };
 
@@ -958,7 +1082,8 @@ export default function DoctorDashboard() {
                                         {pm.medicineName}
                                       </p>
                                       <p className="text-xs text-muted-foreground">
-                                        {pm.medicineCode}
+                                        {pm.medicineCode} - Rp{" "}
+                                        {pm.unitPrice.toLocaleString()}/unit
                                       </p>
                                     </div>
                                     <button
@@ -1004,6 +1129,16 @@ export default function DoctorDashboard() {
                                         className="w-full p-2 text-sm rounded border border-border bg-background"
                                         placeholder="e.g., 2x per day"
                                       />
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t border-border">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-xs font-semibold text-muted-foreground">
+                                        Total Price:
+                                      </span>
+                                      <span className="text-sm font-bold text-primary">
+                                        Rp {pm.price.toLocaleString()}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
