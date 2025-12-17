@@ -23,6 +23,8 @@ export interface BookingType {
       medicineCode: string;
       quantity: number;
       dosage: string;
+      unitPrice: number;
+      price: number;
     }>;
     serviceProvided?: {
       serviceId: string;
