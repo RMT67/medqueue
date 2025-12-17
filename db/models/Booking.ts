@@ -352,31 +352,31 @@ export default class BookingModel {
       return; // No subsequent bookings to adjust
     }
 
-    // Get the first subsequent booking's original appointment time
-    const firstBookingOriginalTime = new Date(bookingsToAdjust[0].appointmentTime);
-    
-    // Calculate time difference (actualFinishTime vs firstBooking's original time)
-    const timeDifferenceMs = actualFinishTime.getTime() - firstBookingOriginalTime.getTime();
+    // Get doctor's updated average time per patient from doctors collection
+    const db = await getDb();
+    const doctorsCollection = db.collection("doctors");
+    const doctor = await doctorsCollection.findOne({ _id: completedBooking.doctorId });
+    const newAverageTime = doctor?.averageTimePerPatient || 15; // fallback to 15 if not found
 
-    // If finish time is same or earlier than next appointment, no adjustment needed
-    if (timeDifferenceMs <= 0) {
-      return;
-    }
+    // Adjust all subsequent bookings:
+    // - First booking: set to actualFinishTime
+    // - Subsequent bookings: previous appointment time + newAverageTime
+    let previousAppointmentTime = actualFinishTime;
 
-    // Adjust all subsequent bookings by the time difference
     for (const booking of bookingsToAdjust) {
-      const currentTime = new Date(booking.appointmentTime);
-      const newTime = new Date(currentTime.getTime() + timeDifferenceMs);
-      
+      // Set new appointment time based on when the previous patient finishes
       await collection.updateOne(
         { _id: booking._id },
         { 
           $set: { 
-            appointmentTime: newTime,
+            appointmentTime: previousAppointmentTime,
             updatedAt: new Date() 
           } 
         }
       );
+      
+      // Calculate next appointment time for the next iteration
+      previousAppointmentTime = new Date(previousAppointmentTime.getTime() + (newAverageTime * 60 * 1000));
     }
   }
 }
