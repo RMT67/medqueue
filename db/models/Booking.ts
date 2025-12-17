@@ -292,4 +292,91 @@ export default class BookingModel {
       );
     }
   }
+
+  static async completeAndAdjustTimes(bookingId: string, actualDurationMinutes: number) {
+    const collection = await this.collection();
+    
+    // Get the booking that will be completed
+    const completedBooking = await collection.findOne({ _id: new ObjectId(bookingId) });
+    
+    if (!completedBooking) {
+      throw new Error("Booking not found");
+    }
+
+    const completedAppointmentTime = completedBooking.appointmentTime 
+      ? new Date(completedBooking.appointmentTime) 
+      : null;
+
+    if (!completedAppointmentTime) {
+      // Just mark as completed if no appointment time
+      await collection.updateOne(
+        { _id: new ObjectId(bookingId) },
+        { 
+          $set: { 
+            status: "completed", 
+            updatedAt: new Date() 
+          } 
+        }
+      );
+      return;
+    }
+
+    // Calculate actual finish time
+    const actualFinishTime = new Date(completedAppointmentTime.getTime() + (actualDurationMinutes * 60 * 1000));
+
+    // Mark booking as completed
+    await collection.updateOne(
+      { _id: new ObjectId(bookingId) },
+      { 
+        $set: { 
+          status: "completed", 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+
+    // Get all confirmed bookings for the same doctor on the same date with later appointment times
+    const scheduleDate = new Date(completedBooking.scheduleDate);
+    
+    const bookingsToAdjust = await collection.find({
+      doctorId: completedBooking.doctorId,
+      scheduleDate: {
+        $gte: new Date(scheduleDate.setHours(0, 0, 0, 0)),
+        $lt: new Date(scheduleDate.setHours(23, 59, 59, 999))
+      },
+      status: "confirmed",
+      appointmentTime: { $gt: completedAppointmentTime }
+    }).sort({ appointmentTime: 1 }).toArray();
+
+    if (bookingsToAdjust.length === 0) {
+      return; // No subsequent bookings to adjust
+    }
+
+    // Get the first subsequent booking's original appointment time
+    const firstBookingOriginalTime = new Date(bookingsToAdjust[0].appointmentTime);
+    
+    // Calculate time difference (actualFinishTime vs firstBooking's original time)
+    const timeDifferenceMs = actualFinishTime.getTime() - firstBookingOriginalTime.getTime();
+
+    // If finish time is same or earlier than next appointment, no adjustment needed
+    if (timeDifferenceMs <= 0) {
+      return;
+    }
+
+    // Adjust all subsequent bookings by the time difference
+    for (const booking of bookingsToAdjust) {
+      const currentTime = new Date(booking.appointmentTime);
+      const newTime = new Date(currentTime.getTime() + timeDifferenceMs);
+      
+      await collection.updateOne(
+        { _id: booking._id },
+        { 
+          $set: { 
+            appointmentTime: newTime,
+            updatedAt: new Date() 
+          } 
+        }
+      );
+    }
+  }
 }

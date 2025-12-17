@@ -45,6 +45,7 @@ export default function DoctorDashboard() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [currentPatient, setCurrentPatient] = useState<QueuePatient | null>(
     null
   );
@@ -269,6 +270,7 @@ export default function DoctorDashboard() {
 
   const handleStartSession = () => {
     setIsSessionActive(true);
+    setSessionStartTime(new Date());
   };
 
   const handleCallNext = () => {
@@ -443,9 +445,71 @@ export default function DoctorDashboard() {
     }
   };
 
-  const handleFinish = () => {
-    setIsSessionActive(false);
-    handleCallNext();
+  const handleFinish = async () => {
+    if (!sessionStartTime || !currentDoctor || !currentPatient) {
+      setIsSessionActive(false);
+      handleCallNext();
+      return;
+    }
+
+    try {
+      // Calculate consultation duration in minutes
+      const endTime = new Date();
+      const durationMs = endTime.getTime() - sessionStartTime.getTime();
+      const durationMinutes = Math.round(durationMs / 60000);
+
+      // Calculate new average time per patient
+      let newAverageTime: number;
+      
+      if (currentDoctor.averageTimePerPatient) {
+        // Doctor has existing average, calculate new average
+        newAverageTime = Math.round(
+          (currentDoctor.averageTimePerPatient + durationMinutes) / 2
+        );
+      } else {
+        // First consultation, set directly
+        newAverageTime = durationMinutes;
+      }
+
+      // Update booking status to completed and adjust subsequent appointment times
+      await apiFetch<
+        { success: boolean; message: string },
+        { bookingId: string; status: string; actualDurationMinutes: number }
+      >("/api/booking", {
+        method: "PATCH",
+        body: { 
+          bookingId: currentPatient._id, 
+          status: "completed",
+          actualDurationMinutes: durationMinutes
+        },
+      });
+
+      // Update doctor's averageTimePerPatient
+      await apiFetch<
+        { doctor: Doctor },
+        { doctorId: string; updateData: Partial<Doctor> }
+      >("/api/doctor", {
+        method: "PUT",
+        body: {
+          doctorId: currentDoctor._id,
+          updateData: {
+            averageTimePerPatient: newAverageTime,
+          },
+        },
+      });
+
+      // Update local state
+      setCurrentDoctor({
+        ...currentDoctor,
+        averageTimePerPatient: newAverageTime,
+      });
+    } catch (error) {
+      console.error("Error finishing consultation:", error);
+    } finally {
+      setIsSessionActive(false);
+      setSessionStartTime(null);
+      handleCallNext();
+    }
   };
 
   return (

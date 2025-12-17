@@ -269,7 +269,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { bookingId, status } = body;
+    const { bookingId, status, actualDurationMinutes } = body;
 
     if (!bookingId || !status) {
       return NextResponse.json(
@@ -306,6 +306,9 @@ export async function PATCH(req: Request) {
 
       // Cancel booking and adjust subsequent appointment times
       await Booking.cancelAndAdjustTimes(bookingId, averageTimePerPatient);
+    } else if (status === "completed" && actualDurationMinutes) {
+      // Complete booking and adjust subsequent appointment times based on actual duration
+      await Booking.completeAndAdjustTimes(bookingId, actualDurationMinutes);
     } else {
       // For other status updates, just update the status
       const result = await Booking.updateStatus(bookingId, status);
