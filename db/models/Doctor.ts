@@ -147,10 +147,35 @@ export default class DoctorModel {
   }
 
   static async getDoctorByUserId(userId: string): Promise<Doctor | null> {
+    console.log("🚀 ~ DoctorModel ~ getDoctorByUserId ~ userId:", userId);
     const collection = await this.collection();
     const doctor = await collection.findOne({
-      userId: new ObjectId(userId)
+      userId: new ObjectId(userId),
     });
+    return doctor as Doctor | null;
+  }
+
+  /**
+   * Find doctor by userId (tries both ObjectId and string formats)
+   * @param userId - The user ID to search for
+   * @returns Doctor object or null if not found
+   */
+  static async findDoctorByUserId(userId: string): Promise<Doctor | null> {
+    const collection = await this.collection();
+
+    // Try finding with ObjectId format first
+    let doctor = await collection.findOne({
+      userId: new ObjectId(userId),
+    });
+
+    // If not found, try with string format
+    if (!doctor) {
+      doctor = await collection.findOne({
+        userId: userId,
+      });
+    }
+
+    console.log("🔍 findDoctorByUserId - userId:", userId, "found:", !!doctor);
     return doctor as Doctor | null;
   }
 
@@ -207,6 +232,19 @@ export default class DoctorModel {
       await collection.updateOne(
         { _id: new ObjectId(doctorId) },
         { $set: updateData }
+      );
+      return await this.getDoctorById(doctorId);
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  static async updateImage(doctorId: string, imageUrl: string) {
+    try {
+      const collection = await this.collection();
+      await collection.updateOne(
+        { _id: new ObjectId(doctorId) },
+        { $set: { image: imageUrl, updatedAt: new Date() } }
       );
       return await this.getDoctorById(doctorId);
     } catch (err) {
