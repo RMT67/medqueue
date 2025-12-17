@@ -269,7 +269,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { bookingId, status, actualDurationMinutes } = body;
+    const { bookingId, status, actualDurationMinutes, consultationResult } = body;
 
     if (!bookingId || !status) {
       return NextResponse.json(
@@ -309,6 +309,15 @@ export async function PATCH(req: Request) {
     } else if (status === "completed" && actualDurationMinutes) {
       // Complete booking and adjust subsequent appointment times based on actual duration
       await Booking.completeAndAdjustTimes(bookingId, actualDurationMinutes);
+
+      // If consultationResult is provided, save it to the booking
+      if (consultationResult) {
+        const collection = await Booking.collection();
+        await collection.updateOne(
+          { _id: new ObjectId(bookingId) },
+          { $set: { consultationResult } }
+        );
+      }
     } else {
       // For other status updates, just update the status
       const result = await Booking.updateStatus(bookingId, status);
