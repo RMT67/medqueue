@@ -11,6 +11,7 @@ import {
   Package,
   DollarSign,
   AlertCircle,
+  Calendar,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -458,33 +459,33 @@ export default function ItemPage() {
           <Card className="border-2 shadow-xl bg-card/80 backdrop-blur-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-muted/50 border-b-2 border-border">
+                <thead className="bg-muted/50 border-b-2 border-border sticky top-0">
                   <tr>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       No.
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Image
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Medicine
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Category
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Manufacturer
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Stock
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Price
                     </th>
-                    <th className="text-left p-4 font-semibold text-foreground">
+                    <th className="text-left p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Expiry
                     </th>
-                    <th className="text-right p-4 font-semibold text-foreground">
+                    <th className="text-right p-4 font-semibold text-sm text-foreground uppercase tracking-wide">
                       Actions
                     </th>
                   </tr>
@@ -494,9 +495,21 @@ export default function ItemPage() {
                     <tr>
                       <td
                         colSpan={9}
-                        className="text-center p-8 text-muted-foreground"
+                        className="text-center p-12"
                       >
-                        No medicines found
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                            <Package className="w-10 h-10 text-muted-foreground" />
+                          </div>
+                          <h3 className="text-xl font-bold text-foreground mb-2">
+                            No Medicines Found
+                          </h3>
+                          <p className="text-muted-foreground max-w-md">
+                            {searchQuery
+                              ? "Try adjusting your search to find medicines."
+                              : "No medicines available. Click 'Add New Medicine' to create a new medicine."}
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -506,60 +519,85 @@ export default function ItemPage() {
                         className="border-b border-border hover:bg-muted/30 transition-colors"
                       >
                         {/* col number */}
-                        <td>
-                          <div className="p-4 text-muted-foreground font-semibold flex justify-center">
-                            <p>{index + 1}</p>
+                        <td className="p-4">
+                          <div className="flex justify-center">
+                            <span className="font-mono font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                              {index + 1}
+                            </span>
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border">
-                            <Image
-                              src={medicine.imageUrl}
-                              alt={medicine.name}
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-border shadow-sm">
+                            {medicine.imageUrl ? (
+                              <Image
+                                src={medicine.imageUrl}
+                                alt={medicine.name}
+                                fill
+                                className="object-cover"
+                                unoptimized
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = "none";
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    const fallback = parent.querySelector(
+                                      ".image-fallback"
+                                    ) as HTMLElement;
+                                    if (fallback) fallback.style.display = "flex";
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <div className="image-fallback hidden w-full h-full absolute inset-0 items-center justify-center bg-linear-to-br from-primary to-accent text-white font-bold text-xs">
+                              {medicine.name.charAt(0).toUpperCase()}
+                            </div>
                           </div>
                         </td>
                         <td className="p-4">
                           <div>
-                            <p className="font-semibold text-foreground">
+                            <p className="font-semibold text-foreground mb-1">
                               {medicine.name}
                             </p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded inline-block">
                               {medicine.code}
                             </p>
                           </div>
                         </td>
                         <td className="p-4">
-                          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
                             {medicine.category}
                           </span>
                         </td>
-                        <td className="p-4 text-foreground">
-                          {medicine.manufacturer}
+                        <td className="p-4">
+                          <p className="text-sm font-medium text-foreground">
+                            {medicine.manufacturer}
+                          </p>
                         </td>
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`font-semibold ${
-                                medicine.stock < medicine.minStock
-                                  ? "text-red-600 dark:text-red-400"
-                                  : "text-foreground"
-                              }`}
-                            >
-                              {medicine.stock}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {medicine.unit}
-                            </span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`font-semibold text-base ${
+                                  medicine.stock < medicine.minStock
+                                    ? "text-red-600 dark:text-red-400"
+                                    : "text-foreground"
+                                }`}
+                              >
+                                {medicine.stock}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {medicine.unit}
+                              </span>
+                            </div>
+                            {medicine.stock < medicine.minStock && (
+                              <div className="flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                                <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+                                  Low stock! (Min: {medicine.minStock})
+                                </p>
+                              </div>
+                            )}
                           </div>
-                          {medicine.stock < medicine.minStock && (
-                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                              Low stock!
-                            </p>
-                          )}
                         </td>
                         <td className="p-4">
                           <div>
@@ -574,8 +612,17 @@ export default function ItemPage() {
                             </p>
                           </div>
                         </td>
-                        <td className="p-4 text-sm text-muted-foreground">
-                          {new Date(medicine.expiryDate).toLocaleDateString()}
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-foreground">
+                              {new Date(medicine.expiryDate).toLocaleDateString("id-ID", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric"
+                              })}
+                            </span>
+                          </div>
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-2">
@@ -583,7 +630,7 @@ export default function ItemPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEdit(medicine)}
-                              className="hover:bg-primary/10 hover:text-primary"
+                              className="hover:bg-primary/10 hover:text-primary border border-transparent hover:border-primary/20"
                             >
                               <Edit2 className="w-4 h-4" />
                             </Button>
@@ -591,7 +638,7 @@ export default function ItemPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDelete(medicine._id)}
-                              className="hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/50"
+                              className="hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 dark:hover:text-red-400 border border-transparent hover:border-red-200 dark:hover:border-red-800"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

@@ -184,7 +184,15 @@ export async function GET(req: Request) {
           } : null,
           hasMedicalRecord: !!medicalRecord,
           hasInvoice: !!invoice,
-          invoiceId: invoice ? invoice._id.toString() : null
+          invoiceId: invoice ? invoice._id.toString() : null,
+          invoice: invoice
+            ? {
+                _id: invoice._id.toString(),
+                status: invoice.status,
+                invoiceNumber: invoice.invoiceNumber || "",
+                total: invoice.total,
+              }
+            : null,
         };
       })
     );
