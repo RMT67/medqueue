@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import User from "@/db/models/User";
+import Doctor from "@/db/models/Doctor";
 import { verifyToken } from "@/lib/auth-helper";
 import { v2 as cloudinary } from "cloudinary";
 
 // Configure Cloudinary
-if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+if (
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET
+) {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -16,10 +21,16 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 export async function POST(req: Request) {
   try {
     // Validate Cloudinary config
-    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
       console.error("Cloudinary configuration missing");
       return NextResponse.json(
-        { message: "Server configuration error. Please contact administrator." },
+        {
+          message: "Server configuration error. Please contact administrator.",
+        },
         { status: 500 }
       );
     }
@@ -28,10 +39,7 @@ export async function POST(req: Request) {
 
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { message: "Unauthorized." },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
     }
 
     try {
@@ -67,9 +75,9 @@ export async function POST(req: Request) {
       // Upload to Cloudinary
       const folder = process.env.CLOUDINARY_FOLDER || "medqueue";
       let uploadResult: { secure_url: string; public_id: string };
-      
+
       try {
-        uploadResult = await new Promise((resolve, reject) => {
+        uploadResult = (await new Promise((resolve, reject) => {
           cloudinary.uploader.upload(
             dataURI,
             {
@@ -88,7 +96,7 @@ export async function POST(req: Request) {
               }
             }
           );
-        }) as { secure_url: string; public_id: string };
+        })) as { secure_url: string; public_id: string };
       } catch (cloudinaryError) {
         console.error("Cloudinary upload failed:", cloudinaryError);
         return NextResponse.json(
@@ -111,6 +119,28 @@ export async function POST(req: Request) {
         );
       }
 
+      // If user is a doctor, also update the doctor's image in doctors collection
+      if (user.role === "doctor") {
+        try {
+          const doctor = await Doctor.findDoctorByUserId(user._id.toString());
+          if (doctor) {
+            await Doctor.updateImage(
+              doctor._id.toString(),
+              uploadResult.secure_url
+            );
+            console.log(
+              "Doctor image updated successfully:",
+              uploadResult.secure_url
+            );
+          } else {
+            console.log("Doctor not found for userId:", user._id.toString());
+          }
+        } catch (doctorUpdateError) {
+          console.error("Failed to update doctor image:", doctorUpdateError);
+          // Continue anyway - user photo is already updated
+        }
+      }
+
       return NextResponse.json({
         user: {
           _id: user._id.toString(),
@@ -119,7 +149,9 @@ export async function POST(req: Request) {
           role: user.role,
           photoUrl: user.photoUrl || null,
           phoneNumber: user.phoneNumber || null,
-          dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().split("T")[0] : null,
+          dateOfBirth: user.dateOfBirth
+            ? user.dateOfBirth.toISOString().split("T")[0]
+            : null,
           gender: user.gender || null,
           address: user.address || null,
           isActive: user.isActive !== undefined ? user.isActive : true,
@@ -127,17 +159,12 @@ export async function POST(req: Request) {
       });
     } catch (jwtError) {
       console.error("JWT error in /api/profile/photo POST:", jwtError);
-      return NextResponse.json(
-        { message: "Invalid token." },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Invalid token." }, { status: 401 });
     }
   } catch (error) {
     console.error("Error in /api/profile/photo POST:", error);
-    const errorMessage = error instanceof Error ? error.message : "Server error.";
-    return NextResponse.json(
-      { message: errorMessage },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Server error.";
+    return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
