@@ -316,6 +316,7 @@ export async function PATCH(req: Request) {
       await Booking.completeAndAdjustTimes(bookingId, actualDurationMinutes);
 
       // If consultationResult is provided, save it to the booking
+      console.log("🚀 ~ PATCH ~ consultationResult:", consultationResult);
       if (consultationResult) {
         const collection = await Booking.collection();
         await collection.updateOne(
