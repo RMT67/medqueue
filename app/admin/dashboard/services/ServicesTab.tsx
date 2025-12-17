@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Service } from "@/types/serviceTypes";
 import { ServiceFormModal } from "./ServiceFormModal";
+import Swal from "sweetalert2";
 
 interface ServicesTabProps {
   services: Service[];
@@ -62,11 +63,11 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
       if (response.ok) {
         onRefresh();
       } else {
-        alert("Failed to delete service");
+        Swal.fire("Error", "Failed to delete service", "error");
       }
     } catch (error) {
       console.error("Error deleting service:", error);
-      alert("Failed to delete service");
+      Swal.fire("Error", "Failed to delete service", "error");
     }
   };
 
@@ -87,11 +88,11 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
       if (response.ok) {
         onRefresh();
       } else {
-        alert("Failed to update service status");
+        Swal.fire("Error", "Failed to update service status", "error");
       }
     } catch (error) {
       console.error("Error updating service status:", error);
-      alert("Failed to update service status");
+      Swal.fire("Error", "Failed to update service status", "error");
     }
   };
 
@@ -119,7 +120,11 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
             Services Management
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Total: <span className="font-semibold text-foreground">{filteredServices.length}</span> services
+            Total:{" "}
+            <span className="font-semibold text-foreground">
+              {filteredServices.length}
+            </span>{" "}
+            services
           </p>
         </div>
         <button
@@ -225,7 +230,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
               <tbody>
                 {filteredServices.map((service) => (
                   <tr
-                    key={service._id}
+                    key={service._id.toString()}
                     className="border-b border-border hover:bg-muted/30 transition-colors"
                   >
                     <td className="p-4">
@@ -253,7 +258,8 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
                     <td className="p-4">
                       <div>
                         <p className="font-semibold text-foreground">
-                          {service.currency} {service.price.toLocaleString("id-ID")}
+                          {service.currency}{" "}
+                          {service.price.toLocaleString("id-ID")}
                         </p>
                       </div>
                     </td>
@@ -287,7 +293,10 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
                         </button>
                         <button
                           onClick={() =>
-                            handleToggleStatus(service._id, service.isActive)
+                            handleToggleStatus(
+                              service._id.toString(),
+                              service.isActive
+                            )
                           }
                           className={`p-2 rounded-lg transition-all border ${
                             service.isActive
@@ -303,7 +312,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
                           )}
                         </button>
                         <button
-                          onClick={() => handleDelete(service._id)}
+                          onClick={() => handleDelete(service._id.toString())}
                           className="p-2 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-800"
                           title="Delete"
                         >
