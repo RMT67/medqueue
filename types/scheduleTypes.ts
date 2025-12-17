@@ -25,6 +25,7 @@ export type DoctorWithSchedule = {
   dayOfWeek: DaySchedule[];
   timeRange: string;
   isAvailable: boolean;
+  firstCallTime: string | null;
   maxPatients: number;
   isOnTime: boolean;
   delayMinutes: number;

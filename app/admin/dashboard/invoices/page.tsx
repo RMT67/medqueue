@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
+import {
+  AdminHeader,
+  AdminTabs,
+  AdminProtectedRoute,
+} from "@/components/adminDashboard";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { InvoiceTable } from "./InvoiceTable";
@@ -79,16 +82,9 @@ async function getInvoices(): Promise<SerializedInvoice[]> {
 }
 
 export default function InvoicePage() {
-  const router = useRouter();
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout } = useAuth();
   const [invoices, setInvoices] = useState<SerializedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "admin")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -112,39 +108,37 @@ export default function InvoicePage() {
     loadInvoices();
   }, [user]);
 
-  if (isLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <Navigation
-        isAuthenticated={true}
-        userRole="admin"
-        userName={user.name}
-        onLogout={logout}
-      />
+    <AdminProtectedRoute
+      loadingComponent={
+        loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading invoices...</p>
+            </div>
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <Navigation
+          isAuthenticated={true}
+          userRole="admin"
+          userName={user?.name || "Admin"}
+          onLogout={logout}
+        />
 
-      <AdminHeader
-        title='Invoice <span class="text-primary">Management</span>'
-        subtitle="Manage and track all invoices"
-      />
+        <AdminHeader
+          title='Invoice <span class="text-primary">Management</span>'
+          subtitle="Manage and track all invoices"
+        />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-        <AdminTabs />
-        <InvoiceTable invoices={invoices} />
-      </main>
-    </div>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+          <AdminTabs />
+          <InvoiceTable invoices={invoices} />
+        </main>
+      </div>
+    </AdminProtectedRoute>
   );
 }

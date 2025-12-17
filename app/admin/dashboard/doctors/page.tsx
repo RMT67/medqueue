@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
+import {
+  AdminHeader,
+  AdminTabs,
+  AdminProtectedRoute,
+} from "@/components/adminDashboard";
 import { DoctorAdmin, Doctor } from "@/types/docterTypes";
 import { DoctorsTab } from "./DoctorsTab";
 import Swal from "sweetalert2";
@@ -28,8 +31,7 @@ const mapDoctorToAdmin = (doctor: Doctor): DoctorAdmin => {
 };
 
 export default function DoctorsPage() {
-  const router = useRouter();
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout } = useAuth();
   const [doctors, setDoctors] = useState<DoctorAdmin[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
 
@@ -57,12 +59,6 @@ export default function DoctorsPage() {
       fetchDoctors();
     }
   }, [user]);
-
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "admin")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
 
   const handleDeleteDoctor = async (doctorId: string) => {
     const result = await Swal.fire({
@@ -111,40 +107,38 @@ export default function DoctorsPage() {
     }
   };
 
-  if (isLoading || isLoadingDoctors) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <Navigation
-        isAuthenticated={true}
-        userRole="admin"
-        userName={user.name}
-        onLogout={logout}
-      />
+    <AdminProtectedRoute
+      loadingComponent={
+        isLoadingDoctors ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading doctors...</p>
+            </div>
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <Navigation
+          isAuthenticated={true}
+          userRole="admin"
+          userName={user?.name || "Admin"}
+          onLogout={logout}
+        />
 
-      <AdminHeader
-        title='Manage <span class="text-primary">Doctors</span>'
-        subtitle="View and manage all doctors in the system"
-      />
+        <AdminHeader
+          title='Manage <span class="text-primary">Doctors</span>'
+          subtitle="View and manage all doctors in the system"
+        />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-        <AdminTabs />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+          <AdminTabs />
 
-        <DoctorsTab doctors={doctors} onDeleteDoctor={handleDeleteDoctor} />
-      </main>
-    </div>
+          <DoctorsTab doctors={doctors} onDeleteDoctor={handleDeleteDoctor} />
+        </main>
+      </div>
+    </AdminProtectedRoute>
   );
 }
