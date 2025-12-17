@@ -163,13 +163,13 @@ export async function POST(req: Request) {
     const selectedDate = new Date(body.scheduleDate);
     const dayOfWeekIndex = selectedDate.getDay(); // 0 (Sunday) to 6 (Saturday)
     const dayOfWeekMap: { [key: number]: string } = {
-      0: "Minggu",
-      1: "Senin",
-      2: "Selasa",
-      3: "Rabu",
-      4: "Kamis",
-      5: "Jumat",
-      6: "Sabtu",
+      0: "Sunday",
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
     };
     const selectedDayOfWeek = dayOfWeekMap[dayOfWeekIndex];
 
@@ -269,7 +269,8 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { bookingId, status, actualDurationMinutes, consultationResult } = body;
+    const { bookingId, status, actualDurationMinutes, consultationResult } =
+      body;
 
     if (!bookingId || !status) {
       return NextResponse.json(
@@ -291,8 +292,10 @@ export async function PATCH(req: Request) {
     if (status === "cancelled") {
       // Get booking to find doctor and get averageTimePerPatient
       const collection = await Booking.collection();
-      const booking = await collection.findOne({ _id: new ObjectId(bookingId) });
-      
+      const booking = await collection.findOne({
+        _id: new ObjectId(bookingId),
+      });
+
       if (!booking) {
         return NextResponse.json(
           { success: false, message: "Booking not found" },
@@ -301,7 +304,9 @@ export async function PATCH(req: Request) {
       }
 
       // Get doctor's average time per patient
-      const doctor = await DoctorModel.getDoctorById(booking.doctorId.toString());
+      const doctor = await DoctorModel.getDoctorById(
+        booking.doctorId.toString()
+      );
       const averageTimePerPatient = doctor?.averageTimePerPatient || 15;
 
       // Cancel booking and adjust subsequent appointment times
