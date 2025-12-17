@@ -44,7 +44,7 @@ export default function AddDoctorPage() {
   // Auth check
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) {
-      router.push("/login");
+      router.push("/login/admin");
     }
   }, [user, authLoading, router]);
 
