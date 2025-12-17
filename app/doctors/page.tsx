@@ -1,7 +1,19 @@
 import DoctorModel from "@/db/models/Doctor";
 import { FindDoctorsFilter } from "@/db/models/Doctor";
-import { Doctor } from "@/types/docterTypes";
 import DoctorsPageClient from "./DoctorsPageClient";
+
+interface DoctorRaw {
+  _id: { toString: () => string } | string;
+  name: string;
+  specialization: string;
+  clinic: string;
+  image?: string;
+  averageRating?: number;
+  totalReviews: number;
+  consultationFee?: number;
+  defaultSchedule?: string;
+  isActive?: boolean;
+}
 
 type SafeDoctor = {
   id: string;
@@ -56,19 +68,22 @@ export default async function DoctorsPage({ searchParams }: DoctorsPageProps) {
   ]);
 
   const doctors: SafeDoctor[] = doctorsRaw.map((doc) => {
-    const id = (doc as any)._id?.toString?.() || (doc as any)._id || "";
+    const docData = doc as unknown as DoctorRaw;
+    const id = typeof docData._id === 'string' 
+      ? docData._id 
+      : docData._id?.toString() || '';
     return {
       id,
       _id: id,
-      name: doc.name,
-      specialization: doc.specialization,
-      clinic: doc.clinic,
-      image: doc.image,
-      averageRating: doc.averageRating,
-      totalReviews: doc.totalReviews,
-      consultationFee: doc.consultationFee,
-      defaultSchedule: doc.defaultSchedule,
-      isActive: doc.isActive,
+      name: docData.name,
+      specialization: docData.specialization,
+      clinic: docData.clinic,
+      image: docData.image,
+      averageRating: docData.averageRating || 0,
+      totalReviews: docData.totalReviews,
+      consultationFee: docData.consultationFee,
+      defaultSchedule: docData.defaultSchedule,
+      isActive: docData.isActive,
     };
   });
 
