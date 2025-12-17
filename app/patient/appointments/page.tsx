@@ -11,6 +11,7 @@ import Image from "next/image"
 import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn, StaggerChildren } from "@/components/animations"
 import { ReviewDoctorModal } from "@/components/review-doctor-modal"
+import Swal from "sweetalert2"
 
 interface Appointment {
   bookingId: string
@@ -102,15 +103,31 @@ export default function MyAppointmentsPage() {
   }, [filter])
 
   const handleCancelAppointment = async (bookingId: string) => {
-    if (!confirm("Are you sure you want to cancel this appointment?")) {
-      return
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Cancel Appointment?",
+      text: "Are you sure you want to cancel this appointment?",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, cancel it",
+      cancelButtonText: "No, keep it",
+    });
+
+    if (!result.isConfirmed) {
+      return;
     }
 
     try {
       setCancellingId(bookingId)
       const token = localStorage.getItem("medqueue_token")
       if (!token) {
-        alert("Authentication required")
+        await Swal.fire({
+          icon: "warning",
+          title: "Authentication Required",
+          text: "Please login to cancel appointment",
+          confirmButtonColor: "#3b82f6",
+        });
         return
       }
 
@@ -138,13 +155,29 @@ export default function MyAppointmentsPage() {
           const data = await refreshResponse.json()
           setAppointments(data.appointments || [])
         }
+        await Swal.fire({
+          icon: "success",
+          title: "Appointment Cancelled",
+          text: "Your appointment has been cancelled successfully.",
+          confirmButtonColor: "#10b981",
+        });
       } else {
         const error = await response.json()
-        alert(error.error || "Failed to cancel appointment")
+        await Swal.fire({
+          icon: "error",
+          title: "Cancellation Failed",
+          text: error.error || "Failed to cancel appointment",
+          confirmButtonColor: "#ef4444",
+        });
       }
     } catch (error) {
       console.error("Error cancelling appointment:", error)
-      alert("Failed to cancel appointment")
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to cancel appointment",
+        confirmButtonColor: "#ef4444",
+      });
     } finally {
       setCancellingId(null)
     }
@@ -388,12 +421,39 @@ export default function MyAppointmentsPage() {
                               </div>
                             )}
 
+                            {/* Rating and Review Display */}
+                            {appointment.statusDisplay === "completed" && appointment.hasReview && appointment.review && (
+                              <div className="pt-4 border-t border-border/50">
+                                <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                    <span className="text-base font-bold text-foreground">
+                                      Your Rating: {appointment.review.rating}/5
+                                    </span>
+                                  </div>
+                                  {appointment.review.comment && (
+                                    <div className="mt-2">
+                                      <p className="text-sm font-semibold text-muted-foreground mb-1">Your Review:</p>
+                                      <p className="text-sm text-foreground">{appointment.review.comment}</p>
+                                    </div>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Reviewed on {new Date(appointment.review.createdAt).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric"
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Action Buttons */}
                             <div className="pt-4 border-t border-border/50 flex flex-wrap items-center gap-3">
                               {/* Rating and Review for completed appointments */}
                               {appointment.statusDisplay === "completed" && (
                                 <>
-                                  {appointment.doctor && appointment.doctor.rating > 0 && (
+                                  {appointment.doctor && appointment.doctor.rating > 0 && !appointment.hasReview && (
                                     <div className="flex items-center gap-1.5">
                                       <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                                       <span className="text-base font-bold text-foreground">
@@ -406,7 +466,7 @@ export default function MyAppointmentsPage() {
                                       )}
                                     </div>
                                   )}
-                                  {!appointment.hasReview && appointment.invoice?.status === "paid" && (
+                                  {!appointment.hasReview && (
                                     <Button
                                       onClick={() => {
                                         setSelectedAppointment(appointment)
@@ -416,8 +476,8 @@ export default function MyAppointmentsPage() {
                                       size="sm"
                                       className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
                                     >
-                                      <MessageSquare className="w-4 h-4" />
-                                      Review Doctor
+                                      <Star className="w-4 h-4" />
+                                      Rate Doctor
                                     </Button>
                                   )}
                                   {appointment.hasMedicalRecord && (
@@ -431,15 +491,15 @@ export default function MyAppointmentsPage() {
                                       View Medical Record
                                     </Button>
                                   )}
-                                  {appointment.hasInvoice && (
+                                  {appointment.hasInvoice && appointment.invoice && (
                                     <Button
-                                      onClick={() => router.push(`/patient/dashboard`)}
+                                      onClick={() => router.push(`/patient/invoices?bookingId=${appointment.bookingId}&status=${appointment.invoice.status}`)}
                                       variant="outline"
                                       size="sm"
                                       className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
                                     >
                                       <Receipt className="w-4 h-4" />
-                                      View Invoice
+                                      View Details Invoice
                                     </Button>
                                   )}
                                 </>
@@ -556,11 +616,21 @@ export default function MyAppointmentsPage() {
                   } else {
                     const error = await response.json()
                     console.error("Failed to submit review:", error)
-                    alert(error.error || "Failed to submit review")
+                    await Swal.fire({
+                      icon: "error",
+                      title: "Review Failed",
+                      text: error.error || "Failed to submit review",
+                      confirmButtonColor: "#ef4444",
+                    });
                   }
                 } catch (error) {
                   console.error("Error submitting review:", error)
-                  alert("Failed to submit review")
+                  await Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Failed to submit review",
+                    confirmButtonColor: "#ef4444",
+                  });
                 }
               }}
             />

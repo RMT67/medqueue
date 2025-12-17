@@ -33,6 +33,7 @@ import Link from "next/link";
 import { FadeIn } from "@/components/animations";
 import { getSocket, joinQueueRoom, leaveQueueRoom } from "@/lib/socket-client";
 import { StatusBadge } from "@/components/status-badge";
+import Swal from "sweetalert2";
 
 type QueueDoctor = {
   _id: string;
@@ -124,6 +125,38 @@ export default function MyQueuePage() {
 
       if (res.ok) {
         const data = await res.json();
+        console.log("[my-queue page] ====== API RESPONSE RECEIVED ======")
+        console.log("[my-queue page] Total queues:", data.queues?.length)
+        
+        // Log ALL queues, not just F-007
+        data.queues?.forEach((q: QueueItem, index: number) => {
+          console.log(`[my-queue page] Queue ${index + 1}:`, {
+            bookingId: q.bookingId,
+            queueNumber: q.queueNumber,
+            bookingNumber: q.bookingNumber,
+            appointmentTime: q.appointmentTime,
+            appointmentTimeType: typeof q.appointmentTime,
+            timeRange: q.timeRange,
+            scheduleDate: q.scheduleDate
+          })
+          if (q.appointmentTime) {
+            try {
+              const testDate = new Date(q.appointmentTime)
+              console.log(`[my-queue page] Queue ${index + 1} appointmentTime parsed:`, {
+                iso: testDate.toISOString(),
+                local: testDate.toString(),
+                hours: testDate.getHours(),
+                minutes: testDate.getMinutes(),
+                formatted: `${testDate.getHours().toString().padStart(2, "0")}:${testDate.getMinutes().toString().padStart(2, "0")}`
+              })
+            } catch (e) {
+              console.error(`[my-queue page] Error parsing appointmentTime for queue ${index + 1}:`, e)
+            }
+          } else {
+            console.warn(`[my-queue page] ⚠️ Queue ${index + 1} appointmentTime is NULL or UNDEFINED!`)
+          }
+        })
+        
         setQueues(data.queues || []);
         return;
       }
@@ -201,7 +234,9 @@ export default function MyQueuePage() {
   );
 
   // Get current active queue (first active queue)
-  const currentQueue = useMemo(() => activeQueues[0] || null, [activeQueues]);
+  const currentQueue = useMemo(() => {
+    return activeQueues[0] || null
+  }, [activeQueues]);
 
   // Cancelled appointments
   const cancelledQueues = useMemo(
@@ -368,6 +403,8 @@ export default function MyQueuePage() {
       };
 
       // Listen for call time updates
+      // NOTE: estimatedCallTime dari socket adalah untuk countdown timer, BUKAN untuk Call Time display
+      // Call Time display menggunakan appointmentTime dari booking (tidak terpengaruh socket)
       const handleCallTimeUpdate = (data: {
         bookingId: string;
         estimatedCallTime: string;
@@ -377,6 +414,11 @@ export default function MyQueuePage() {
         averageServiceTime?: number;
       }) => {
         if (data.bookingId === bookingId) {
+          console.log("[my-queue page] Socket call-time-update received:", {
+            estimatedCallTime: data.estimatedCallTime,
+            bookingId: data.bookingId
+          })
+          // NOTE: estimatedCallTime ini hanya untuk countdown timer, TIDAK mengubah appointmentTime
           setQueuePosition((prev) => ({
             patientsAhead: data.patientsAhead,
             estimatedTime: data.estimatedTime,
@@ -396,7 +438,11 @@ export default function MyQueuePage() {
         estimatedCallTimeTimestamp?: string;
       }) => {
         if (data.bookingId === bookingId) {
-          // Refresh queues when status changes
+          console.log("[my-queue page] Socket status-change received, refreshing queues:", {
+            queueStatus: data.queueStatus,
+            bookingId: data.bookingId
+          })
+          // Refresh queues when status changes (ini akan fetch ulang dari API, appointmentTime tetap dari booking)
           fetchQueues();
         }
       };
@@ -424,7 +470,18 @@ export default function MyQueuePage() {
   const handlePayment = async () => {
     if (!currentQueue?.invoice?._id) return;
 
-    if (!confirm("Are you sure you want to process this payment?")) {
+    const result = await Swal.fire({
+      icon: "question",
+      title: "Process Payment?",
+      text: "Are you sure you want to process this payment?",
+      showCancelButton: true,
+      confirmButtonColor: "#10b981",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, process it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -432,7 +489,12 @@ export default function MyQueuePage() {
       setIsProcessingPayment(true);
       const token = localStorage.getItem("medqueue_token");
       if (!token) {
-        alert("Please login to process payment");
+        await Swal.fire({
+          icon: "warning",
+          title: "Authentication Required",
+          text: "Please login to process payment",
+          confirmButtonColor: "#3b82f6",
+        });
         return;
       }
 
@@ -452,23 +514,49 @@ export default function MyQueuePage() {
 
       if (response.ok) {
         const data = await response.json();
-        alert("Payment processed successfully!");
+        await Swal.fire({
+          icon: "success",
+          title: "Payment Successful!",
+          text: "Payment processed successfully!",
+          confirmButtonColor: "#10b981",
+        });
         // Refresh queues to get updated invoice status
         await fetchQueues();
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to process payment");
+        await Swal.fire({
+          icon: "error",
+          title: "Payment Failed",
+          text: error.error || "Failed to process payment",
+          confirmButtonColor: "#ef4444",
+        });
       }
     } catch (error) {
       console.error("Error processing payment:", error);
-      alert("Failed to process payment");
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to process payment",
+        confirmButtonColor: "#ef4444",
+      });
     } finally {
       setIsProcessingPayment(false);
     }
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm("Are you sure you want to cancel this appointment? This action cannot be undone.")) {
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Cancel Appointment?",
+      text: "Are you sure you want to cancel this appointment? This action cannot be undone.",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, cancel it",
+      cancelButtonText: "No, keep it",
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -476,13 +564,23 @@ export default function MyQueuePage() {
       setCancellingId(bookingId);
       const token = localStorage.getItem("medqueue_token");
       if (!token) {
-        alert("Please login to cancel booking");
+        await Swal.fire({
+          icon: "warning",
+          title: "Authentication Required",
+          text: "Please login to cancel booking",
+          confirmButtonColor: "#3b82f6",
+        });
         return;
       }
 
       // Validate bookingId
       if (!bookingId) {
-        alert("Invalid booking ID");
+        await Swal.fire({
+          icon: "error",
+          title: "Invalid Booking",
+          text: "Invalid booking ID",
+          confirmButtonColor: "#ef4444",
+        });
         return;
       }
 
@@ -498,15 +596,30 @@ export default function MyQueuePage() {
       });
 
       if (response.ok) {
-        alert("Appointment cancelled successfully");
+        await Swal.fire({
+          icon: "success",
+          title: "Appointment Cancelled",
+          text: "Appointment cancelled successfully",
+          confirmButtonColor: "#10b981",
+        });
         await fetchQueues();
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to cancel appointment");
+        await Swal.fire({
+          icon: "error",
+          title: "Cancellation Failed",
+          text: error.error || "Failed to cancel appointment",
+          confirmButtonColor: "#ef4444",
+        });
       }
     } catch (error) {
       console.error("Error cancelling appointment:", error);
-      alert("Failed to cancel appointment");
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to cancel appointment",
+        confirmButtonColor: "#ef4444",
+      });
     } finally {
       setCancellingId(null);
     }
@@ -709,7 +822,7 @@ export default function MyQueuePage() {
               </Button>
             </div>
           </Card>
-        ) : queues.length === 0 ? (
+        ) : !currentQueue || activeQueues.length === 0 ? (
           <FadeIn direction="up" delay={0}>
             <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
               <div className="max-w-md mx-auto">
@@ -1010,7 +1123,12 @@ export default function MyQueuePage() {
                 );
 
                 if (!appointmentToReview) {
-                  alert("Appointment not found");
+                  await Swal.fire({
+                    icon: "error",
+                    title: "Appointment Not Found",
+                    text: "Appointment not found",
+                    confirmButtonColor: "#ef4444",
+                  });
                   return;
                 }
 
@@ -1034,11 +1152,21 @@ export default function MyQueuePage() {
                   await fetchQueues();
                 } else {
                   const error = await response.json();
-                  alert(error.error || "Failed to submit review");
+                  await Swal.fire({
+                    icon: "error",
+                    title: "Review Failed",
+                    text: error.error || "Failed to submit review",
+                    confirmButtonColor: "#ef4444",
+                  });
                 }
               } catch (error) {
                 console.error("Error submitting review:", error);
-                alert("Failed to submit review");
+                await Swal.fire({
+                  icon: "error",
+                  title: "Error",
+                  text: "Failed to submit review",
+                  confirmButtonColor: "#ef4444",
+                });
               }
             }}
           />
@@ -1067,7 +1195,7 @@ export default function MyQueuePage() {
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {pastAppointments.length > 0 ? (
-              pastAppointments.map((appointment) => {
+              pastAppointments.slice(0, 3).map((appointment) => {
                 const initials = (appointment.doctor?.name || "D")
                   .split(" ")
                   .map((n) => n[0])

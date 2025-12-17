@@ -43,7 +43,7 @@ export function DoctorCardGrid({
     .toUpperCase();
 
   return (
-    <Card className="group relative overflow-hidden border border-border/50 hover:border-primary/30 transition-all duration-500 hover:shadow-2xl bg-card/95 backdrop-blur-sm h-full flex flex-col">
+    <Card className="group relative overflow-hidden border border-border/50 hover:border-primary/30 transition-all duration-500 hover:shadow-2xl bg-card/95 backdrop-blur-sm h-full flex flex-col pt-0 gap-0">
       {/* Gradient Background on Hover */}
       <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 

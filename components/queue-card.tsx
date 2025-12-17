@@ -200,7 +200,7 @@ export function QueueCard({
   doctorImage,
   status,
   appointmentDate = "Today, Dec 5, 2024",
-  appointmentTime = "10:30",
+  appointmentTime,
   timeRange,
   patientComplaint,
   bookingId,
@@ -299,12 +299,42 @@ export function QueueCard({
     [appointmentDate, appointmentTime]
   )
 
+  // Available Time harus selalu dari DoctorSchedule (timeRange), BUKAN dari appointmentTime
+  // appointmentTime adalah waktu appointment pasien, sedangkan Available Time adalah jadwal dokter
   const formattedAvailableTime = useMemo(() => {
-    if (timeRange) return timeRange
-    if (appointmentTime) return formatDisplayTime(appointmentTime)
-    if (appointmentDate) return formatDisplayTime(appointmentDate)
+    if (timeRange) {
+      return timeRange
+    }
+    // Jika timeRange tidak ada, return "-" (jangan gunakan appointmentTime sebagai fallback)
+    // karena appointmentTime bukan jadwal dokter, tapi waktu appointment pasien
     return "-"
-  }, [timeRange, appointmentTime, appointmentDate])
+  }, [timeRange]) // Hanya depend pada timeRange, BUKAN appointmentTime atau appointmentDate
+
+  // Format appointmentTime sebagai HH:mm (SAMA PERSIS dengan doctor dashboard)
+  // Pastikan menggunakan appointmentTime sebenarnya dari booking, BUKAN timeRange atau scheduleStartTime
+  const formattedAppointmentTime = useMemo(() => {
+    if (!appointmentTime) {
+      return "N/A"
+    }
+    
+    try {
+      const appointmentTimeDate = new Date(appointmentTime)
+      
+      // Validasi bahwa time valid
+      if (isNaN(appointmentTimeDate.getTime())) {
+        return "N/A"
+      }
+      
+      // Format SAMA PERSIS dengan doctor dashboard
+      // getHours() dan getMinutes() menggunakan local timezone (sama seperti doctor dashboard)
+      const startHour = appointmentTimeDate.getHours().toString().padStart(2, "0")
+      const startMin = appointmentTimeDate.getMinutes().toString().padStart(2, "0")
+      return `${startHour}:${startMin}`
+    } catch (error) {
+      console.error("[QueueCard] Error formatting appointmentTime:", error)
+      return "N/A"
+    }
+  }, [appointmentTime]) // Hanya depend pada appointmentTime, BUKAN timeRange
 
   const getPracticeStartTime = (baseDate: Date | null, range?: string | null) => {
     if (!baseDate) return null
@@ -436,23 +466,7 @@ export function QueueCard({
         </div>
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-4 text-center border border-primary/20 shadow-md ring-1 ring-primary/10">
           <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Call Time</p>
-          {propEstimatedCallTime ? (
-            <>
-              <p className="font-bold text-xl text-primary">{propEstimatedCallTime}</p>
-              {averageServiceTime && (
-                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
-                  Avg. service: {averageServiceTime} min
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="font-bold text-xl text-primary">{estimatedCallTime}</p>
-              {estimatedCallTime !== "Now" && estimatedCallTime !== "Completed" && (
-                <p className="text-xs text-muted-foreground mt-1.5 font-medium">{estimatedCallTimeFormatted}</p>
-              )}
-            </>
-          )}
+          <p className="font-bold text-xl text-primary">{formattedAppointmentTime}</p>
         </div>
       </div>
 

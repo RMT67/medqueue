@@ -41,11 +41,21 @@ export async function GET(req: Request) {
     const invoicesCollection = db.collection("invoices");
 
     // ✅ 3. Get invoice
-    const invoice = await invoicesCollection.findOne({
+    // If status is "paid", try to find with paid status first, but also allow pending as fallback
+    // This handles cases where webhook hasn't processed yet
+    let invoice = await invoicesCollection.findOne({
       bookingId: new ObjectId(bookingId),
       patientId: patientObjectId,
       status: status
     });
+
+    // If not found and status is "paid", try to find with any status (webhook might not have updated yet)
+    if (!invoice && status === "paid") {
+      invoice = await invoicesCollection.findOne({
+        bookingId: new ObjectId(bookingId),
+        patientId: patientObjectId,
+      });
+    }
 
     if (!invoice) {
       return NextResponse.json(

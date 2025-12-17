@@ -39,7 +39,7 @@ export function DoctorCard({
       {/* Gradient Background on Hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-      <div className="relative p-8">
+      <div className="relative pt-0 px-8 pb-8">
         <div className="flex gap-6 items-start">
           {/* Doctor Avatar */}
           <Link href={`/booking/${id}`} className="relative flex-shrink-0">

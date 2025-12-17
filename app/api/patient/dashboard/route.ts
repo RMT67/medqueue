@@ -67,9 +67,13 @@ export async function GET(req: Request) {
           _id: new ObjectId(invoice.medicalRecordId)
         });
         
-        if (medicalRecord && 
+        // Medical record valid jika punya prescriptions ATAU service
+        const hasPrescriptions = medicalRecord && 
             medicalRecord.prescriptions && 
-            medicalRecord.prescriptions.length > 0) {
+            medicalRecord.prescriptions.length > 0;
+        const hasService = medicalRecord && !!medicalRecord.serviceId;
+        
+        if (hasPrescriptions || hasService) {
           // Check booking status
           const booking = await bookingsCollection.findOne({
             _id: new ObjectId(invoice.bookingId)
@@ -119,11 +123,13 @@ export async function GET(req: Request) {
 
       // ✅ Hanya return invoice jika:
       // 1. Medical record ada
-      // 2. Medical record punya prescription/receipt (lengkap)
+      // 2. Medical record punya prescription ATAU service (lengkap)
       // 3. Booking status = completed
-      const hasValidMedicalRecord = medicalRecord && 
+      const hasPrescriptions = medicalRecord && 
         medicalRecord.prescriptions && 
         medicalRecord.prescriptions.length > 0;
+      const hasService = medicalRecord && !!medicalRecord.serviceId;
+      const hasValidMedicalRecord = hasPrescriptions || hasService;
 
       const isBookingCompleted = booking && booking.status === "completed";
 
@@ -131,13 +137,15 @@ export async function GET(req: Request) {
         // Get doctor info
         const doctor = await DoctorModel.getDoctorById(pendingInvoice.doctorId);
 
-        // Format medication receipt dari medical record
-        const medicationReceipt = medicalRecord.prescriptions.map((prescription: any) => ({
-          name: prescription.medicineName,
-          dosage: prescription.dosage,
-          quantity: prescription.quantity,
-          price: prescription.unitPrice * prescription.quantity
-        }));
+        // Format medication receipt dari medical record (jika ada prescriptions)
+        const medicationReceipt = (medicalRecord.prescriptions && medicalRecord.prescriptions.length > 0)
+          ? medicalRecord.prescriptions.map((prescription: any) => ({
+              name: prescription.medicineName,
+              dosage: prescription.dosage,
+              quantity: prescription.quantity,
+              price: prescription.unitPrice * prescription.quantity
+            }))
+          : [];
 
         // Calculate days until due
         const dueDate = new Date(pendingInvoice.dueDate);

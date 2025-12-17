@@ -56,6 +56,7 @@ export async function GET(
     }
 
     // ✅ 4. Get schedule and extract startTime
+    // Menggunakan logika yang sama dengan my-queue API untuk konsistensi
     let schedule = null;
     let scheduleStartTime: string | null = null;
     if (booking.scheduleId) {
@@ -64,7 +65,7 @@ export async function GET(
       schedule = await DoctorScheduleModel.getDefaultSchedule(booking.doctorId);
     }
 
-    // Extract startTime from schedule
+    // Extract startTime from schedule - support both Indonesian and English day names
     if (schedule?.dayOfWeek && schedule.dayOfWeek.length > 0) {
       const scheduleDate = booking.scheduleDate 
         ? new Date(booking.scheduleDate) 
@@ -72,11 +73,63 @@ export async function GET(
         ? new Date(booking.appointmentTime) 
         : new Date();
       const dayIndex = scheduleDate.getDay();
-      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-      const dayName = dayNames[dayIndex];
-      const daySchedule = schedule.dayOfWeek.find((d) => d.hari === dayName);
+      
+      // Database mungkin menggunakan format bahasa Inggris ("Wednesday") atau Indonesia ("Rabu")
+      // Support kedua format untuk kompatibilitas
+      const dayMapIndonesian: { [key: number]: string } = {
+        0: "Minggu", 1: "Senin", 2: "Selasa", 3: "Rabu",
+        4: "Kamis", 5: "Jumat", 6: "Sabtu",
+      };
+      const dayMapEnglish: { [key: number]: string } = {
+        0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+        4: "Thursday", 5: "Friday", 6: "Saturday",
+      };
+      const dayNameIndonesian = dayMapIndonesian[dayIndex];
+      const dayNameEnglish = dayMapEnglish[dayIndex];
+      
+      // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
+      // NOTE: Field di database adalah "availabel" (dengan typo), bukan "available"
+      const daySchedule = schedule.dayOfWeek.find((d) => 
+        (d.hari === dayNameIndonesian || d.hari === dayNameEnglish) && 
+        (d.availabel === true || (d.startTime && d.endTime)) // Cek available atau minimal punya startTime/endTime
+      );
+      
       if (daySchedule && daySchedule.startTime) {
         scheduleStartTime = daySchedule.startTime;
+      }
+    }
+    
+    // Fallback: Jika masih tidak ada, coba ambil dari default schedule
+    if (!scheduleStartTime) {
+      const defaultSchedule = await DoctorScheduleModel.getDefaultSchedule(booking.doctorId);
+      
+      if (defaultSchedule?.dayOfWeek && defaultSchedule.dayOfWeek.length > 0) {
+        const scheduleDate = booking.scheduleDate 
+          ? new Date(booking.scheduleDate) 
+          : booking.appointmentTime 
+          ? new Date(booking.appointmentTime) 
+          : new Date();
+        const dayIndex = scheduleDate.getDay();
+        const dayMapIndonesian: { [key: number]: string } = {
+          0: "Minggu", 1: "Senin", 2: "Selasa", 3: "Rabu",
+          4: "Kamis", 5: "Jumat", 6: "Sabtu",
+        };
+        const dayMapEnglish: { [key: number]: string } = {
+          0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+          4: "Thursday", 5: "Friday", 6: "Saturday",
+        };
+        const dayNameIndonesian = dayMapIndonesian[dayIndex];
+        const dayNameEnglish = dayMapEnglish[dayIndex];
+        
+        // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
+        const availableDay = defaultSchedule.dayOfWeek.find(d => 
+          (d.hari === dayNameIndonesian || d.hari === dayNameEnglish) && 
+          (d.availabel === true || (d.startTime && d.endTime))
+        );
+        
+        if (availableDay && availableDay.startTime) {
+          scheduleStartTime = availableDay.startTime;
+        }
       }
     }
 
@@ -100,19 +153,66 @@ export async function GET(
     // ✅ 6. Get average service time
     const averageServiceTime = doctor.averageServiceTime || 10;
 
-    // ✅ 7. Calculate estimated call time with schedule startTime
+    // ✅ 7. Calculate estimated call time
+    // PRIORITAS: Gunakan appointmentTime dari booking sebagai base time (sama seperti doctor dashboard)
+    // Jika appointmentTime ada, gunakan itu. Jika tidak, baru gunakan scheduleStartTime
     const scheduleDate = booking.scheduleDate 
       ? new Date(booking.scheduleDate) 
       : booking.appointmentTime 
       ? new Date(booking.appointmentTime) 
       : new Date();
 
-    const callTimeData = calculateEstimatedCallTime(
-      patientsAhead,
-      averageServiceTime,
-      scheduleStartTime, // Pass schedule startTime
-      scheduleDate // Pass schedule date
-    );
+    let callTimeData;
+    if (booking.appointmentTime) {
+      // Jika appointmentTime ada, gunakan appointmentTime sebagai base time
+      // Adjust berdasarkan patientsAhead jika ada pasien di depan
+      const appointmentTimeDate = new Date(booking.appointmentTime);
+      const totalWaitMinutes = patientsAhead * averageServiceTime;
+      const estimatedCallTimeDate = new Date(appointmentTimeDate.getTime() + totalWaitMinutes * 60 * 1000);
+      
+      const hours = estimatedCallTimeDate.getHours();
+      const minutes = estimatedCallTimeDate.getMinutes();
+      const displayHours = hours.toString().padStart(2, "0");
+      const displayMinutes = minutes.toString().padStart(2, "0");
+      
+      const currentTime = new Date();
+      const minutesUntil = Math.max(0, Math.ceil((estimatedCallTimeDate.getTime() - currentTime.getTime()) / (60 * 1000)));
+      
+      let formatted: string;
+      if (minutesUntil <= 1) {
+        formatted = "Any moment now";
+      } else if (minutesUntil < 60) {
+        formatted = `In ${minutesUntil} minutes`;
+      } else {
+        const hoursUntil = Math.floor(minutesUntil / 60);
+        const remainingMinutes = minutesUntil % 60;
+        formatted = `In ${hoursUntil}h ${remainingMinutes}m`;
+      }
+      
+      console.log(`[insights API] Using appointmentTime as base:`, {
+        appointmentTime: booking.appointmentTime,
+        appointmentTimeFormatted: `${displayHours}:${displayMinutes}`,
+        patientsAhead,
+        totalWaitMinutes,
+        estimatedCallTime: `${displayHours}:${displayMinutes}`
+      });
+      
+      callTimeData = {
+        estimatedTime: totalWaitMinutes,
+        estimatedCallTime: `${displayHours}:${displayMinutes}`,
+        estimatedCallTimeTimestamp: estimatedCallTimeDate,
+        estimatedCallTimeFormatted: formatted
+      };
+    } else {
+      // Fallback: gunakan scheduleStartTime jika appointmentTime tidak ada
+      console.log(`[insights API] No appointmentTime, using scheduleStartTime:`, scheduleStartTime);
+      callTimeData = calculateEstimatedCallTime(
+        patientsAhead,
+        averageServiceTime,
+        scheduleStartTime, // Pass schedule startTime
+        scheduleDate // Pass schedule date
+      );
+    }
 
     // ✅ 8. Calculate clinic traffic
     const trafficData = await calculateClinicTraffic(
@@ -128,6 +228,8 @@ export async function GET(
     );
 
     // ✅ 10. Generate AI insights
+    // Pastikan menggunakan appointmentTime sebenarnya dari booking untuk konteks (jika diperlukan)
+    // estimatedCallTime sudah dihitung dengan benar menggunakan scheduleStartTime yang sudah diperbaiki
     const insightsData = await generateInsights(
       averageServiceTime,
       scheduleStatusData.scheduleStatus,

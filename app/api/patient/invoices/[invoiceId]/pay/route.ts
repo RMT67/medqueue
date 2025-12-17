@@ -27,7 +27,7 @@ export async function POST(
 
     const { invoiceId } = await params;
     const body = await req.json().catch(() => ({}));
-    const { paymentMethod = "manual" } = body;
+    const { paymentMethod = "midtrans" } = body;
 
     // ✅ 2. Get invoice and verify ownership
     const invoice = await InvoiceModel.getById(invoiceId);
@@ -61,25 +61,35 @@ export async function POST(
       );
     }
 
-    // ✅ 4. Update invoice status to paid
-    const updatedInvoice = await InvoiceModel.update(invoiceId, {
-      status: "paid",
-      paymentMethod: paymentMethod,
-      paidAt: new Date(),
-    });
+    // ✅ 4. If payment method is manual, update directly
+    // Otherwise, redirect to Midtrans payment creation
+    if (paymentMethod === "manual") {
+      const updatedInvoice = await InvoiceModel.update(invoiceId, {
+        status: "paid",
+        paymentMethod: paymentMethod,
+        paidAt: new Date(),
+      });
 
-    // ✅ 5. Return success response
-    return NextResponse.json(
-      {
-        message: "Payment processed successfully",
-        invoice: {
-          invoiceId: updatedInvoice?._id?.toString(),
-          invoiceNumber: updatedInvoice?.invoiceNumber,
-          status: updatedInvoice?.status,
-          paidAt: updatedInvoice?.paidAt,
+      return NextResponse.json(
+        {
+          message: "Payment processed successfully",
+          invoice: {
+            invoiceId: updatedInvoice?._id?.toString(),
+            invoiceNumber: updatedInvoice?.invoiceNumber,
+            status: updatedInvoice?.status,
+            paidAt: updatedInvoice?.paidAt,
+          },
         },
-      },
-      { status: 200 }
+        { status: 200 }
+      );
+    }
+
+    // ✅ 5. For Midtrans, redirect to payment creation endpoint
+    // This endpoint is now just for manual payments
+    // Midtrans payments should use /api/payment/midtrans/create
+    return NextResponse.json(
+      { error: "Please use /api/payment/midtrans/create for Midtrans payments" },
+      { status: 400 }
     );
   } catch (error) {
     console.error("Error processing payment:", error);

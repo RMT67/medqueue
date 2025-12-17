@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { FadeIn } from "@/components/animations";
+import Swal from "sweetalert2";
 
 interface InvoiceItem {
   type: "consultation" | "medicine" | "service";
@@ -115,41 +116,166 @@ export default function InvoiceDetailPage() {
     try {
       setIsProcessingPayment(true);
       const token = localStorage.getItem("medqueue_token");
-      if (!token) return;
-
-      const response = await fetch(
-        `/api/patient/invoices/${invoice.invoiceId}/pay`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        // Refresh invoice data
-        const updatedResponse = await fetch(
-          `/api/patient/invoices?bookingId=${bookingId}&status=paid`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (updatedResponse.ok) {
-          const data = await updatedResponse.json();
-          setInvoice(data);
-        }
-      } else {
-        const errorData = await response.json().catch(() => null);
-        alert(errorData?.error || "Failed to process payment");
+      if (!token) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Authentication Required",
+          text: "Please login to process payment",
+          confirmButtonColor: "#3b82f6",
+        });
+        return;
       }
+
+      // Create Midtrans payment transaction
+      const response = await fetch(`/api/payment/midtrans/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          invoiceId: invoice.invoiceId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        await Swal.fire({
+          icon: "error",
+          title: "Payment Failed",
+          text: errorData?.error || "Failed to create payment",
+          confirmButtonColor: "#ef4444",
+        });
+        return;
+      }
+
+      const data = await response.json();
+      const { token: snapToken, redirect_url } = data;
+
+      // Load Midtrans Snap script dynamically
+      const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+      if (!clientKey) {
+        await Swal.fire({
+          icon: "error",
+          title: "Configuration Error",
+          text: "Payment configuration is missing. Please contact support.",
+          confirmButtonColor: "#ef4444",
+        });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
+      script.setAttribute("data-client-key", clientKey);
+      script.onload = () => {
+        // @ts-ignore - Midtrans Snap is loaded globally
+        if (window.snap) {
+          // @ts-ignore
+          window.snap.pay(snapToken, {
+            onSuccess: async (result: any) => {
+              console.log("Payment success:", result);
+              
+              // Wait a bit for webhook to process, then retry fetching invoice
+              const fetchUpdatedInvoice = async (retries = 5) => {
+                for (let i = 0; i < retries; i++) {
+                  // Try with paid status first
+                  let updatedResponse = await fetch(
+                    `/api/patient/invoices?bookingId=${bookingId}&status=paid`,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  if (updatedResponse.ok) {
+                    const invoiceData = await updatedResponse.json();
+                    setInvoice(invoiceData);
+                    await Swal.fire({
+                      icon: "success",
+                      title: "Payment Successful!",
+                      text: "Your payment has been processed successfully.",
+                      confirmButtonColor: "#10b981",
+                    });
+                    return;
+                  }
+
+                  // If not found with paid status, try with pending (webhook might not have processed yet)
+                  if (i < retries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                  }
+                }
+
+                // Final attempt: try without status filter to get latest status
+                const finalResponse = await fetch(
+                  `/api/patient/invoices?bookingId=${bookingId}&status=pending`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                );
+
+                if (finalResponse.ok) {
+                  const invoiceData = await finalResponse.json();
+                  setInvoice(invoiceData);
+                  await Swal.fire({
+                    icon: "info",
+                    title: "Payment Processing",
+                    text: "Payment is being processed. Please refresh the page in a moment.",
+                    confirmButtonColor: "#3b82f6",
+                  });
+                } else {
+                  await Swal.fire({
+                    icon: "success",
+                    title: "Payment Successful!",
+                    text: "Payment successful! Please refresh the page to see updated status.",
+                    confirmButtonColor: "#10b981",
+                  });
+                }
+              };
+
+              await fetchUpdatedInvoice();
+            },
+            onPending: (result: any) => {
+              console.log("Payment pending:", result);
+              Swal.fire({
+                icon: "info",
+                title: "Payment Pending",
+                text: "Payment is pending. Please complete the payment.",
+                confirmButtonColor: "#3b82f6",
+              });
+            },
+            onError: (result: any) => {
+              console.error("Payment error:", result);
+              Swal.fire({
+                icon: "error",
+                title: "Payment Failed",
+                text: "Payment failed. Please try again.",
+                confirmButtonColor: "#ef4444",
+              });
+            },
+            onClose: () => {
+              console.log("Payment popup closed");
+            },
+          });
+        } else {
+          // Fallback to redirect if Snap is not available
+          window.location.href = redirect_url;
+        }
+      };
+      script.onerror = () => {
+        // Fallback to redirect if script fails to load
+        window.location.href = redirect_url;
+      };
+      document.body.appendChild(script);
     } catch (error) {
       console.error("Error processing payment:", error);
-      alert("Failed to process payment");
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to process payment",
+        confirmButtonColor: "#ef4444",
+      });
     } finally {
       setIsProcessingPayment(false);
     }
@@ -473,4 +599,3 @@ export default function InvoiceDetailPage() {
     </ProtectedRoute>
   );
 }
-

@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/lib/auth-context";
-import {
-  AdminHeader,
-  AdminTabs,
-  AdminProtectedRoute,
-} from "@/components/adminDashboard";
+import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { ScheduleTab } from "./ScheduleTab";
 import { DoctorWithSchedule } from "@/types/scheduleTypes";
 import { DoctorScheduleType } from "@/types/doctorScheduleType";
@@ -38,7 +35,8 @@ type ScheduleFormData = Omit<
 
 // ==================== MAIN COMPONENT ====================
 export default function SchedulePage() {
-  const { user, logout } = useAuth();
+  const router = useRouter();
+  const { user, logout, isLoading } = useAuth();
 
   // State management
   const [schedules, setSchedules] = useState<DoctorWithSchedule[]>([]);
@@ -104,6 +102,12 @@ export default function SchedulePage() {
 
   // ==================== EFFECTS ====================
   useEffect(() => {
+    if (!isLoading && (!user || user.role !== "admin")) {
+      router.push("/login");
+    }
+  }, [user, isLoading, router]);
+
+  useEffect(() => {
     if (user && user.role === "admin") {
       fetchSchedules();
       fetchDoctors();
@@ -114,7 +118,7 @@ export default function SchedulePage() {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/schedules");
+      const response = await fetch("/api/schedules");
 
       if (!response.ok) {
         throw new Error("Failed to fetch schedules");
@@ -187,7 +191,7 @@ export default function SchedulePage() {
         doctorId: formData.doctorId, // Send as string, backend handles ObjectId conversion
       };
 
-      const response = await fetch("/api/admin/schedules", {
+      const response = await fetch("/api/schedules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -214,13 +218,12 @@ export default function SchedulePage() {
         timer: 1500,
         showConfirmButton: false,
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("Error creating schedule:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text:
-          error instanceof Error ? error.message : "Failed to create schedule",
+        text: error.message || "Failed to create schedule",
       });
     } finally {
       setSubmitting(false);
@@ -246,7 +249,7 @@ export default function SchedulePage() {
 
     try {
       setSubmitting(true);
-      const response = await fetch(`/api/admin/schedules`, {
+      const response = await fetch(`/api/schedules`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ _id: editingId, ...formData }),
@@ -273,13 +276,12 @@ export default function SchedulePage() {
         timer: 1500,
         showConfirmButton: false,
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("Error updating schedule:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text:
-          error instanceof Error ? error.message : "Failed to update schedule",
+        text: error.message || "Failed to update schedule",
       });
     } finally {
       setSubmitting(false);
@@ -301,7 +303,7 @@ export default function SchedulePage() {
     if (!result.isConfirmed) return;
 
     try {
-      const response = await fetch(`/api/admin/schedules?id=${scheduleId}`, {
+      const response = await fetch(`/api/schedules?id=${scheduleId}`, {
         method: "DELETE",
       });
 
@@ -332,20 +334,20 @@ export default function SchedulePage() {
   // Helper function to normalize day names (Indonesian to English)
   const normalizeDayName = (dayName: string): string => {
     const dayMap: Record<string, string> = {
-      Minggu: "Sunday",
-      Senin: "Monday",
-      Selasa: "Tuesday",
-      Rabu: "Wednesday",
-      Kamis: "Thursday",
-      Jumat: "Friday",
-      Sabtu: "Saturday",
-      Sunday: "Sunday",
-      Monday: "Monday",
-      Tuesday: "Tuesday",
-      Wednesday: "Wednesday",
-      Thursday: "Thursday",
-      Friday: "Friday",
-      Saturday: "Saturday",
+      "Minggu": "Sunday",
+      "Senin": "Monday",
+      "Selasa": "Tuesday",
+      "Rabu": "Wednesday",
+      "Kamis": "Thursday",
+      "Jumat": "Friday",
+      "Sabtu": "Saturday",
+      "Sunday": "Sunday",
+      "Monday": "Monday",
+      "Tuesday": "Tuesday",
+      "Wednesday": "Wednesday",
+      "Thursday": "Thursday",
+      "Friday": "Friday",
+      "Saturday": "Saturday",
     };
     return dayMap[dayName] || dayName;
   };
@@ -353,11 +355,11 @@ export default function SchedulePage() {
   // ==================== FORM HANDLERS ====================
   const handleEdit = (schedule: DoctorWithSchedule) => {
     setEditingId(schedule._id);
-
+    
     // Define all 7 days in order
     const allDays = [
       "Monday",
-      "Tuesday",
+      "Tuesday", 
       "Wednesday",
       "Thursday",
       "Friday",
@@ -473,277 +475,280 @@ export default function SchedulePage() {
     }));
   };
 
+  // ==================== LOADING & AUTH CHECK ====================
+  if (isLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   // ==================== RENDER ====================
   return (
-    <AdminProtectedRoute
-      loadingComponent={
-        loading ? (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Loading schedules...</p>
-            </div>
-          </div>
-        ) : undefined
-      }
-    >
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <Navigation
-          isAuthenticated={true}
-          userRole="admin"
-          userName={user?.name || "Admin"}
-          onLogout={logout}
-        />
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <Navigation
+        isAuthenticated={true}
+        userRole="admin"
+        userName={user.name}
+        onLogout={logout}
+      />
 
-        <AdminHeader
-          title='Doctor <span class="text-primary">Schedules</span>'
-          subtitle="Manage doctor schedules and availability"
-        />
+      <AdminHeader
+        title='Doctor <span class="text-primary">Schedules</span>'
+        subtitle="Manage doctor schedules and availability"
+      />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-          <AdminTabs />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+        <AdminTabs />
 
-          {/* Action Bar */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setViewMode("calendar")}
-                variant={viewMode === "calendar" ? "default" : "outline"}
-                size="sm"
-              >
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                Calendar View
-              </Button>
-              <Button
-                onClick={() => setViewMode("list")}
-                variant={viewMode === "list" ? "default" : "outline"}
-                size="sm"
-              >
-                <List className="w-4 h-4 mr-2" />
-                List View
-              </Button>
-            </div>
-
+        {/* Action Bar */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex gap-2">
             <Button
-              onClick={() => {
-                resetForm();
-                setShowForm(true);
-              }}
-              className="bg-linear-to-r from-primary to-accent hover:opacity-90"
+              onClick={() => setViewMode("calendar")}
+              variant={viewMode === "calendar" ? "default" : "outline"}
+              size="sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Schedule
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              Calendar View
+            </Button>
+            <Button
+              onClick={() => setViewMode("list")}
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="sm"
+            >
+              <List className="w-4 h-4 mr-2" />
+              List View
             </Button>
           </div>
 
-          {/* Form Section */}
-          {showForm && (
-            <Card className="p-6 mb-6 border-2 border-primary/20 shadow-xl">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">
-                  {editingId ? "Edit Schedule" : "Create New Schedule"}
-                </h3>
-                <Button variant="ghost" size="sm" onClick={resetForm}>
-                  <X className="w-5 h-5" />
-                </Button>
+          <Button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className="bg-linear-to-r from-primary to-accent hover:opacity-90"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Schedule
+          </Button>
+        </div>
+
+        {/* Form Section */}
+        {showForm && (
+          <Card className="p-6 mb-6 border-2 border-primary/20 shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">
+                {editingId ? "Edit Schedule" : "Create New Schedule"}
+              </h3>
+              <Button variant="ghost" size="sm" onClick={resetForm}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="grid gap-6">
+              {/* Doctor Selection */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Doctor <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.doctorId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, doctorId: e.target.value })
+                  }
+                  disabled={!!editingId}
+                  className="w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Select a doctor</option>
+                  {doctors.map((doctor) => (
+                    <option key={doctor._id} value={doctor._id}>
+                      {doctor.name} - {doctor.specialization}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="grid gap-6">
-                {/* Doctor Selection */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Doctor <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.doctorId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, doctorId: e.target.value })
-                    }
-                    disabled={!!editingId}
-                    className="w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">Select a doctor</option>
-                    {doctors.map((doctor) => (
-                      <option key={doctor._id} value={doctor._id}>
-                        {doctor.name} - {doctor.specialization}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Days of Week */}
-                <div>
-                  <label className="block text-sm font-medium mb-3">
-                    Days of Week <span className="text-red-500">*</span>
-                  </label>
-                  <div className="space-y-3">
-                    {formData.dayOfWeek.map((day, index) => (
-                      <div
-                        key={day.hari}
-                        className="flex items-center gap-4 p-4 border-2 rounded-lg bg-muted/30"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={day.available}
-                          onChange={(e) =>
-                            updateDaySchedule(
-                              index,
-                              "available",
-                              e.target.checked
-                            )
-                          }
-                          className="w-5 h-5"
-                        />
-                        <span className="font-medium w-24">{day.hari}</span>
-                        {day.available && (
-                          <>
-                            <Input
-                              type="time"
-                              value={day.startTime}
-                              onChange={(e) =>
-                                updateDaySchedule(
-                                  index,
-                                  "startTime",
-                                  e.target.value
-                                )
-                              }
-                              className="w-32"
-                            />
-                            <span>to</span>
-                            <Input
-                              type="time"
-                              value={day.endTime}
-                              onChange={(e) =>
-                                updateDaySchedule(
-                                  index,
-                                  "endTime",
-                                  e.target.value
-                                )
-                              }
-                              className="w-32"
-                            />
-                          </>
-                        )}
-                        {!day.available && (
-                          <span className="text-sm text-muted-foreground italic">
-                            Not available
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Settings Grid */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Max Patients <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={formData.maxPatients}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          maxPatients: parseInt(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Delay Minutes
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={formData.delayMinutes}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          delayMinutes: parseInt(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      First Call Time
-                    </label>
-                    <Input
-                      type="time"
-                      value={formData.firstCallTime}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          firstCallTime: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
+              {/* Days of Week */}
+              <div>
+                <label className="block text-sm font-medium mb-3">
+                  Days of Week <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-3">
+                  {formData.dayOfWeek.map((day, index) => (
+                    <div
+                      key={day.hari}
+                      className="flex items-center gap-4 p-4 border-2 rounded-lg bg-muted/30"
+                    >
                       <input
                         type="checkbox"
-                        checked={formData.isAvailable}
+                        checked={day.available}
                         onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            isAvailable: e.target.checked,
-                          })
+                          updateDaySchedule(
+                            index,
+                            "available",
+                            e.target.checked
+                          )
                         }
                         className="w-5 h-5"
                       />
-                      <span className="text-sm font-medium">Available</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex gap-3 justify-end pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={resetForm}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={editingId ? handleUpdate : handleCreate}
-                    disabled={submitting}
-                    className="bg-linear-to-r from-primary to-accent"
-                  >
-                    {submitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        {editingId ? "Update" : "Create"} Schedule
-                      </>
-                    )}
-                  </Button>
+                      <span className="font-medium w-24">{day.hari}</span>
+                      {day.available && (
+                        <>
+                          <Input
+                            type="time"
+                            value={day.startTime}
+                            onChange={(e) =>
+                              updateDaySchedule(
+                                index,
+                                "startTime",
+                                e.target.value
+                              )
+                            }
+                            className="w-32"
+                          />
+                          <span>to</span>
+                          <Input
+                            type="time"
+                            value={day.endTime}
+                            onChange={(e) =>
+                              updateDaySchedule(
+                                index,
+                                "endTime",
+                                e.target.value
+                              )
+                            }
+                            className="w-32"
+                          />
+                        </>
+                      )}
+                      {!day.available && (
+                        <span className="text-sm text-muted-foreground italic">
+                          Not available
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </Card>
-          )}
 
-          {/* Content Views */}
-          <ScheduleTab
-            schedules={schedules}
-            viewMode={viewMode}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        </main>
-      </div>
-    </AdminProtectedRoute>
+              {/* Settings Grid */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Max Patients <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={formData.maxPatients}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        maxPatients: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Delay Minutes
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.delayMinutes}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        delayMinutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    First Call Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={formData.firstCallTime}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        firstCallTime: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.isAvailable}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          isAvailable: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5"
+                    />
+                    <span className="text-sm font-medium">Available</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex gap-3 justify-end pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={editingId ? handleUpdate : handleCreate}
+                  disabled={submitting}
+                  className="bg-linear-to-r from-primary to-accent"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      {editingId ? "Update" : "Create"} Schedule
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Content Views */}
+        <ScheduleTab
+          schedules={schedules}
+          viewMode={viewMode}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      </main>
+    </div>
   );
 }

@@ -68,6 +68,7 @@ export async function GET(req: Request) {
         };
         
         // Extract startTime from dayOfWeek for the booking date (not today!)
+        // Support both Indonesian and English day names
         if (schedule.dayOfWeek && schedule.dayOfWeek.length > 0) {
           // ✅ FIX: Use booking's scheduleDate, not today's date
           const bookingDate = activeBooking.scheduleDate 
@@ -75,9 +76,28 @@ export async function GET(req: Request) {
             : activeBooking.appointmentTime 
             ? new Date(activeBooking.appointmentTime) 
             : new Date();
-          const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-          const bookingDayName = dayNames[bookingDate.getDay()];
-          const bookingDaySchedule = schedule.dayOfWeek.find(day => day.hari === bookingDayName);
+          const dayIndex = bookingDate.getDay();
+          
+          // Database mungkin menggunakan format bahasa Inggris ("Wednesday") atau Indonesia ("Rabu")
+          // Support kedua format untuk kompatibilitas
+          const dayMapIndonesian: { [key: number]: string } = {
+            0: "Minggu", 1: "Senin", 2: "Selasa", 3: "Rabu",
+            4: "Kamis", 5: "Jumat", 6: "Sabtu",
+          };
+          const dayMapEnglish: { [key: number]: string } = {
+            0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+            4: "Thursday", 5: "Friday", 6: "Saturday",
+          };
+          const dayNameIndonesian = dayMapIndonesian[dayIndex];
+          const dayNameEnglish = dayMapEnglish[dayIndex];
+          
+          // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
+          // NOTE: Field di database adalah "availabel" (dengan typo), bukan "available"
+          const bookingDaySchedule = schedule.dayOfWeek.find(day => 
+            (day.hari === dayNameIndonesian || day.hari === dayNameEnglish) && 
+            (day.availabel === true || (day.startTime && day.endTime))
+          );
+          
           if (bookingDaySchedule && bookingDaySchedule.startTime) {
             scheduleStartTime = bookingDaySchedule.startTime; // "09:00"
           }
@@ -94,6 +114,7 @@ export async function GET(req: Request) {
         };
         
         // Extract startTime from default schedule for the booking date (not today!)
+        // Support both Indonesian and English day names
         if (defaultSchedule.dayOfWeek && defaultSchedule.dayOfWeek.length > 0) {
           // ✅ FIX: Use booking's scheduleDate, not today's date
           const bookingDate = activeBooking.scheduleDate 
@@ -101,9 +122,28 @@ export async function GET(req: Request) {
             : activeBooking.appointmentTime 
             ? new Date(activeBooking.appointmentTime) 
             : new Date();
-          const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-          const bookingDayName = dayNames[bookingDate.getDay()];
-          const bookingDaySchedule = defaultSchedule.dayOfWeek.find(day => day.hari === bookingDayName);
+          const dayIndex = bookingDate.getDay();
+          
+          // Database mungkin menggunakan format bahasa Inggris ("Wednesday") atau Indonesia ("Rabu")
+          // Support kedua format untuk kompatibilitas
+          const dayMapIndonesian: { [key: number]: string } = {
+            0: "Minggu", 1: "Senin", 2: "Selasa", 3: "Rabu",
+            4: "Kamis", 5: "Jumat", 6: "Sabtu",
+          };
+          const dayMapEnglish: { [key: number]: string } = {
+            0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+            4: "Thursday", 5: "Friday", 6: "Saturday",
+          };
+          const dayNameIndonesian = dayMapIndonesian[dayIndex];
+          const dayNameEnglish = dayMapEnglish[dayIndex];
+          
+          // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
+          // NOTE: Field di database adalah "availabel" (dengan typo), bukan "available"
+          const bookingDaySchedule = defaultSchedule.dayOfWeek.find(day => 
+            (day.hari === dayNameIndonesian || day.hari === dayNameEnglish) && 
+            (day.availabel === true || (day.startTime && day.endTime))
+          );
+          
           if (bookingDaySchedule && bookingDaySchedule.startTime) {
             scheduleStartTime = bookingDaySchedule.startTime;
           }
@@ -217,16 +257,63 @@ export async function GET(req: Request) {
     // Jika belum ada yang mulai, actualSessionStartTime tetap null, akan menggunakan scheduleStartTime
 
     // ✅ 8. Calculate estimated call time
+    // PRIORITAS: Gunakan appointmentTime dari booking sebagai base time (sama seperti doctor dashboard dan insights)
     // Logic:
-    // - Jika doctor sudah mulai (actualSessionStartTime ada): gunakan actualSessionStartTime sebagai base
-    // - Jika doctor belum mulai: gunakan scheduleStartTime sebagai base
-    const callTimeData = calculateEstimatedCallTime(
-      Math.max(0, patientsAhead),
-      averageServiceTime,
-      scheduleStartTime, // Pass schedule startTime (fallback if doctor hasn't started)
-      scheduleDate, // Pass schedule date
-      actualSessionStartTime // Pass actual session start time (if doctor has started)
-    );
+    // 1. Jika appointmentTime ada: gunakan appointmentTime sebagai base, adjust berdasarkan patientsAhead
+    // 2. Jika doctor sudah mulai (actualSessionStartTime ada): gunakan actualSessionStartTime sebagai base
+    // 3. Jika doctor belum mulai: gunakan scheduleStartTime sebagai base
+    let callTimeData;
+    
+    if (activeBooking.appointmentTime) {
+      // Jika appointmentTime ada, gunakan appointmentTime sebagai base time
+      // Adjust berdasarkan patientsAhead jika ada pasien di depan
+      const appointmentTimeDate = new Date(activeBooking.appointmentTime);
+      const totalWaitMinutes = Math.max(0, patientsAhead) * averageServiceTime;
+      const estimatedCallTimeDate = new Date(appointmentTimeDate.getTime() + totalWaitMinutes * 60 * 1000);
+      
+      const hours = estimatedCallTimeDate.getHours();
+      const minutes = estimatedCallTimeDate.getMinutes();
+      const displayHours = hours.toString().padStart(2, "0");
+      const displayMinutes = minutes.toString().padStart(2, "0");
+      
+      const currentTime = new Date();
+      const minutesUntil = Math.max(0, Math.ceil((estimatedCallTimeDate.getTime() - currentTime.getTime()) / (60 * 1000)));
+      
+      let formatted: string;
+      if (minutesUntil <= 1) {
+        formatted = "Any moment now";
+      } else if (minutesUntil < 60) {
+        formatted = `In ${minutesUntil} minutes`;
+      } else {
+        const hoursUntil = Math.floor(minutesUntil / 60);
+        const remainingMinutes = minutesUntil % 60;
+        formatted = `In ${hoursUntil}h ${remainingMinutes}m`;
+      }
+      
+      callTimeData = {
+        estimatedTime: totalWaitMinutes,
+        estimatedCallTime: `${displayHours}:${displayMinutes}`,
+        estimatedCallTimeTimestamp: estimatedCallTimeDate,
+        estimatedCallTimeFormatted: formatted
+      };
+    } else if (actualSessionStartTime) {
+      // Jika doctor sudah mulai, gunakan actualSessionStartTime
+      callTimeData = calculateEstimatedCallTime(
+        Math.max(0, patientsAhead),
+        averageServiceTime,
+        scheduleStartTime, // Pass schedule startTime (fallback)
+        scheduleDate, // Pass schedule date
+        actualSessionStartTime // Pass actual session start time
+      );
+    } else {
+      // Fallback: gunakan scheduleStartTime jika appointmentTime tidak ada
+      callTimeData = calculateEstimatedCallTime(
+        Math.max(0, patientsAhead),
+        averageServiceTime,
+        scheduleStartTime, // Pass schedule startTime
+        scheduleDate // Pass schedule date
+      );
+    }
 
     // ✅ 9. Map queue status
     let queueStatus: "waiting" | "being-served" | "completed" = "waiting";

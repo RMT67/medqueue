@@ -53,7 +53,18 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
   });
 
   const handleDelete = async (serviceId: string) => {
-    if (!confirm("Are you sure you want to delete this service?")) return;
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Delete Service?",
+      text: "Are you sure you want to delete this service?",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       const response = await fetch(`/api/service?id=${serviceId}`, {
@@ -61,13 +72,29 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
       });
 
       if (response.ok) {
+        await Swal.fire({
+          icon: "success",
+          title: "Service Deleted",
+          text: "Service has been deleted successfully.",
+          confirmButtonColor: "#10b981",
+        });
         onRefresh();
       } else {
-        Swal.fire("Error", "Failed to delete service", "error");
+        await Swal.fire({
+          icon: "error",
+          title: "Deletion Failed",
+          text: "Failed to delete service",
+          confirmButtonColor: "#ef4444",
+        });
       }
     } catch (error) {
       console.error("Error deleting service:", error);
-      Swal.fire("Error", "Failed to delete service", "error");
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete service",
+        confirmButtonColor: "#ef4444",
+      });
     }
   };
 
@@ -86,13 +113,29 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
       );
 
       if (response.ok) {
+        await Swal.fire({
+          icon: "success",
+          title: "Status Updated",
+          text: `Service has been ${currentStatus ? "deactivated" : "activated"} successfully.`,
+          confirmButtonColor: "#10b981",
+        });
         onRefresh();
       } else {
-        Swal.fire("Error", "Failed to update service status", "error");
+        await Swal.fire({
+          icon: "error",
+          title: "Update Failed",
+          text: "Failed to update service status",
+          confirmButtonColor: "#ef4444",
+        });
       }
     } catch (error) {
       console.error("Error updating service status:", error);
-      Swal.fire("Error", "Failed to update service status", "error");
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to update service status",
+        confirmButtonColor: "#ef4444",
+      });
     }
   };
 
@@ -120,11 +163,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
             Services Management
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Total:{" "}
-            <span className="font-semibold text-foreground">
-              {filteredServices.length}
-            </span>{" "}
-            services
+            Total: <span className="font-semibold text-foreground">{filteredServices.length}</span> services
           </p>
         </div>
         <button
@@ -230,7 +269,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
               <tbody>
                 {filteredServices.map((service) => (
                   <tr
-                    key={service._id.toString()}
+                    key={service._id}
                     className="border-b border-border hover:bg-muted/30 transition-colors"
                   >
                     <td className="p-4">
@@ -258,8 +297,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
                     <td className="p-4">
                       <div>
                         <p className="font-semibold text-foreground">
-                          {service.currency}{" "}
-                          {service.price.toLocaleString("id-ID")}
+                          {service.currency} {service.price.toLocaleString("id-ID")}
                         </p>
                       </div>
                     </td>
@@ -293,10 +331,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
                         </button>
                         <button
                           onClick={() =>
-                            handleToggleStatus(
-                              service._id.toString(),
-                              service.isActive
-                            )
+                            handleToggleStatus(service._id, service.isActive)
                           }
                           className={`p-2 rounded-lg transition-all border ${
                             service.isActive
@@ -312,7 +347,7 @@ export function ServicesTab({ services, onRefresh }: ServicesTabProps) {
                           )}
                         </button>
                         <button
-                          onClick={() => handleDelete(service._id.toString())}
+                          onClick={() => handleDelete(service._id)}
                           className="p-2 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-800"
                           title="Delete"
                         >

@@ -12,6 +12,7 @@ import { Clock, Calendar, FileText, Stethoscope, ArrowRight, Sparkles, TrendingU
 import { ProtectedRoute } from "@/components/protected-route"
 import { FadeIn } from "@/components/animations"
 import { DoctorCardGrid } from "@/components/doctor-card-grid"
+import Swal from "sweetalert2"
 
 interface DashboardData {
   summary: {
@@ -52,6 +53,8 @@ interface DashboardData {
       image: string
     }
     daysUntilDue: number
+    bookingId?: string
+    medicalRecordId?: string
   } | null
   recommendedDoctors: Array<{
     doctorId: string
@@ -73,6 +76,7 @@ export default function PatientDashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
   const fetchDashboard = async () => {
     try {
@@ -309,34 +313,34 @@ export default function PatientDashboardPage() {
           {/* Pending Payment Section */}
           {dashboardData?.pendingInvoice && (
             <FadeIn direction="up" delay={400}>
-              <div className="mt-12 lg:mt-16">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg ring-4 ring-amber-100 dark:ring-amber-900/30">
-                    <AlertCircle className="w-6 h-6 text-white" />
+              <div className="mt-8 lg:mt-10">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg ring-2 ring-amber-100 dark:ring-amber-900/30">
+                    <AlertCircle className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-3xl lg:text-4xl font-bold text-foreground">Pending Payment</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Invoice and receipt that require payment</p>
+                    <h2 className="text-2xl lg:text-3xl font-bold text-foreground">Pending Payment</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Invoice and receipt that require payment</p>
                   </div>
                 </div>
 
-                <Card className="p-8 border border-amber-200/50 dark:border-amber-800/50 shadow-2xl bg-gradient-to-br from-amber-50/40 via-card to-amber-50/20 dark:from-amber-950/30 dark:via-card dark:to-amber-950/10 backdrop-blur-md ring-1 ring-amber-100/50 dark:ring-amber-900/20">
-                <div className="flex flex-col lg:flex-row gap-8">
+                <Card className="p-6 border border-amber-200/50 dark:border-amber-800/50 shadow-xl bg-gradient-to-br from-amber-50/40 via-card to-amber-50/20 dark:from-amber-950/30 dark:via-card dark:to-amber-950/10 backdrop-blur-md ring-1 ring-amber-100/50 dark:ring-amber-900/20">
+                <div className="flex flex-col lg:flex-row gap-6">
                   {/* Invoice Info */}
-                  <div className="flex-1 space-y-5">
-                    <div className="mb-6">
-                      <h3 className="text-xl font-bold text-foreground mb-1">Invoice & Receipt</h3>
+                  <div className="flex-1 space-y-4">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-foreground mb-0.5">Invoice & Receipt</h3>
                       <p className="text-xs text-muted-foreground font-medium">Payment required</p>
                     </div>
 
-                    <div className="p-5 bg-card/90 rounded-xl border border-border/50 shadow-lg backdrop-blur-sm">
-                      <div className="flex items-center justify-between mb-3">
+                    <div className="p-4 bg-card/90 rounded-xl border border-border/50 shadow-md backdrop-blur-sm">
+                      <div className="flex items-center justify-between mb-2.5">
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Invoice Number</p>
+                          <p className="text-xs font-semibold text-muted-foreground mb-0.5 uppercase tracking-wide">Invoice Number</p>
                           <p className="text-sm font-bold text-foreground">{dashboardData.pendingInvoice.invoiceNumber}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Due Date</p>
+                          <p className="text-xs font-semibold text-muted-foreground mb-0.5 uppercase tracking-wide">Due Date</p>
                           <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
                             {new Date(dashboardData.pendingInvoice.dueDate).toLocaleDateString("en-US", {
                               month: "short",
@@ -346,18 +350,18 @@ export default function PatientDashboardPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="pt-3 border-t border-border">
+                      <div className="pt-2.5 border-t border-border">
                         {dashboardData.pendingInvoice.items.map((item, index) => (
-                          <div key={index} className="flex items-center justify-between mb-2">
+                          <div key={index} className="flex items-center justify-between mb-1.5">
                             <span className="text-sm text-muted-foreground">{item.name}</span>
                             <span className="text-sm font-semibold text-foreground">
                               Rp {item.total.toLocaleString("id-ID")}
                             </span>
                           </div>
                         ))}
-                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                        <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                           <span className="text-sm font-bold text-foreground">Total Amount</span>
-                          <span className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                          <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
                             Rp {dashboardData.pendingInvoice.total.toLocaleString("id-ID")}
                           </span>
                         </div>
@@ -367,16 +371,16 @@ export default function PatientDashboardPage() {
                     {/* Medication Receipt */}
                     {dashboardData.pendingInvoice.medicationReceipt.medicines.length > 0 && (
                       <div>
-                        <div className="flex items-center gap-2.5 mb-4">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Pill className="w-4 h-4 text-primary" />
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Pill className="w-3.5 h-3.5 text-primary" />
                           </div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medication Receipt</p>
                         </div>
                         {dashboardData.pendingInvoice.medicationReceipt.medicines.map((medicine, index) => (
-                          <div key={index} className="p-4 bg-accent/10 rounded-xl border border-accent/30 shadow-sm mb-3">
-                            <p className="text-sm font-semibold text-foreground mb-1.5">{medicine.name}</p>
-                            <p className="text-xs text-muted-foreground mb-2">
+                          <div key={index} className="p-3 bg-accent/10 rounded-xl border border-accent/30 shadow-sm mb-2">
+                            <p className="text-sm font-semibold text-foreground mb-1">{medicine.name}</p>
+                            <p className="text-xs text-muted-foreground mb-1.5">
                               {medicine.dosage} • Qty: {medicine.quantity}
                             </p>
                             <p className="text-sm font-bold text-accent">Rp {medicine.price.toLocaleString("id-ID")}</p>
@@ -387,13 +391,13 @@ export default function PatientDashboardPage() {
                   </div>
 
                   {/* Action Section */}
-                  <div className="lg:w-96 flex flex-col justify-between gap-6">
-                    <div className="space-y-5">
+                  <div className="lg:w-80 flex flex-col justify-between gap-4">
+                    <div className="space-y-4">
                       {/* Doctor Information */}
                       {dashboardData.pendingInvoice.doctor && (
-                        <div className="p-5 bg-card/90 rounded-xl border border-border/50 shadow-lg backdrop-blur-sm">
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-2 ring-primary/10">
+                        <div className="p-4 bg-card/90 rounded-xl border border-border/50 shadow-md backdrop-blur-sm">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-1 ring-primary/10">
                               {dashboardData.pendingInvoice.doctor.image ? (
                                 <>
                                   <Image
@@ -448,8 +452,8 @@ export default function PatientDashboardPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="pt-4 border-t border-border/50">
-                            <p className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Clinic</p>
+                          <div className="pt-3 border-t border-border/50">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Clinic</p>
                             <p className="text-sm font-medium text-foreground">
                               {dashboardData.pendingInvoice.doctor.clinic}
                             </p>
@@ -457,9 +461,9 @@ export default function PatientDashboardPage() {
                         </div>
                       )}
 
-                      <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/50 rounded-xl shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/50 rounded-xl shadow-sm">
+                        <div className="flex items-start gap-2.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                           <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
                             Payment is due in {dashboardData.pendingInvoice.daysUntilDue} {dashboardData.pendingInvoice.daysUntilDue === 1 ? 'day' : 'days'}. Please complete payment to avoid service interruption.
                           </p>
@@ -468,23 +472,140 @@ export default function PatientDashboardPage() {
                     </div>
                     <div className="space-y-3">
                       <Button
-                        onClick={() => router.push("/my-queue")}
-                        className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                        onClick={async () => {
+                          if (!dashboardData.pendingInvoice) return;
+                          
+                          try {
+                            setIsProcessingPayment(true);
+                            const token = localStorage.getItem("medqueue_token");
+                            if (!token) {
+                              await Swal.fire({
+                                icon: "warning",
+                                title: "Authentication Required",
+                                text: "Please login to process payment",
+                                confirmButtonColor: "#3b82f6",
+                              });
+                              return;
+                            }
+
+                            // Create Midtrans payment transaction
+                            const response = await fetch(`/api/payment/midtrans/create`, {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({
+                                invoiceId: dashboardData.pendingInvoice.invoiceId,
+                              }),
+                            });
+
+                            if (!response.ok) {
+                              const errorData = await response.json().catch(() => null);
+                              await Swal.fire({
+                                icon: "error",
+                                title: "Payment Failed",
+                                text: errorData?.error || "Failed to create payment",
+                                confirmButtonColor: "#ef4444",
+                              });
+                              return;
+                            }
+
+                            const data = await response.json();
+                            const { token: snapToken, redirect_url } = data;
+
+                            // Load Midtrans Snap script dynamically
+                            const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+                            if (!clientKey) {
+                              await Swal.fire({
+                                icon: "error",
+                                title: "Configuration Error",
+                                text: "Payment configuration is missing. Please contact support.",
+                                confirmButtonColor: "#ef4444",
+                              });
+                              return;
+                            }
+                            const script = document.createElement("script");
+                            script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
+                            script.setAttribute("data-client-key", clientKey);
+                            script.onload = () => {
+                              // @ts-ignore - Midtrans Snap is loaded globally
+                              if (window.snap) {
+                                // @ts-ignore
+                                window.snap.pay(snapToken, {
+                                  onSuccess: async (result: any) => {
+                                    console.log("Payment success:", result);
+                                    // Refresh dashboard data
+                                    await fetchDashboard();
+                                    await Swal.fire({
+                                      icon: "success",
+                                      title: "Payment Successful!",
+                                      text: "Your payment has been processed successfully.",
+                                      confirmButtonColor: "#10b981",
+                                    });
+                                  },
+                                  onPending: (result: any) => {
+                                    console.log("Payment pending:", result);
+                                    Swal.fire({
+                                      icon: "info",
+                                      title: "Payment Pending",
+                                      text: "Payment is pending. Please complete the payment.",
+                                      confirmButtonColor: "#3b82f6",
+                                    });
+                                  },
+                                  onError: (result: any) => {
+                                    console.error("Payment error:", result);
+                                    Swal.fire({
+                                      icon: "error",
+                                      title: "Payment Failed",
+                                      text: "Payment failed. Please try again.",
+                                      confirmButtonColor: "#ef4444",
+                                    });
+                                  },
+                                  onClose: () => {
+                                    console.log("Payment popup closed");
+                                  },
+                                });
+                              } else {
+                                // Fallback to redirect if Snap is not available
+                                window.location.href = redirect_url;
+                              }
+                            };
+                            script.onerror = () => {
+                              // Fallback to redirect if script fails to load
+                              window.location.href = redirect_url;
+                            };
+                            document.body.appendChild(script);
+                          } catch (error) {
+                            console.error("Error processing payment:", error);
+                            await Swal.fire({
+                              icon: "error",
+                              title: "Error",
+                              text: "Failed to process payment",
+                              confirmButtonColor: "#ef4444",
+                            });
+                          } finally {
+                            setIsProcessingPayment(false);
+                          }
+                        }}
+                        disabled={isProcessingPayment || !dashboardData.pendingInvoice}
+                        className="w-full h-11 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <CreditCard className="w-5 h-5" />
-                        Process Payment
+                        <CreditCard className="w-4 h-4" />
+                        {isProcessingPayment ? "Processing..." : "Process Payment"}
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => {
                           if (dashboardData.pendingInvoice.bookingId) {
-                            router.push(`/my-queue`)
+                            router.push(`/patient/invoices?bookingId=${dashboardData.pendingInvoice.bookingId}&status=${dashboardData.pendingInvoice.status}`)
                           } else {
-                            router.push("/patient/appointments")
+                            router.push("/patient/invoices")
                           }
                         }}
-                        className="w-full h-11 border-2 border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 font-medium"
+                        className="w-full h-10 border-2 border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 font-medium gap-2"
                       >
+                        <FileText className="w-4 h-4" />
                         View Details
                       </Button>
                     </div>
@@ -542,4 +663,3 @@ export default function PatientDashboardPage() {
     </ProtectedRoute>
   )
 }
-
