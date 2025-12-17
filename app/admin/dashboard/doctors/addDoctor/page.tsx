@@ -38,7 +38,6 @@ export default function AddDoctorPage() {
     specialization: "",
     clinic: "",
     image: "",
-    consultationFee: "" as string | number,
     isActive: true,
   });
 
@@ -97,7 +96,6 @@ export default function AddDoctorPage() {
         specialization: formData.specialization,
         clinic: formData.clinic,
         image: formData.image || "",
-        consultationFee: Number(formData.consultationFee) || 0,
         isActive: formData.isActive,
         averageRating: 0,
         totalReviews: 0,
@@ -288,23 +286,6 @@ export default function AddDoctorPage() {
                   value={formData.clinic}
                   onChange={handleInputChange}
                   placeholder="Clinic name"
-                  className="h-11 border-2 focus:border-primary"
-                  required
-                />
-              </div>
-
-              {/* Consultation Fee */}
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Consultation Fee <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="number"
-                  name="consultationFee"
-                  value={formData.consultationFee}
-                  onChange={handleInputChange}
-                  placeholder="0"
-                  min="0"
                   className="h-11 border-2 focus:border-primary"
                   required
                 />

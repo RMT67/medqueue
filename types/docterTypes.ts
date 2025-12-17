@@ -20,7 +20,6 @@ export type Doctor = {
   specialization: string;
   clinic: string;
   image: string;
-  consultationFee: number;
   averageRating?: number;
   totalReviews: number;
   isActive: boolean;

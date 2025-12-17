@@ -53,8 +53,7 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { name, specialization, clinic, image, consultationFee, isActive } =
-      body;
+    const { name, specialization, clinic, image, isActive } = body;
 
     const updateData: Partial<Doctor> = {};
     if (name !== undefined) updateData.name = name;
@@ -62,8 +61,6 @@ export async function PUT(
       updateData.specialization = specialization;
     if (clinic !== undefined) updateData.clinic = clinic;
     if (image !== undefined) updateData.image = image;
-    if (consultationFee !== undefined)
-      updateData.consultationFee = consultationFee;
     if (isActive !== undefined) updateData.isActive = isActive;
 
     const updatedDoctor = await DoctorModel.update(doctorId, updateData);
