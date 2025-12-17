@@ -33,7 +33,11 @@ export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
               Manage Doctors
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Total: <span className="font-semibold text-foreground">{doctors.length}</span> doctors
+              Total:{" "}
+              <span className="font-semibold text-foreground">
+                {doctors.length}
+              </span>{" "}
+              doctors
             </p>
           </div>
         </div>
@@ -55,7 +59,8 @@ export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
               No Doctors Found
             </h3>
             <p className="text-muted-foreground max-w-md">
-              No doctors available. Click "Add Doctor" to create a new doctor profile.
+              No doctors available. Click &quot;Add Doctor&quot; to create a new
+              doctor profile.
             </p>
           </div>
         </Card>
@@ -112,7 +117,8 @@ export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
                                       const fallback = parent.querySelector(
                                         ".image-fallback"
                                       ) as HTMLElement;
-                                      if (fallback) fallback.style.display = "flex";
+                                      if (fallback)
+                                        fallback.style.display = "flex";
                                     }
                                   }}
                                 />
@@ -152,14 +158,16 @@ export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
                       <td className="p-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 ${
-                            doctor.status === "online" || doctor.status === "Available"
+                            doctor.status === "online" ||
+                            doctor.status === "Available"
                               ? "bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
                               : "bg-gray-50 dark:bg-gray-950/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800"
                           }`}
                         >
                           <div
                             className={`w-2 h-2 rounded-full ${
-                              doctor.status === "online" || doctor.status === "Available"
+                              doctor.status === "online" ||
+                              doctor.status === "Available"
                                 ? "bg-green-500"
                                 : "bg-gray-400"
                             }`}
@@ -193,7 +201,9 @@ export function DoctorsTab({ doctors, onDeleteDoctor }: DoctorsTabProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onDeleteDoctor(doctor._id.toString())}
+                            onClick={() =>
+                              onDeleteDoctor(doctor._id.toString())
+                            }
                             className="hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 dark:hover:text-red-400 border border-transparent hover:border-red-200 dark:hover:border-red-800"
                             title="Delete Doctor"
                           >

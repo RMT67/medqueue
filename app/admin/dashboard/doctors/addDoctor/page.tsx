@@ -74,7 +74,6 @@ export default function AddDoctorPage() {
 
     try {
       // Step 1: Create User first using apiFetch helper
-      console.log("🚀 ~ handleSubmit ~ formData.name:", formData.name);
       const userData = await apiFetch<
         RegisterResponse,
         { name: string; email: string; password: string; role: string }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import DoctorModel from "@/db/models/Doctor";
+import User from "@/db/models/User";
 import { Doctor } from "@/types/docterTypes";
 
 export async function GET(
@@ -98,10 +99,29 @@ export async function DELETE(
       );
     }
 
+    // Get doctor first to find the associated userId
+    const doctor = await DoctorModel.getDoctorById(doctorId);
+
+    if (!doctor) {
+      return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
+    }
+
+    // Delete the doctor
     await DoctorModel.delete(doctorId);
 
+    // Delete the associated user if userId exists
+    if (doctor.userId) {
+      try {
+        await User.findByIdAndDelete(doctor.userId.toString());
+        console.log("Associated user deleted:", doctor.userId.toString());
+      } catch (userDeleteError) {
+        console.error("Failed to delete associated user:", userDeleteError);
+        // Continue anyway - doctor is already deleted
+      }
+    }
+
     return NextResponse.json(
-      { message: "Doctor deleted successfully" },
+      { message: "Doctor and associated user deleted successfully" },
       { status: 200 }
     );
   } catch (error) {
