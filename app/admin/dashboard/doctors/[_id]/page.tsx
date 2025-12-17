@@ -10,7 +10,6 @@ import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { AdminHeader, AdminTabs } from "@/components/adminDashboard";
 import { Doctor } from "@/types/docterTypes";
-import Image from "next/image";
 
 export default function UpdateDoctorPage() {
   const router = useRouter();
@@ -28,7 +27,6 @@ export default function UpdateDoctorPage() {
     specialization: "",
     clinic: "",
     image: "",
-    consultationFee: "" as string | number,
     isActive: true,
   });
 
@@ -54,7 +52,6 @@ export default function UpdateDoctorPage() {
           specialization: doctor.specialization || "",
           clinic: doctor.clinic || "",
           image: doctor.image || "",
-          consultationFee: doctor.consultationFee || "",
           isActive: doctor.isActive ?? true,
         });
       } catch (error) {
@@ -110,7 +107,6 @@ export default function UpdateDoctorPage() {
         body: JSON.stringify({
           id: doctorId,
           ...formData,
-          consultationFee: Number(formData.consultationFee),
         }),
       });
 
@@ -258,38 +254,6 @@ export default function UpdateDoctorPage() {
                 />
               </div>
 
-              {/* Consultation Fee */}
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Consultation Fee <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="number"
-                  name="consultationFee"
-                  value={formData.consultationFee}
-                  onChange={handleInputChange}
-                  placeholder="0"
-                  min="0"
-                  className="h-11 border-2 focus:border-primary"
-                  required
-                />
-              </div>
-
-              {/* Image URL */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Image URL
-                </label>
-                <Input
-                  type="url"
-                  name="image"
-                  value={formData.image}
-                  onChange={handleInputChange}
-                  placeholder="https://example.com/image.jpg"
-                  className="h-11 border-2 focus:border-primary"
-                />
-              </div>
-
               {/* Active Status */}
               <div className="md:col-span-2">
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -306,26 +270,6 @@ export default function UpdateDoctorPage() {
                 </label>
               </div>
             </div>
-
-            {/* Image Preview */}
-            {formData.image && (
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Image Preview
-                </label>
-                <Image
-                  src={formData.image}
-                  alt="Doctor preview"
-                  className="w-32 h-32 rounded-lg object-cover border-2 border-border"
-                  onError={(e) => {
-                    e.currentTarget.src =
-                      "https://via.placeholder.com/150?text=No+Image";
-                  }}
-                  width={128}
-                  height={128}
-                />
-              </div>
-            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
