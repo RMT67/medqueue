@@ -15,6 +15,22 @@ export interface BookingType {
   status?: "pending" | "confirmed" | "cancelled" | "completed";
   bookingNumber?: string;
   queueNumber?: string;
+  consultationResult?: {
+    diagnosisNote: string;
+    prescribedMedicines: Array<{
+      medicineId: string;
+      medicineName: string;
+      medicineCode: string;
+      quantity: number;
+      dosage: string;
+    }>;
+    serviceProvided?: {
+      serviceId: string;
+      serviceName: string;
+      serviceCode: string;
+      price: number;
+    };
+  };
 }
 
 export interface BookingDisplayType {

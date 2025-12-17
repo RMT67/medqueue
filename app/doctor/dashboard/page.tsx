@@ -41,6 +41,29 @@ interface QueuePatient {
   bookingData: BookingType;
 }
 
+// Medicine API response type
+interface MedicineAPIResponse {
+  _id: string;
+  code: string;
+  name: string;
+  price: number;
+  unit: string;
+  category?: string;
+  stock?: number;
+  imageUrl?: string;
+}
+
+// Service API response type
+interface ServiceAPIResponse {
+  _id: string;
+  code: string;
+  name: string;
+  price: number;
+  category?: string;
+  duration?: number;
+  description?: string;
+}
+
 export default function DoctorDashboard() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
@@ -55,6 +78,41 @@ export default function DoctorDashboard() {
   const [doctorError, setDoctorError] = useState<string | null>(null);
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState<string | null>(null);
+  const [diagnosisNote, setDiagnosisNote] = useState("");
+  const [prescribedMedicines, setPrescribedMedicines] = useState<
+    Array<{
+      medicineId: string;
+      medicineName: string;
+      medicineCode: string;
+      quantity: number;
+      dosage: string;
+    }>
+  >([]);
+  const [selectedService, setSelectedService] = useState<{
+    serviceId: string;
+    serviceName: string;
+    serviceCode: string;
+    price: number;
+  } | null>(null);
+  const [medicines, setMedicines] = useState<
+    Array<{
+      _id: string;
+      code: string;
+      name: string;
+      price: number;
+      unit: string;
+    }>
+  >([]);
+  const [services, setServices] = useState<
+    Array<{
+      _id: string;
+      code: string;
+      name: string;
+      price: number;
+    }>
+  >([]);
+  const [medicinesLoading, setMedicinesLoading] = useState(false);
+  const [servicesLoading, setServicesLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "doctor")) {
@@ -93,6 +151,55 @@ export default function DoctorDashboard() {
     }
 
     fetchDoctor();
+  }, [user]);
+
+  // Fetch medicines and services for consultation
+  useEffect(() => {
+    async function fetchMedicinesAndServices() {
+      if (!user || user.role !== "doctor") return;
+
+      try {
+        // Fetch medicines
+        setMedicinesLoading(true);
+        const medResponse = await fetch("/api/item");
+        if (medResponse.ok) {
+          const medData = await medResponse.json();
+          setMedicines(
+            medData.data?.map((m: MedicineAPIResponse) => ({
+              _id: m._id,
+              code: m.code,
+              name: m.name,
+              price: m.price,
+              unit: m.unit,
+            })) || []
+          );
+        }
+
+        // Fetch services
+        setServicesLoading(true);
+        const svcResponse = await fetch("/api/service?activeOnly=true");
+        if (svcResponse.ok) {
+          const svcData = await svcResponse.json();
+          setServices(
+            Array.isArray(svcData)
+              ? svcData.map((s: ServiceAPIResponse) => ({
+                  _id: s._id,
+                  code: s.code,
+                  name: s.name,
+                  price: s.price,
+                }))
+              : []
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching medicines/services:", error);
+      } finally {
+        setMedicinesLoading(false);
+        setServicesLoading(false);
+      }
+    }
+
+    fetchMedicinesAndServices();
   }, [user]);
 
   // Fetch bookings for the logged-in doctor
@@ -271,6 +378,76 @@ export default function DoctorDashboard() {
   const handleStartSession = () => {
     setIsSessionActive(true);
     setSessionStartTime(new Date());
+    // Reset consultation data
+    setDiagnosisNote("");
+    setPrescribedMedicines([]);
+    setSelectedService(null);
+  };
+
+  const handleAddMedicine = (medicineId: string) => {
+    if (!medicineId) return;
+
+    const medicine = medicines.find((m) => m._id === medicineId);
+    if (!medicine) return;
+
+    // Check if already added
+    if (prescribedMedicines.find((pm) => pm.medicineId === medicineId)) {
+      Swal.fire("Duplicate Medicine", "Medicine already added", "warning");
+      return;
+    }
+
+    setPrescribedMedicines([
+      ...prescribedMedicines,
+      {
+        medicineId: medicine._id,
+        medicineName: medicine.name,
+        medicineCode: medicine.code,
+        quantity: 1,
+        dosage: "1x per day",
+      },
+    ]);
+  };
+
+  const handleRemoveMedicine = (medicineId: string) => {
+    setPrescribedMedicines(
+      prescribedMedicines.filter((pm) => pm.medicineId !== medicineId)
+    );
+  };
+
+  const handleUpdateMedicineQuantity = (
+    medicineId: string,
+    quantity: number
+  ) => {
+    setPrescribedMedicines(
+      prescribedMedicines.map((pm) =>
+        pm.medicineId === medicineId ? { ...pm, quantity } : pm
+      )
+    );
+  };
+
+  const handleUpdateMedicineDosage = (medicineId: string, dosage: string) => {
+    setPrescribedMedicines(
+      prescribedMedicines.map((pm) =>
+        pm.medicineId === medicineId ? { ...pm, dosage } : pm
+      )
+    );
+  };
+
+  const handleSelectService = (serviceId: string) => {
+    if (!serviceId) {
+      setSelectedService(null);
+      return;
+    }
+
+    const service = services.find((s) => s._id === serviceId);
+    if (service) {
+      setSelectedService({
+        serviceId: service._id,
+        serviceName: service.name,
+        serviceCode: service.code,
+        price: service.price,
+      });
+    }
   };
 
   const handleCallNext = () => {
@@ -357,7 +534,16 @@ export default function DoctorDashboard() {
 
         // Transform bookings to queue format
         const queueData: QueuePatient[] = todayBookings.map(
-          (booking: BookingType, idx: number) => {
+          (
+            booking: BookingType & {
+              patient?: {
+                fullName: string;
+                gender?: string;
+                dateOfBirth?: string;
+              } | null;
+            },
+            idx: number
+          ) => {
             // Get patient data from populated field
             const patientName = booking.patient?.fullName || "Unknown Patient";
             const patientGender = booking.patient?.gender;
@@ -441,7 +627,7 @@ export default function DoctorDashboard() {
       }
     } catch (error) {
       console.error("Error skipping patient:", error);
-      alert("Failed to skip patient");
+      Swal.fire("Error", "Failed to skip patient", "error");
     }
   };
 
@@ -449,6 +635,12 @@ export default function DoctorDashboard() {
     if (!sessionStartTime || !currentDoctor || !currentPatient) {
       setIsSessionActive(false);
       handleCallNext();
+      return;
+    }
+
+    // Validate consultation data
+    if (!diagnosisNote.trim()) {
+      Swal.fire("Validation Error", "Please enter a diagnosis note", "warning");
       return;
     }
 
@@ -460,7 +652,7 @@ export default function DoctorDashboard() {
 
       // Calculate new average time per patient
       let newAverageTime: number;
-      
+
       if (currentDoctor.averageTimePerPatient) {
         // Doctor has existing average, calculate new average
         newAverageTime = Math.round(
@@ -474,13 +666,38 @@ export default function DoctorDashboard() {
       // Update booking status to completed and adjust subsequent appointment times
       await apiFetch<
         { success: boolean; message: string },
-        { bookingId: string; status: string; actualDurationMinutes: number }
+        {
+          bookingId: string;
+          status: string;
+          actualDurationMinutes: number;
+          consultationResult: {
+            diagnosisNote: string;
+            prescribedMedicines: Array<{
+              medicineId: string;
+              medicineName: string;
+              medicineCode: string;
+              quantity: number;
+              dosage: string;
+            }>;
+            serviceProvided?: {
+              serviceId: string;
+              serviceName: string;
+              serviceCode: string;
+              price: number;
+            };
+          };
+        }
       >("/api/booking", {
         method: "PATCH",
-        body: { 
-          bookingId: currentPatient._id, 
+        body: {
+          bookingId: currentPatient._id,
           status: "completed",
-          actualDurationMinutes: durationMinutes
+          actualDurationMinutes: durationMinutes,
+          consultationResult: {
+            diagnosisNote,
+            prescribedMedicines,
+            serviceProvided: selectedService || undefined,
+          },
         },
       });
 
@@ -686,6 +903,156 @@ export default function DoctorDashboard() {
                           </p>
                         </div>
                       )}
+
+                      {/* Diagnosis Note */}
+                      {isSessionActive && (
+                        <div className="pt-4 border-t-2 border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                            Diagnosis Note
+                          </p>
+                          <textarea
+                            value={diagnosisNote}
+                            onChange={(e) => setDiagnosisNote(e.target.value)}
+                            placeholder="Enter diagnosis and conclusion here..."
+                            className="w-full min-h-[100px] p-3 text-sm rounded-lg border-2 border-border bg-background focus:border-primary focus:outline-none resize-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* Medicine Selection */}
+                      {isSessionActive && (
+                        <div className="pt-4 border-t-2 border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                            Prescribed Medicine
+                          </p>
+                          <select
+                            onChange={(e) => handleAddMedicine(e.target.value)}
+                            value=""
+                            disabled={medicinesLoading}
+                            className="w-full p-3 text-sm rounded-lg border-2 border-border bg-background focus:border-primary focus:outline-none"
+                          >
+                            <option value="">
+                              {medicinesLoading
+                                ? "Loading medicines..."
+                                : "Select medicine to add..."}
+                            </option>
+                            {medicines.map((medicine) => (
+                              <option key={medicine._id} value={medicine._id}>
+                                {medicine.name} - {medicine.code} (Rp{" "}
+                                {medicine.price.toLocaleString()})
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* List of prescribed medicines */}
+                          {prescribedMedicines.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {prescribedMedicines.map((pm) => (
+                                <div
+                                  key={pm.medicineId}
+                                  className="p-3 bg-muted/50 rounded-lg border border-border"
+                                >
+                                  <div className="flex justify-between items-start mb-2">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-semibold text-foreground">
+                                        {pm.medicineName}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {pm.medicineCode}
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        handleRemoveMedicine(pm.medicineId)
+                                      }
+                                      className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-xs text-muted-foreground">
+                                        Quantity
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={pm.quantity}
+                                        onChange={(e) =>
+                                          handleUpdateMedicineQuantity(
+                                            pm.medicineId,
+                                            parseInt(e.target.value) || 1
+                                          )
+                                        }
+                                        className="w-full p-2 text-sm rounded border border-border bg-background"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-muted-foreground">
+                                        Dosage
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={pm.dosage}
+                                        onChange={(e) =>
+                                          handleUpdateMedicineDosage(
+                                            pm.medicineId,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full p-2 text-sm rounded border border-border bg-background"
+                                        placeholder="e.g., 2x per day"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Service Selection */}
+                      {isSessionActive && (
+                        <div className="pt-4 border-t-2 border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                            Service Provided
+                          </p>
+                          <select
+                            value={selectedService?.serviceId || ""}
+                            onChange={(e) =>
+                              handleSelectService(e.target.value)
+                            }
+                            disabled={servicesLoading}
+                            className="w-full p-3 text-sm rounded-lg border-2 border-border bg-background focus:border-primary focus:outline-none"
+                          >
+                            <option value="">
+                              {servicesLoading
+                                ? "Loading services..."
+                                : "Select service..."}
+                            </option>
+                            {services.map((service) => (
+                              <option key={service._id} value={service._id}>
+                                {service.name} - {service.code} (Rp{" "}
+                                {service.price.toLocaleString()})
+                              </option>
+                            ))}
+                          </select>
+                          {selectedService && (
+                            <div className="mt-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                              <p className="text-sm font-semibold text-foreground">
+                                {selectedService.serviceName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {selectedService.serviceCode} - Rp{" "}
+                                {selectedService.price.toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="pt-4 border-t-2 border-border">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                           Status
