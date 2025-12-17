@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { DoctorCard } from "@/components/doctor-card";
 import { DoctorCardGrid } from "@/components/doctor-card-grid";
 import { FadeIn, StaggerChildren } from "@/components/animations";
 import { useAuth } from "@/lib/auth-context";
-import { Doctor } from "@/types/docterTypes";
 import {
   Search,
   Filter,
@@ -25,6 +24,20 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+
+interface DaySchedule {
+  hari: string;
+  available?: boolean;
+  availabel?: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+interface DoctorSchedule {
+  _id: string;
+  doctorId: string;
+  dayOfWeek: DaySchedule[];
+}
 
 interface SafeDoctor {
   id: string;
@@ -71,12 +84,60 @@ export default function DoctorsPageClient({
   );
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [schedules, setSchedules] = useState<Record<string, DoctorSchedule>>(
+    {}
+  );
 
   // debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  // Fetch schedules for all doctors from doctorSchedules collection
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      const scheduleMap: Record<string, DoctorSchedule> = {};
+
+      await Promise.all(
+        doctors.map(async (doctor) => {
+          try {
+            const response = await fetch(
+              `/api/schedules?doctorId=${doctor._id}`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              if (data?.dayOfWeek) {
+                scheduleMap[doctor._id] = {
+                  ...data,
+                  dayOfWeek: data.dayOfWeek.map((day: DaySchedule) => ({
+                    ...day,
+                    available:
+                      day.available !== undefined
+                        ? day.available
+                        : day.availabel !== undefined
+                        ? day.availabel
+                        : false,
+                  })),
+                };
+              }
+            }
+          } catch (error) {
+            console.error(
+              `Error fetching schedule for doctor ${doctor._id}:`,
+              error
+            );
+          }
+        })
+      );
+
+      setSchedules(scheduleMap);
+    };
+
+    if (doctors.length > 0) {
+      fetchSchedules();
+    }
+  }, [doctors]);
 
   // sync URL when debounced search changes
   useEffect(() => {
@@ -90,17 +151,48 @@ export default function DoctorsPageClient({
   const hasActiveFilters =
     debouncedSearchTerm !== "" || specialization !== "All Specializations";
 
+  // Helper function to format schedule display
+  const formatScheduleDisplay = useCallback(
+    (doctorId: string): string => {
+      const schedule = schedules[doctorId];
+      if (!schedule || !schedule.dayOfWeek || schedule.dayOfWeek.length === 0) {
+        return "Schedule not available";
+      }
+
+      const availableDays = schedule.dayOfWeek.filter(
+        (day) => day.available || day.availabel
+      );
+      if (availableDays.length === 0) {
+        return "No available days";
+      }
+
+      // Get first available day as sample
+      const firstDay = availableDays[0];
+      const dayName = firstDay.hari;
+      const timeRange = `${firstDay.startTime} - ${firstDay.endTime}`;
+
+      if (availableDays.length === 1) {
+        return `${dayName}: ${timeRange}`;
+      }
+
+      return `${dayName}: ${timeRange} (+${
+        availableDays.length - 1
+      } more days)`;
+    },
+    [schedules]
+  );
+
   const mappedDoctors = useMemo(
     () =>
       doctors.map((doctor) => ({
         ...doctor,
         id: doctor.id,
         _id: doctor._id,
-        schedule: doctor.defaultSchedule,
+        schedule: formatScheduleDisplay(doctor._id),
         rating: doctor.averageRating,
         reviews: doctor.totalReviews,
       })),
-    [doctors]
+    [doctors, formatScheduleDisplay]
   );
 
   const updateQuery = (params: Record<string, string | null>) => {
@@ -135,14 +227,14 @@ export default function DoctorsPageClient({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <Navigation
         isAuthenticated={!!user}
         userRole={user?.role}
         userName={user?.name}
       />
 
-      <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-12 lg:py-16 border-b border-border/50 overflow-hidden">
+      <section className="relative bg-linear-to-br from-primary/5 via-background to-accent/5 py-12 lg:py-16 border-b border-border/50 overflow-hidden">
         <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05]">
           <div
             className="absolute inset-0"
@@ -157,10 +249,10 @@ export default function DoctorsPageClient({
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="space-y-3">
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground flex items-center gap-4">
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg ring-4 ring-primary/10">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-linear-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg ring-4 ring-primary/10">
                     <UserSearch className="w-6 h-6 md:w-7 md:h-7 text-white" />
                   </div>
-                  <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  <span className="bg-linear-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                     Find Your <span className="text-primary">Doctor</span>
                   </span>
                 </h1>
@@ -169,15 +261,15 @@ export default function DoctorsPageClient({
                 </p>
               </div>
 
-              <div className="flex gap-4 flex-shrink-0">
+              <div className="flex gap-4 shrink-0">
                 <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center ring-2 ring-primary/10">
+                    <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary/20 to-primary/10 flex items-center justify-center ring-2 ring-primary/10">
                       <Users className="w-5 h-5 text-primary" />
                     </div>
                     <div>
                       <div className="text-xl font-bold text-foreground">
-                        {meta.total}+ 
+                        {meta.total}+
                       </div>
                       <div className="text-xs text-muted-foreground font-medium">
                         Doctors
@@ -187,7 +279,7 @@ export default function DoctorsPageClient({
                 </Card>
                 <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 dark:from-yellow-900/30 dark:to-yellow-900/20 flex items-center justify-center ring-2 ring-yellow-200/50 dark:ring-yellow-800/30">
+                    <div className="w-10 h-10 rounded-xl bg-linear-to-br from-yellow-100 to-yellow-50 dark:from-yellow-900/30 dark:to-yellow-900/20 flex items-center justify-center ring-2 ring-yellow-200/50 dark:ring-yellow-800/30">
                       <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                     </div>
                     <div>
@@ -230,7 +322,7 @@ export default function DoctorsPageClient({
                     className="w-full pl-12 pr-4 h-12 text-base border border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl transition-all"
                   />
                 </div>
-                <div className="flex gap-3 flex-shrink-0">
+                <div className="flex gap-3 shrink-0">
                   <Button
                     onClick={() => setShowFilters(!showFilters)}
                     variant={
@@ -268,14 +360,14 @@ export default function DoctorsPageClient({
                 <div className="mt-6 pt-6 border-t border-border/50 flex flex-wrap gap-3">
                   {debouncedSearchTerm && (
                     <div className="flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-semibold border border-primary/20 shadow-sm">
-                      <Search className="w-4 h-4 flex-shrink-0" />
-                      <span>"{debouncedSearchTerm}"</span>
+                      <Search className="w-4 h-4 shrink-0" />
+                      <span>&ldquo;{debouncedSearchTerm}&rdquo;</span>
                       <button
                         onClick={() => {
                           setSearchTerm("");
                           setDebouncedSearchTerm("");
                         }}
-                        className="hover:bg-primary/20 rounded-lg p-1 transition-colors flex-shrink-0"
+                        className="hover:bg-primary/20 rounded-lg p-1 transition-colors shrink-0"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -283,11 +375,13 @@ export default function DoctorsPageClient({
                   )}
                   {specialization !== "All Specializations" && (
                     <div className="flex items-center gap-2.5 px-4 py-2 bg-accent/10 text-accent rounded-xl text-sm font-semibold border border-accent/20 shadow-sm">
-                      <Stethoscope className="w-4 h-4 flex-shrink-0" />
+                      <Stethoscope className="w-4 h-4 shrink-0" />
                       <span>{specialization}</span>
                       <button
-                        onClick={() => handleSpecializationChange("All Specializations")}
-                        className="hover:bg-accent/20 rounded-lg p-1 transition-colors flex-shrink-0"
+                        onClick={() =>
+                          handleSpecializationChange("All Specializations")
+                        }
+                        className="hover:bg-accent/20 rounded-lg p-1 transition-colors shrink-0"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -332,7 +426,7 @@ export default function DoctorsPageClient({
                         }}
                         className={`px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 border-2 ${
                           specialization === spec
-                            ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-primary shadow-md"
+                            ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground border-primary shadow-md"
                             : "bg-card hover:bg-muted text-foreground border-border/50 hover:border-primary/30"
                         }`}
                       >
@@ -377,7 +471,7 @@ export default function DoctorsPageClient({
                       onClick={() => handleSpecializationChange(spec)}
                       className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 border-2 ${
                         specialization === spec
-                          ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-primary shadow-md"
+                          ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground border-primary shadow-md"
                           : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border-border/50 hover:border-primary/30"
                       }`}
                     >
@@ -393,7 +487,9 @@ export default function DoctorsPageClient({
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">
-                  {`${meta.total} ${meta.total === 1 ? "Doctor" : "Doctors"} Found`}
+                  {`${meta.total} ${
+                    meta.total === 1 ? "Doctor" : "Doctors"
+                  } Found`}
                 </h2>
                 {hasActiveFilters ? (
                   <p className="text-sm text-muted-foreground flex items-center gap-2.5 font-medium">
@@ -412,7 +508,7 @@ export default function DoctorsPageClient({
                   onClick={() => setViewMode("list")}
                   className={`p-2.5 rounded-lg transition-all duration-300 ${
                     viewMode === "list"
-                      ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
+                      ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                   title="List View"
@@ -423,7 +519,7 @@ export default function DoctorsPageClient({
                   onClick={() => setViewMode("grid")}
                   className={`p-2.5 rounded-lg transition-all duration-300 ${
                     viewMode === "grid"
-                      ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
+                      ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                   title="Grid View"
@@ -437,7 +533,7 @@ export default function DoctorsPageClient({
               <FadeIn direction="up" delay={0}>
                 <Card className="border border-border/50 p-12 lg:p-16 text-center shadow-xl bg-card/95 backdrop-blur-sm">
                   <div className="max-w-md mx-auto">
-                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
+                    <div className="w-24 h-24 rounded-3xl bg-linear-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
                       <Search className="w-12 h-12 text-muted-foreground" />
                     </div>
                     <h3 className="text-3xl font-bold text-foreground mb-4">
@@ -452,7 +548,7 @@ export default function DoctorsPageClient({
                       <Button
                         onClick={clearFilters}
                         size="lg"
-                        className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                        className="gap-2 bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
                       >
                         <X className="w-5 h-5" />
                         Clear All Filters
