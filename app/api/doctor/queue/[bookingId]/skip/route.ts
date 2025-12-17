@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
-import { emitQueueStatusChange, recalculateAndEmitCallTimeUpdates } from "@/lib/socket-server";
+import {
+  emitQueueStatusChange,
+  recalculateAndEmitCallTimeUpdates,
+} from "@/lib/socket-server";
+import DoctorModel from "@/db/models/Doctor";
 
 export async function PATCH(
   req: Request,
@@ -12,10 +16,7 @@ export async function PATCH(
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId, role } = verifyToken(authHeader);
@@ -39,13 +40,22 @@ export async function PATCH(
     }
 
     const db = await getDb();
-    const doctorObjectId = new ObjectId(userId);
+    // const doctorObjectId = new ObjectId(userId);
+    const doctorLogin = await DoctorModel.getDoctorByUserId(userId);
+    if (!doctorLogin) {
+      return NextResponse.json(
+        { error: "Doctor profile not found" },
+        { status: 404 }
+      );
+    }
+    const doctorObjectId = doctorLogin._id;
+
     const bookingsCollection = db.collection("bookings");
 
     // ✅ 3. Get booking and verify it belongs to this doctor
     const booking = await bookingsCollection.findOne({
       _id: new ObjectId(bookingId),
-      doctorId: doctorObjectId
+      doctorId: doctorObjectId,
     });
 
     if (!booking) {
@@ -77,29 +87,29 @@ export async function PATCH(
         $set: {
           status: "cancelled",
           cancelReason: "Skipped by doctor - Patient no-show",
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
     // ✅ 6. Get updated booking
     const updatedBooking = await bookingsCollection.findOne({
-      _id: new ObjectId(bookingId)
+      _id: new ObjectId(bookingId),
     });
 
     // ✅ 7. Emit socket event for status change
     emitQueueStatusChange(bookingId, {
-      queueStatus: "cancelled"
+      queueStatus: "cancelled",
     });
 
     // ✅ 8. Recalculate and emit call time updates to all remaining patients in the same queue
     try {
-      const scheduleDate = booking.scheduleDate 
-        ? new Date(booking.scheduleDate) 
-        : booking.appointmentTime 
-        ? new Date(booking.appointmentTime) 
+      const scheduleDate = booking.scheduleDate
+        ? new Date(booking.scheduleDate)
+        : booking.appointmentTime
+        ? new Date(booking.appointmentTime)
         : new Date();
-      
+
       await recalculateAndEmitCallTimeUpdates(
         booking.doctorId.toString(),
         scheduleDate,
@@ -115,8 +125,8 @@ export async function PATCH(
       booking: {
         bookingId: updatedBooking?._id.toString(),
         status: updatedBooking?.status,
-        cancelReason: updatedBooking?.cancelReason
-      }
+        cancelReason: updatedBooking?.cancelReason,
+      },
     });
   } catch (error) {
     console.error("Error skipping patient:", error);
@@ -126,4 +136,3 @@ export async function PATCH(
     );
   }
 }
-

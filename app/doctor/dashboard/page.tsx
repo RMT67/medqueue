@@ -25,6 +25,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Doctor } from "@/types/docterTypes";
 import { BookingType } from "@/types/bookingType";
+import Swal from "sweetalert2";
 
 // Transform booking data to queue format for UI
 interface QueuePatient {
@@ -284,9 +285,9 @@ export default function DoctorDashboard() {
     if (!currentPatient || !user) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("medqueue_token");
       if (!token) {
-        alert("Authentication required");
+        Swal.fire("Authentication required", "Please log in again.", "warning");
         return;
       }
 
@@ -303,13 +304,13 @@ export default function DoctorDashboard() {
 
       if (!response.ok) {
         const error = await response.json();
-        alert(error.error || "Failed to skip patient");
+        Swal.fire("Error", error.error || "Failed to skip patient", "error");
         return;
       }
 
       // Refresh bookings to get updated queue (exclude cancelled/skipped)
       if (!currentDoctor) {
-        alert("Doctor profile not found");
+        Swal.fire("Error", "Doctor profile not found", "error");
         return;
       }
 
@@ -356,8 +357,7 @@ export default function DoctorDashboard() {
         const queueData: QueuePatient[] = todayBookings.map(
           (booking: BookingType, idx: number) => {
             // Get patient data from populated field
-            const patientName =
-              booking.patient?.fullName || "Unknown Patient";
+            const patientName = booking.patient?.fullName || "Unknown Patient";
             const patientGender = booking.patient?.gender;
             let patientAge: number | undefined;
 
