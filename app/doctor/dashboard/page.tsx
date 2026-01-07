@@ -133,13 +133,15 @@ export default function DoctorDashboard() {
       try {
         setDoctorLoading(true);
         setDoctorError(null);
+        console.log("Begin fetching doctor data for dashboard...");
         const response = await apiFetch<{ doctor: Doctor }, void>(
-          `/api/doctor?userId=${user._id}`,
+          `/api/doctor/${user._id}`,
           {
             method: "GET",
             skipAuth: true,
           }
         );
+        console.log("Fetching completed");
         setCurrentDoctor(response.doctor);
       } catch (err) {
         console.error("Error fetching doctor:", err);

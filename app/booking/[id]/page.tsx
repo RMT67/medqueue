@@ -50,8 +50,7 @@ interface DoctorSchedule {
   dayOfWeek: DaySchedule[];
 }
 
-const API_BASE_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 function buildApiUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -62,26 +61,29 @@ function buildApiUrl(path: string) {
 // Helper function to normalize day names (handle both English and Indonesian)
 function normalizeDayName(dayName: string): string {
   const dayMap: Record<string, string> = {
-    "Minggu": "Sunday",
-    "Senin": "Monday",
-    "Selasa": "Tuesday",
-    "Rabu": "Wednesday",
-    "Kamis": "Thursday",
-    "Jumat": "Friday",
-    "Sabtu": "Saturday",
-    "Sunday": "Sunday",
-    "Monday": "Monday",
-    "Tuesday": "Tuesday",
-    "Wednesday": "Wednesday",
-    "Thursday": "Thursday",
-    "Friday": "Friday",
-    "Saturday": "Saturday",
+    Minggu: "Sunday",
+    Senin: "Monday",
+    Selasa: "Tuesday",
+    Rabu: "Wednesday",
+    Kamis: "Thursday",
+    Jumat: "Friday",
+    Sabtu: "Saturday",
+    Sunday: "Sunday",
+    Monday: "Monday",
+    Tuesday: "Tuesday",
+    Wednesday: "Wednesday",
+    Thursday: "Thursday",
+    Friday: "Friday",
+    Saturday: "Saturday",
   };
   return dayMap[dayName] || dayName;
 }
 
 // Helper function to get day name in both formats
-function getDayNames(dayIndex: number): { english: string; indonesian: string } {
+function getDayNames(dayIndex: number): {
+  english: string;
+  indonesian: string;
+} {
   const dayOfWeekMapEnglish: { [key: number]: string } = {
     0: "Sunday",
     1: "Monday",
@@ -187,10 +189,7 @@ export default function BookingPage({
         setScheduleMessage(null);
         // Use query parameter to get schedule by doctorId
         const response = await fetch(scheduleUrl);
-        console.log(
-          "[booking] fetchDoctorSchedule status:",
-          response.status
-        );
+        console.log("[booking] fetchDoctorSchedule status:", response.status);
 
         if (response.status === 404) {
           console.warn("[booking] schedule not found", { scheduleUrl });
@@ -252,12 +251,17 @@ export default function BookingPage({
       // Find schedule for selected day - try both English and Indonesian formats
       const daySchedule = doctorSchedule.dayOfWeek.find((day) => {
         const hariNormalized = normalizeDayName(day.hari);
-        const isAvailable = day.available !== undefined ? day.available : (day.availabel !== undefined ? day.availabel : false);
+        const isAvailable =
+          day.available !== undefined
+            ? day.available
+            : day.availabel !== undefined
+            ? day.availabel
+            : false;
         return (
-          (hariNormalized === dayNames.english || 
-           hariNormalized === dayNames.indonesian ||
-           day.hari === dayNames.english ||
-           day.hari === dayNames.indonesian) && 
+          (hariNormalized === dayNames.english ||
+            hariNormalized === dayNames.indonesian ||
+            day.hari === dayNames.english ||
+            day.hari === dayNames.indonesian) &&
           isAvailable
         );
       });
@@ -436,12 +440,17 @@ export default function BookingPage({
       // Find schedule - try both English and Indonesian formats
       const daySchedule = doctorSchedule.dayOfWeek.find((day) => {
         const hariNormalized = normalizeDayName(day.hari);
-        const isAvailable = day.available !== undefined ? day.available : (day.availabel !== undefined ? day.availabel : false);
+        const isAvailable =
+          day.available !== undefined
+            ? day.available
+            : day.availabel !== undefined
+            ? day.availabel
+            : false;
         return (
-          (hariNormalized === dayNames.english || 
-           hariNormalized === dayNames.indonesian ||
-           day.hari === dayNames.english ||
-           day.hari === dayNames.indonesian) && 
+          (hariNormalized === dayNames.english ||
+            hariNormalized === dayNames.indonesian ||
+            day.hari === dayNames.english ||
+            day.hari === dayNames.indonesian) &&
           isAvailable
         );
       });
@@ -748,8 +757,9 @@ export default function BookingPage({
                       Schedule not available
                     </p>
                     <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">
-                      We couldn&apos;t load a schedule for this doctor yet. You can still choose a
-                      date, and we&apos;ll update once a schedule is added.
+                      We couldn&apos;t load a schedule for this doctor yet. You
+                      can still choose a date, and we&apos;ll update once a
+                      schedule is added.
                     </p>
                   </div>
                 )}

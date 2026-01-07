@@ -13,7 +13,7 @@ function getDatabaseName(): string {
   try {
     const url = new URL(uri);
     const dbName = url.pathname.replace("/", "");
-    return dbName || "medqueue_test";
+    return dbName || "medqueue";
   } catch {
     // If URI parsing fails, try to extract from connection string
     const dbMatch = uri.match(/\/([^?]+)(\?|$)/);
@@ -21,7 +21,7 @@ function getDatabaseName(): string {
       return dbMatch[1];
     }
     // Fallback to default
-    return "medqueue_test";
+    return "medqueue";
   }
 }
 

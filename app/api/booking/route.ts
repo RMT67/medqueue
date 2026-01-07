@@ -148,10 +148,7 @@ export async function POST(req: Request) {
     // ✅ 0. Authentication - Verify patient token
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     let userId: string;
@@ -189,22 +186,25 @@ export async function POST(req: Request) {
     const db = await getDb();
     const bookingsCollection = db.collection("bookings");
     const patientObjectId = new ObjectId(userId);
-    
-    const activeBookings = await bookingsCollection.find({
-      patientId: patientObjectId,
-      status: { $in: ["confirmed", "in-progress"] }
-    }).toArray();
+
+    const activeBookings = await bookingsCollection
+      .find({
+        patientId: patientObjectId,
+        status: { $in: ["confirmed", "in-progress"] },
+      })
+      .toArray();
 
     if (activeBookings.length > 0) {
       return NextResponse.json(
-        { 
-          message: "You already have an active appointment. Please complete or cancel your current appointment before booking a new one.",
+        {
+          message:
+            "You already have an active appointment. Please complete or cancel your current appointment before booking a new one.",
           existingBooking: {
             bookingId: activeBookings[0]._id.toString(),
             bookingNumber: activeBookings[0].bookingNumber,
             status: activeBookings[0].status,
-            appointmentTime: activeBookings[0].appointmentTime
-          }
+            appointmentTime: activeBookings[0].appointmentTime,
+          },
         },
         { status: 400 }
       );
@@ -382,8 +382,10 @@ export async function PATCH(req: Request) {
       console.log("🚀 ~ PATCH ~ consultationResult:", consultationResult);
       if (consultationResult) {
         const collection = await Booking.collection();
-        const booking = await collection.findOne({ _id: new ObjectId(bookingId) });
-        
+        const booking = await collection.findOne({
+          _id: new ObjectId(bookingId),
+        });
+
         if (!booking) {
           return NextResponse.json(
             { success: false, message: "Booking not found" },
@@ -399,21 +401,25 @@ export async function PATCH(req: Request) {
 
         // Create medical record from consultationResult
         try {
-          const MedicalRecordModel = (await import("@/db/models/MedicalRecord")).default;
-          
+          const MedicalRecordModel = (await import("@/db/models/MedicalRecord"))
+            .default;
+
           // Check if medical record already exists for this booking
-          const existingRecord = await MedicalRecordModel.getByBookingId(bookingId);
-          
+          const existingRecord = await MedicalRecordModel.getByBookingId(
+            bookingId
+          );
+
           if (!existingRecord) {
             // Map consultationResult to medical record format
-            const prescriptions = consultationResult.prescribedMedicines?.map(med => ({
-              medicineId: med.medicineId,
-              medicineName: med.medicineName,
-              dosage: med.dosage,
-              quantity: med.quantity,
-              unitPrice: med.unitPrice,
-              notes: undefined // consultationResult doesn't have notes per medicine
-            })) || [];
+            const prescriptions =
+              consultationResult.prescribedMedicines?.map((med) => ({
+                medicineId: med.medicineId,
+                medicineName: med.medicineName,
+                dosage: med.dosage,
+                quantity: med.quantity,
+                unitPrice: med.unitPrice,
+                notes: undefined, // consultationResult doesn't have notes per medicine
+              })) || [];
 
             const medicalRecordData = {
               patientId: new ObjectId(booking.patientId),
@@ -421,31 +427,44 @@ export async function PATCH(req: Request) {
               bookingId: new ObjectId(bookingId),
               diagnosis: consultationResult.diagnosisNote || "",
               prescriptions: prescriptions,
-              type: consultationResult.serviceProvided ? "Consultation" : "Prescription" as const,
+              type: consultationResult.serviceProvided
+                ? "Consultation"
+                : ("Prescription" as const),
               ...(consultationResult.serviceProvided && {
                 serviceId: consultationResult.serviceProvided.serviceId,
                 serviceName: consultationResult.serviceProvided.serviceName,
-                servicePrice: consultationResult.serviceProvided.price
-              })
+                servicePrice: consultationResult.serviceProvided.price,
+              }),
             };
 
-            const medicalRecord = await MedicalRecordModel.create(medicalRecordData);
-            console.log(`✅ Medical record created from consultationResult for booking ${bookingId}:`, medicalRecord._id?.toString());
+            const medicalRecord = await MedicalRecordModel.create(
+              medicalRecordData
+            );
+            console.log(
+              `✅ Medical record created from consultationResult for booking ${bookingId}:`,
+              medicalRecord._id?.toString()
+            );
 
             // Auto-generate invoice if medical record has prescriptions or service
             const hasPrescriptions = prescriptions.length > 0;
             const hasService = !!consultationResult.serviceProvided;
-            
+
             if (hasPrescriptions || hasService) {
               try {
-                const InvoiceModel = (await import("@/db/models/Invoice")).default;
-                const ServiceModel = (await import("@/db/models/ServiceModel")).default;
-                const MedicineModel = (await import("@/db/models/Medicine")).default;
-                const { generateInvoiceNumber, calculateDueDate } = await import("@/lib/invoice-utils");
-                
+                const InvoiceModel = (await import("@/db/models/Invoice"))
+                  .default;
+                const ServiceModel = (await import("@/db/models/ServiceModel"))
+                  .default;
+                const MedicineModel = (await import("@/db/models/Medicine"))
+                  .default;
+                const { generateInvoiceNumber, calculateDueDate } =
+                  await import("@/lib/invoice-utils");
+
                 // Check if invoice already exists
-                const existingInvoice = await InvoiceModel.getByMedicalRecordId(medicalRecord._id.toString());
-                
+                const existingInvoice = await InvoiceModel.getByMedicalRecordId(
+                  medicalRecord._id.toString()
+                );
+
                 if (!existingInvoice) {
                   // Calculate Invoice Items
                   const items: Array<{
@@ -458,14 +477,16 @@ export async function PATCH(req: Request) {
 
                   // Add Service (Consultation/Check-up/etc) - dari Services collection
                   if (consultationResult.serviceProvided) {
-                    const service = await ServiceModel.getServiceById(consultationResult.serviceProvided.serviceId);
+                    const service = await ServiceModel.getServiceById(
+                      consultationResult.serviceProvided.serviceId
+                    );
                     if (service && service.isActive) {
                       items.push({
                         type: "service",
                         name: service.name,
                         quantity: 1,
                         unitPrice: service.price,
-                        total: service.price
+                        total: service.price,
                       });
                     } else {
                       items.push({
@@ -473,12 +494,14 @@ export async function PATCH(req: Request) {
                         name: consultationResult.serviceProvided.serviceName,
                         quantity: 1,
                         unitPrice: consultationResult.serviceProvided.price,
-                        total: consultationResult.serviceProvided.price
+                        total: consultationResult.serviceProvided.price,
                       });
                     }
                   } else {
                     // Fallback: Use doctor consultation fee if no serviceId
-                    const doctor = await DoctorModel.getDoctorById(booking.doctorId.toString());
+                    const doctor = await DoctorModel.getDoctorById(
+                      booking.doctorId.toString()
+                    );
                     const consultationFee = doctor?.consultationFee || 0;
                     if (consultationFee > 0) {
                       items.push({
@@ -486,7 +509,7 @@ export async function PATCH(req: Request) {
                         name: "Consultation Fee",
                         quantity: 1,
                         unitPrice: consultationFee,
-                        total: consultationFee
+                        total: consultationFee,
                       });
                     }
                   }
@@ -495,52 +518,67 @@ export async function PATCH(req: Request) {
                   if (prescriptions.length > 0) {
                     for (const prescription of prescriptions) {
                       if (prescription.medicineId) {
-                        const medicine = await MedicineModel.getById(prescription.medicineId);
-                        
+                        const medicine = await MedicineModel.getById(
+                          prescription.medicineId
+                        );
+
                         if (medicine && medicine.isActive) {
                           let unitPrice = prescription.unitPrice;
-                          
-                          if (medicine.packaging && prescription.quantity >= medicine.packaging.unitPerPack) {
-                            const packsNeeded = Math.ceil(prescription.quantity / medicine.packaging.unitPerPack);
-                            unitPrice = medicine.packaging.packPrice * packsNeeded;
+
+                          if (
+                            medicine.packaging &&
+                            prescription.quantity >=
+                              medicine.packaging.unitPerPack
+                          ) {
+                            const packsNeeded = Math.ceil(
+                              prescription.quantity /
+                                medicine.packaging.unitPerPack
+                            );
+                            unitPrice =
+                              medicine.packaging.packPrice * packsNeeded;
                           } else {
                             unitPrice = medicine.price * prescription.quantity;
                           }
-                          
+
                           const medicineTotal = unitPrice;
-                          
+
                           items.push({
                             type: "medicine",
                             name: medicine.name,
                             quantity: prescription.quantity,
                             unitPrice: unitPrice / prescription.quantity,
-                            total: medicineTotal
+                            total: medicineTotal,
                           });
                         } else {
-                          const medicineTotal = prescription.unitPrice * prescription.quantity;
+                          const medicineTotal =
+                            prescription.unitPrice * prescription.quantity;
                           items.push({
                             type: "medicine",
                             name: prescription.medicineName,
                             quantity: prescription.quantity,
                             unitPrice: prescription.unitPrice,
-                            total: medicineTotal
+                            total: medicineTotal,
                           });
                         }
                       } else {
-                        const medicineTotal = prescription.unitPrice * prescription.quantity;
+                        const medicineTotal =
+                          prescription.unitPrice * prescription.quantity;
                         items.push({
                           type: "medicine",
                           name: prescription.medicineName,
                           quantity: prescription.quantity,
                           unitPrice: prescription.unitPrice,
-                          total: medicineTotal
+                          total: medicineTotal,
                         });
                       }
                     }
                   }
 
                   // Calculate Totals
-                  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+                  const subtotal = items.reduce(
+                    (sum, item) => sum + item.total,
+                    0
+                  );
                   const total = subtotal;
 
                   // Generate Invoice Number
@@ -562,24 +600,36 @@ export async function PATCH(req: Request) {
                     items: items,
                     subtotal: subtotal,
                     total: total,
-                    status: "pending"
+                    status: "pending",
                   });
 
-                  console.log(`✅ Invoice auto-generated from consultationResult for booking ${bookingId}`);
+                  console.log(
+                    `✅ Invoice auto-generated from consultationResult for booking ${bookingId}`
+                  );
                 } else {
-                  console.log(`ℹ️ Invoice already exists for medical record ${medicalRecord._id.toString()}`);
+                  console.log(
+                    `ℹ️ Invoice already exists for medical record ${medicalRecord._id.toString()}`
+                  );
                 }
               } catch (invoiceError) {
-                console.error("⚠️ Error auto-generating invoice from consultationResult:", invoiceError);
+                console.error(
+                  "⚠️ Error auto-generating invoice from consultationResult:",
+                  invoiceError
+                );
                 // Don't fail the request if invoice generation fails
                 // Medical record is still created
               }
             }
           } else {
-            console.log(`ℹ️ Medical record already exists for booking ${bookingId}`);
+            console.log(
+              `ℹ️ Medical record already exists for booking ${bookingId}`
+            );
           }
         } catch (medicalRecordError) {
-          console.error("⚠️ Error creating medical record from consultationResult:", medicalRecordError);
+          console.error(
+            "⚠️ Error creating medical record from consultationResult:",
+            medicalRecordError
+          );
           // Don't fail the request if medical record creation fails
           // The consultationResult is still saved to booking
         }

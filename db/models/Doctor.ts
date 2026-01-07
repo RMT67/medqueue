@@ -139,11 +139,12 @@ export default class DoctorModel {
     return collection.countDocuments(query);
   }
 
-  static async getDoctorById(doctorId: string): Promise<Doctor | null> {
+  static async getDoctorById(_id: string): Promise<Doctor | null> {
     const collection = await this.collection();
-    return collection.findOne({
-      _id: new ObjectId(doctorId),
+    const doctorData = collection.findOne({
+      _id: new ObjectId(_id),
     }) as Promise<Doctor | null>;
+    return doctorData;
   }
 
   static async getDoctorByUserId(userId: string): Promise<Doctor | null> {

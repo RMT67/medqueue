@@ -1,53 +1,61 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Navigation } from "@/components/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Eye, EyeOff, Stethoscope, Mail, Lock, LogIn, ArrowLeft } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
-import { ScaleIn } from "@/components/animations"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Navigation } from "@/components/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Eye,
+  EyeOff,
+  Stethoscope,
+  Mail,
+  Lock,
+  LogIn,
+  ArrowLeft,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { ScaleIn } from "@/components/animations";
 
 export default function DoctorLoginPage() {
-  const router = useRouter()
-  const { login } = useAuth()
+  const router = useRouter();
+  const { login } = useAuth();
 
-  const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
+    e.preventDefault();
+    setError("");
 
     if (!email || !password) {
-      setError("Please fill in all fields")
-      return
+      setError("Please fill in all fields");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const success = await login(email, password, "doctor")
+      const success = await login(email, password, "doctor");
       if (success) {
-        router.push("/doctor/dashboard")
+        router.push("/doctor/dashboard");
       } else {
-        setError("Invalid email or password")
+        setError("Invalid email or password");
       }
     } catch (err) {
-      setError("An error occurred. Please try again.")
+      setError("An error occurred. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <Navigation />
 
       <div className="relative min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12 overflow-hidden">
@@ -70,7 +78,10 @@ export default function DoctorLoginPage() {
             <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-3xl p-8 lg:p-10 shadow-2xl">
               {/* Back Button */}
               <Link href="/">
-                <Button variant="ghost" className="mb-4 gap-2 text-muted-foreground hover:text-foreground">
+                <Button
+                  variant="ghost"
+                  className="mb-4 gap-2 text-muted-foreground hover:text-foreground"
+                >
                   <ArrowLeft className="w-4 h-4" />
                   Back to Home
                 </Button>
@@ -81,8 +92,12 @@ export default function DoctorLoginPage() {
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4 shadow-lg">
                   <Stethoscope className="w-8 h-8 text-white" />
                 </div>
-                <h1 className="text-3xl font-bold text-foreground mb-2">Doctor Login</h1>
-                <p className="text-muted-foreground">Sign in to manage your patient queue</p>
+                <h1 className="text-3xl font-bold text-foreground mb-2">
+                  Doctor Login
+                </h1>
+                <p className="text-muted-foreground">
+                  Sign in to manage your patient queue
+                </p>
               </div>
 
               {error && (
@@ -133,17 +148,28 @@ export default function DoctorLoginPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="rounded border-2 border-border" disabled={isLoading} />
+                    <input
+                      type="checkbox"
+                      className="rounded border-2 border-border"
+                      disabled={isLoading}
+                    />
                     <span className="text-muted-foreground">Remember me</span>
                   </label>
-                  <Link href="#" className="text-primary hover:underline font-medium transition-colors">
+                  <Link
+                    href="#"
+                    className="text-primary hover:underline font-medium transition-colors"
+                  >
                     Forgot password?
                   </Link>
                 </div>
@@ -171,5 +197,5 @@ export default function DoctorLoginPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
