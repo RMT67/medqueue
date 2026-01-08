@@ -135,13 +135,13 @@ export default function DoctorDashboard() {
         setDoctorError(null);
         console.log("Begin fetching doctor data for dashboard...");
         const response = await apiFetch<{ doctor: Doctor }, void>(
-          `/api/doctor/${user._id}`,
+          `/api/doctor/${user._id}?role=${user.role}`,
           {
             method: "GET",
             skipAuth: true,
           }
         );
-        console.log("Fetching completed");
+        console.log("Fetching data doctor completed");
         setCurrentDoctor(response.doctor);
       } catch (err) {
         console.error("Error fetching doctor:", err);
@@ -154,8 +154,8 @@ export default function DoctorDashboard() {
       }
     }
 
-    fetchDoctor();
-  }, [user]);
+    if (!isLoading) fetchDoctor();
+  }, [user, isLoading]);
 
   // Fetch medicines and services for consultation
   useEffect(() => {
@@ -165,8 +165,12 @@ export default function DoctorDashboard() {
       try {
         // Fetch medicines
         setMedicinesLoading(true);
+        console.log("Begin fetching medicine data...");
+
         const medResponse = await fetch("/api/item");
         if (medResponse.ok) {
+          console.log("Fetching data medicine completed");
+
           const medData = await medResponse.json();
           setMedicines(
             medData.data?.map((m: MedicineAPIResponse) => ({
@@ -181,8 +185,11 @@ export default function DoctorDashboard() {
 
         // Fetch services
         setServicesLoading(true);
+        console.log("Begin fetching service data...");
+
         const svcResponse = await fetch("/api/service?activeOnly=true");
         if (svcResponse.ok) {
+          console.log("Fetching data service completed");
           const svcData = await svcResponse.json();
           setServices(
             Array.isArray(svcData)
@@ -218,6 +225,7 @@ export default function DoctorDashboard() {
       if (!currentDoctor) return;
       if (doctorLoading) return;
 
+      console.log("Begin fetching bookings for dashboard...");
       try {
         setBookingsLoading(true);
         setBookingsError(null);
@@ -237,9 +245,12 @@ export default function DoctorDashboard() {
             >;
           },
           void
-        >(`/api/booking?doctorId=${currentDoctor._id}&populate=patient`, {
-          method: "GET",
-        });
+        >(
+          `/api/booking?doctorId=${currentDoctor._id}&populate=patient&role=${user.role}`,
+          {
+            method: "GET",
+          }
+        );
 
         if (response.success && response.data) {
           // Filter today's bookings with status "confirmed"
@@ -361,6 +372,7 @@ export default function DoctorDashboard() {
         setQueue([]);
       } finally {
         setBookingsLoading(false);
+        console.log("Fetching bookings for dashboard completed");
       }
     }
 

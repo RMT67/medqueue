@@ -148,7 +148,6 @@ export default class DoctorModel {
   }
 
   static async getDoctorByUserId(userId: string): Promise<Doctor | null> {
-    console.log("🚀 ~ DoctorModel ~ getDoctorByUserId ~ userId:", userId);
     const collection = await this.collection();
     const doctor = await collection.findOne({
       userId: new ObjectId(userId),

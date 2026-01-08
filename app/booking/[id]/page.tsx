@@ -135,7 +135,8 @@ export default function BookingPage({
   // Fetch doctor data from API
   useEffect(() => {
     const fetchDoctor = async () => {
-      const doctorUrl = buildApiUrl(`/api/doctor/${id}`);
+      const role = user?.role || "patient";
+      const doctorUrl = buildApiUrl(`/api/doctor/${id}?role=${role}`);
       console.log("[booking] fetchDoctor url:", doctorUrl);
       try {
         setDoctorLoading(true);
@@ -168,10 +169,10 @@ export default function BookingPage({
       }
     };
 
-    if (id) {
+    if (id && !isLoading) {
       fetchDoctor();
     }
-  }, [id]);
+  }, [id, isLoading, user?.role]);
 
   // Fetch doctor schedule from API
   useEffect(() => {

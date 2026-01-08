@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const doctorId = searchParams.get("doctorId");
     const populate = searchParams.get("populate");
+    const qRole = searchParams.get("role");
 
     if (!doctorId) {
       return NextResponse.json(
@@ -41,7 +42,12 @@ export async function GET(req: Request) {
     }
 
     // Authorization check: ensure requester is a doctor
-    const authHeader = req.headers.get("authorization");
+    let authHeader = req.headers.get("authorization");
+    console.log("🚀 ~ GET ~ authHeader:", authHeader);
+    if (qRole === "doctor") {
+      authHeader = authHeader?.split(" ")[1] || null;
+    }
+
     if (authHeader) {
       try {
         const { userId, role } = verifyToken(authHeader);
@@ -148,6 +154,7 @@ export async function POST(req: Request) {
   try {
     // ✅ 0. Authentication - Verify patient token
     const authHeader = req.headers.get("authorization");
+    console.log("🚀 ~ POST ~ authHeader:", authHeader);
     if (!authHeader) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
