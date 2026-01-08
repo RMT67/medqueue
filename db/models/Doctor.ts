@@ -207,7 +207,8 @@ export default class DoctorModel {
       doctorData.queueCode = generateQueueCode(doctorCount);
     }
 
-    // change type of
+    // change type of userId to ObjectId
+    doctorData.userId = new ObjectId(doctorData.userId) as unknown as string;
 
     doctorData = {
       ...doctorData,

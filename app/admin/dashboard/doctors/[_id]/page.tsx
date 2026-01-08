@@ -32,13 +32,13 @@ export default function UpdateDoctorPage() {
 
   // Fetch doctor data
   useEffect(() => {
-    const fetchDoctor = async () => {
+    const fetchDoctor = async (role: string) => {
       if (!doctorId) return;
 
       try {
         setIsLoading(true);
         setError(null);
-        const response = await fetch(`/api/doctor/${doctorId}`);
+        const response = await fetch(`/api/doctor/${doctorId}?role=${role}`);
 
         if (!response.ok) {
           throw new Error("Failed to fetch doctor data");
@@ -63,7 +63,7 @@ export default function UpdateDoctorPage() {
     };
 
     if (user?.role === "admin") {
-      fetchDoctor();
+      fetchDoctor(user.role);
     }
   }, [doctorId, user]);
 

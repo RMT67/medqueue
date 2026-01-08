@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
-import { emitQueueStatusChange, recalculateAndEmitCallTimeUpdates } from "@/lib/socket-server";
+import {
+  emitQueueStatusChange,
+  recalculateAndEmitCallTimeUpdates,
+} from "@/lib/socket-server";
 
 export async function PATCH(
   req: Request,
@@ -11,11 +14,8 @@ export async function PATCH(
   try {
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId, role } = verifyToken(authHeader);
@@ -29,7 +29,7 @@ export async function PATCH(
     // ✅ Handle Next.js 15 params (can be Promise)
     const resolvedParams = params instanceof Promise ? await params : params;
     const { bookingId } = resolvedParams;
-    
+
     // ✅ Parse body safely (handle empty body)
     let cancelReason = "";
     try {
@@ -53,14 +53,14 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    
+
     if (typeof bookingId !== "string") {
       return NextResponse.json(
         { error: "Invalid booking ID format" },
         { status: 400 }
       );
     }
-    
+
     if (!ObjectId.isValid(bookingId)) {
       return NextResponse.json(
         { error: "Invalid booking ID" },
@@ -73,20 +73,18 @@ export async function PATCH(
     // ✅ 3. Get booking and verify ownership
     // Try to find booking first without patientId filter to see if it exists
     const bookingExists = await bookingsCollection.findOne({
-      _id: bookingObjectId
+      _id: bookingObjectId,
     });
 
     if (!bookingExists) {
-      return NextResponse.json(
-        { error: "Booking not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
     // Check if patientId matches (handle both ObjectId and string formats)
-    const bookingPatientId = bookingExists.patientId instanceof ObjectId
-      ? bookingExists.patientId.toString()
-      : bookingExists.patientId?.toString();
+    const bookingPatientId =
+      bookingExists.patientId instanceof ObjectId
+        ? bookingExists.patientId.toString()
+        : bookingExists.patientId?.toString();
     const requestPatientId = patientObjectId.toString();
 
     if (bookingPatientId !== requestPatientId) {
@@ -120,36 +118,39 @@ export async function PATCH(
         $set: {
           status: "cancelled",
           cancelReason: cancelReason || "",
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
 
     // ✅ 5. Get updated booking
     const updatedBooking = await bookingsCollection.findOne({
-      _id: new ObjectId(bookingId)
+      _id: new ObjectId(bookingId),
     });
 
     // ✅ 6. Emit socket event for status change
     emitQueueStatusChange(bookingId, {
-      queueStatus: "cancelled"
+      queueStatus: "cancelled",
     });
 
     // ✅ 7. Recalculate and emit call time updates to all remaining patients in the same queue
     try {
-      const scheduleDate = booking.scheduleDate 
-        ? new Date(booking.scheduleDate) 
-        : booking.appointmentTime 
-        ? new Date(booking.appointmentTime) 
+      const scheduleDate = booking.scheduleDate
+        ? new Date(booking.scheduleDate)
+        : booking.appointmentTime
+        ? new Date(booking.appointmentTime)
         : new Date();
-      
+
       await recalculateAndEmitCallTimeUpdates(
         booking.doctorId.toString(),
         scheduleDate,
         bookingId // Pass cancelled booking ID to exclude it from recalculation
       );
     } catch (error) {
-      console.error("Error recalculating call times after cancellation:", error);
+      console.error(
+        "Error recalculating call times after cancellation:",
+        error
+      );
       // Don't fail the request if recalculation fails
     }
 
@@ -158,8 +159,8 @@ export async function PATCH(
       booking: {
         bookingId: updatedBooking?._id.toString(),
         status: updatedBooking?.status,
-        cancelReason: updatedBooking?.cancelReason
-      }
+        cancelReason: updatedBooking?.cancelReason,
+      },
     });
   } catch (error) {
     console.error("Error cancelling appointment:", error);
@@ -169,4 +170,3 @@ export async function PATCH(
     );
   }
 }
-

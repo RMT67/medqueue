@@ -21,7 +21,7 @@ export async function GET(
       );
     }
 
-    if (role === "patient") {
+    if (role === "patient" || role === "admin") {
       const doctor = await DoctorModel.getDoctorById(_id);
 
       if (!doctor) {

@@ -25,11 +25,8 @@ export async function POST(req: Request) {
   try {
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { userId, role } = verifyToken(authHeader);
@@ -53,10 +50,7 @@ export async function POST(req: Request) {
     // ✅ 2. Get invoice and verify ownership
     const invoice = await InvoiceModel.getById(invoiceId);
     if (!invoice) {
-      return NextResponse.json(
-        { error: "Invoice not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
     // Verify ownership
@@ -85,12 +79,9 @@ export async function POST(req: Request) {
     // ✅ 4. Get patient user data for customer details
     await connectDB();
     const patient = await User.findById(userId);
-    
+
     if (!patient) {
-      return NextResponse.json(
-        { error: "Patient not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
     }
 
     // Validate email format
@@ -121,9 +112,15 @@ export async function POST(req: Request) {
         phone: patient.phoneNumber || "",
       },
       callbacks: {
-        finish: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/patient/invoices?bookingId=${invoice.bookingId}&status=paid`,
-        unfinish: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/patient/invoices?bookingId=${invoice.bookingId}&status=pending`,
-        error: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/patient/invoices?bookingId=${invoice.bookingId}&status=pending`,
+        finish: `${
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+        }/patient/invoices?bookingId=${invoice.bookingId}&status=paid`,
+        unfinish: `${
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+        }/patient/invoices?bookingId=${invoice.bookingId}&status=pending`,
+        error: `${
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+        }/patient/invoices?bookingId=${invoice.bookingId}&status=pending`,
       },
     };
 

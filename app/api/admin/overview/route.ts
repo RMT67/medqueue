@@ -73,7 +73,6 @@ export async function GET() {
         );
       }
     );
-    console.log("🚀 ~ GET ~ todaySchedules:", todaySchedules);
 
     // Get doctor IDs who have schedules today
     const doctorIdsWithScheduleToday = todaySchedules.map(

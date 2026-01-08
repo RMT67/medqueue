@@ -1,120 +1,138 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import Image from "next/image"
-import { Navigation } from "@/components/navigation"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useAuth } from "@/lib/auth-context"
-import { Clock, Calendar, FileText, Stethoscope, ArrowRight, Sparkles, TrendingUp, Activity, Receipt, CreditCard, Pill, AlertCircle, User, Star } from "lucide-react"
-import { ProtectedRoute } from "@/components/protected-route"
-import { FadeIn } from "@/components/animations"
-import { DoctorCardGrid } from "@/components/doctor-card-grid"
-import Swal from "sweetalert2"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { Navigation } from "@/components/navigation";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import {
+  Clock,
+  Calendar,
+  FileText,
+  Stethoscope,
+  ArrowRight,
+  Sparkles,
+  TrendingUp,
+  Activity,
+  Receipt,
+  CreditCard,
+  Pill,
+  AlertCircle,
+  User,
+  Star,
+} from "lucide-react";
+import { ProtectedRoute } from "@/components/protected-route";
+import { FadeIn } from "@/components/animations";
+import { DoctorCardGrid } from "@/components/doctor-card-grid";
+import Swal from "sweetalert2";
 
 interface DashboardData {
   summary: {
-    activeQueue: number
-    pendingPayments: number
-    upcomingAppointments: number
-  }
+    activeQueue: number;
+    pendingPayments: number;
+    upcomingAppointments: number;
+  };
   pendingInvoice: {
-    invoiceId: string
-    invoiceNumber: string
-    date: string
-    dueDate: string
-    status: string
+    invoiceId: string;
+    invoiceNumber: string;
+    date: string;
+    dueDate: string;
+    status: string;
     items: Array<{
-      type: string
-      name: string
-      quantity: number
-      unitPrice: number
-      total: number
-    }>
-    subtotal: number
-    total: number
+      type: string;
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+    }>;
+    subtotal: number;
+    total: number;
     medicationReceipt: {
       medicines: Array<{
-        name: string
-        dosage: string
-        quantity: number
-        price: number
-      }>
-    }
+        name: string;
+        dosage: string;
+        quantity: number;
+        price: number;
+      }>;
+    };
     doctor: {
-      doctorId: string
-      name: string
-      specialization: string
-      clinic: string
-      rating: number
-      totalReviews: number
-      image: string
-    }
-    daysUntilDue: number
-    bookingId?: string
-    medicalRecordId?: string
-  } | null
+      doctorId: string;
+      name: string;
+      specialization: string;
+      clinic: string;
+      rating: number;
+      totalReviews: number;
+      image: string;
+    };
+    daysUntilDue: number;
+    bookingId?: string;
+    medicalRecordId?: string;
+  } | null;
   recommendedDoctors: Array<{
-    doctorId: string
-    name: string
-    specialization: string
-    clinic: string
-    schedule: string
-    rating: number
-    totalReviews: number
-    image: string
-    consultationFee: number
-    isTopRated: boolean
-  }>
+    doctorId: string;
+    name: string;
+    specialization: string;
+    clinic: string;
+    schedule: string;
+    rating: number;
+    totalReviews: number;
+    image: string;
+    consultationFee: number;
+    isTopRated: boolean;
+  }>;
 }
 
 export default function PatientDashboardPage() {
-  const router = useRouter()
-  const { user, logout } = useAuth()
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const fetchDashboard = async () => {
     try {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
-      const token = localStorage.getItem("medqueue_token")
+      const token = localStorage.getItem("medqueue_token");
       if (!token) {
-        setIsLoading(false)
-        return
+        setIsLoading(false);
+        return;
       }
 
       const response = await fetch("/api/patient/dashboard", {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
         },
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setDashboardData(data)
+        const data = await response.json();
+        setDashboardData(data);
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        setError(errorData.error || "Failed to fetch dashboard data")
-        console.error("Failed to fetch dashboard data:", errorData)
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error || "Failed to fetch dashboard data");
+        console.error("Failed to fetch dashboard data:", errorData);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Error fetching dashboard"
-      setError(errorMessage)
-      console.error("Error fetching dashboard:", error)
+      const errorMessage =
+        error instanceof Error ? error.message : "Error fetching dashboard";
+      setError(errorMessage);
+      console.error("Error fetching dashboard:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchDashboard()
-  }, [])
+    fetchDashboard();
+  }, []);
 
   const menuCards = [
     {
@@ -150,12 +168,17 @@ export default function PatientDashboardPage() {
       bgGradient: "from-primary/10 to-primary/5",
       available: true,
     },
-  ]
+  ];
 
   return (
     <ProtectedRoute allowedRoles={["patient"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <Navigation isAuthenticated={true} userRole="patient" userName={user?.name} onLogout={logout} />
+        <Navigation
+          isAuthenticated={true}
+          userRole="patient"
+          userName={user?.name}
+          onLogout={logout}
+        />
 
         {/* Hero Header */}
         <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-12 lg:py-16 border-b border-border/50 overflow-hidden">
@@ -182,10 +205,14 @@ export default function PatientDashboardPage() {
                     </span>
                   </h1>
                   <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
-                    Welcome back, <span className="font-semibold text-foreground">{user?.name}</span>! Manage your healthcare journey from here.
+                    Welcome back,{" "}
+                    <span className="font-semibold text-foreground">
+                      {user?.name}
+                    </span>
+                    ! Manage your healthcare journey from here.
                   </p>
                 </div>
-                
+
                 {/* Quick Stats */}
                 <div className="flex gap-4 flex-shrink-0">
                   <Card className="px-5 py-4 bg-card/90 backdrop-blur-md border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
@@ -195,9 +222,13 @@ export default function PatientDashboardPage() {
                       </div>
                       <div>
                         <div className="text-xl font-bold text-foreground">
-                          {isLoading ? "..." : dashboardData?.summary.activeQueue || 0}
+                          {isLoading
+                            ? "..."
+                            : dashboardData?.summary.activeQueue || 0}
                         </div>
-                        <div className="text-xs text-muted-foreground font-medium">Active Queue</div>
+                        <div className="text-xs text-muted-foreground font-medium">
+                          Active Queue
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -208,9 +239,13 @@ export default function PatientDashboardPage() {
                       </div>
                       <div>
                         <div className="text-xl font-bold text-foreground">
-                          {isLoading ? "..." : dashboardData?.summary.pendingPayments || 0}
+                          {isLoading
+                            ? "..."
+                            : dashboardData?.summary.pendingPayments || 0}
                         </div>
-                        <div className="text-xs text-muted-foreground font-medium">Pending Payments</div>
+                        <div className="text-xs text-muted-foreground font-medium">
+                          Pending Payments
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -227,7 +262,9 @@ export default function PatientDashboardPage() {
               <Card className="mb-6 p-6 border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  <p className="text-red-700 dark:text-red-300 font-semibold">{error}</p>
+                  <p className="text-red-700 dark:text-red-300 font-semibold">
+                    {error}
+                  </p>
                 </div>
               </Card>
             </FadeIn>
@@ -236,41 +273,61 @@ export default function PatientDashboardPage() {
           <FadeIn direction="up" delay={100}>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {menuCards.map((card, index) => {
-                const Icon = card.icon
-                const isPrimary = card.id === "queue"
+                const Icon = card.icon;
+                const isPrimary = card.id === "queue";
                 return (
                   <FadeIn key={card.id} direction="up" delay={index * 100}>
-                    <Card className={`group relative overflow-hidden border transition-all duration-500 hover:shadow-2xl h-full flex flex-col ${
-                      !card.available ? "opacity-75" : ""
-                    } ${
-                      isPrimary 
-                        ? "border-primary/30 bg-gradient-to-br from-primary/5 via-card to-primary/5 shadow-xl hover:border-primary/50 hover:shadow-2xl ring-1 ring-primary/10" 
-                        : "border-border/50 bg-card/95 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl"
-                    }`}>
+                    <Card
+                      className={`group relative overflow-hidden border transition-all duration-500 hover:shadow-2xl h-full flex flex-col ${
+                        !card.available ? "opacity-75" : ""
+                      } ${
+                        isPrimary
+                          ? "border-primary/30 bg-gradient-to-br from-primary/5 via-card to-primary/5 shadow-xl hover:border-primary/50 hover:shadow-2xl ring-1 ring-primary/10"
+                          : "border-border/50 bg-card/95 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl"
+                      }`}
+                    >
                       {/* Subtle gradient overlay on hover */}
-                      <div className={`absolute inset-0 bg-gradient-to-br ${card.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-                      
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br ${card.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
+                      />
+
                       {/* Shine effect on hover */}
                       <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-                      <div className={`relative flex-1 flex flex-col ${isPrimary ? "p-8" : "p-6"}`}>
+                      <div
+                        className={`relative flex-1 flex flex-col ${
+                          isPrimary ? "p-8" : "p-6"
+                        }`}
+                      >
                         {/* Icon */}
-                        <div className={`rounded-2xl bg-gradient-to-br ${card.gradient} flex items-center justify-center mb-6 shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 ring-4 ring-white/10 ${
-                          isPrimary ? "w-20 h-20" : "w-16 h-16"
-                        }`}>
-                          <Icon className={`text-white drop-shadow-sm ${isPrimary ? "w-10 h-10" : "w-8 h-8"}`} />
+                        <div
+                          className={`rounded-2xl bg-gradient-to-br ${
+                            card.gradient
+                          } flex items-center justify-center mb-6 shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 ring-4 ring-white/10 ${
+                            isPrimary ? "w-20 h-20" : "w-16 h-16"
+                          }`}
+                        >
+                          <Icon
+                            className={`text-white drop-shadow-sm ${
+                              isPrimary ? "w-10 h-10" : "w-8 h-8"
+                            }`}
+                          />
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 space-y-3">
-                          <h3 className={`font-bold text-foreground group-hover:text-primary transition-colors duration-300 ${
-                            isPrimary ? "text-2xl" : "text-xl"
-                          }`}>
+                          <h3
+                            className={`font-bold text-foreground group-hover:text-primary transition-colors duration-300 ${
+                              isPrimary ? "text-2xl" : "text-xl"
+                            }`}
+                          >
                             {card.title}
                           </h3>
-                          <p className={`text-muted-foreground leading-relaxed ${
-                            isPrimary ? "text-base" : "text-sm"
-                          }`}>
+                          <p
+                            className={`text-muted-foreground leading-relaxed ${
+                              isPrimary ? "text-base" : "text-sm"
+                            }`}
+                          >
                             {card.description}
                           </p>
                         </div>
@@ -278,25 +335,35 @@ export default function PatientDashboardPage() {
                         {/* Action Button */}
                         {card.available ? (
                           <Link href={card.href} className="mt-6">
-                            <Button 
-                              className={`w-full bg-gradient-to-r ${card.gradient} hover:opacity-95 text-white gap-2 group-hover:shadow-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-                                isPrimary ? "h-12 text-base shadow-lg" : "h-11 shadow-md"
+                            <Button
+                              className={`w-full bg-gradient-to-r ${
+                                card.gradient
+                              } hover:opacity-95 text-white gap-2 group-hover:shadow-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+                                isPrimary
+                                  ? "h-12 text-base shadow-lg"
+                                  : "h-11 shadow-md"
                               }`}
                             >
                               <span className="relative z-10 flex items-center justify-center gap-2">
-                                {card.id === "queue" ? "View Queue" : 
-                                 card.id === "appointment" ? "View Appointments" :
-                                 card.id === "record" ? "View Records" : "Open"}
-                                <ArrowRight className={`group-hover:translate-x-1 transition-transform duration-300 ${
-                                  isPrimary ? "w-5 h-5" : "w-4 h-4"
-                                }`} />
+                                {card.id === "queue"
+                                  ? "View Queue"
+                                  : card.id === "appointment"
+                                  ? "View Appointments"
+                                  : card.id === "record"
+                                  ? "View Records"
+                                  : "Open"}
+                                <ArrowRight
+                                  className={`group-hover:translate-x-1 transition-transform duration-300 ${
+                                    isPrimary ? "w-5 h-5" : "w-4 h-4"
+                                  }`}
+                                />
                               </span>
                               <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                             </Button>
                           </Link>
                         ) : (
-                          <Button 
-                            className="w-full bg-muted text-muted-foreground cursor-not-allowed mt-6" 
+                          <Button
+                            className="w-full bg-muted text-muted-foreground cursor-not-allowed mt-6"
                             disabled
                           >
                             Coming Soon
@@ -305,7 +372,7 @@ export default function PatientDashboardPage() {
                       </div>
                     </Card>
                   </FadeIn>
-                )
+                );
               })}
             </div>
           </FadeIn>
@@ -319,301 +386,383 @@ export default function PatientDashboardPage() {
                     <AlertCircle className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl lg:text-3xl font-bold text-foreground">Pending Payment</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">Invoice and receipt that require payment</p>
+                    <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
+                      Pending Payment
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Invoice and receipt that require payment
+                    </p>
                   </div>
                 </div>
 
                 <Card className="p-6 border border-amber-200/50 dark:border-amber-800/50 shadow-xl bg-gradient-to-br from-amber-50/40 via-card to-amber-50/20 dark:from-amber-950/30 dark:via-card dark:to-amber-950/10 backdrop-blur-md ring-1 ring-amber-100/50 dark:ring-amber-900/20">
-                <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Invoice Info */}
-                  <div className="flex-1 space-y-4">
-                    <div className="mb-4">
-                      <h3 className="text-lg font-bold text-foreground mb-0.5">Invoice & Receipt</h3>
-                      <p className="text-xs text-muted-foreground font-medium">Payment required</p>
-                    </div>
-
-                    <div className="p-4 bg-card/90 rounded-xl border border-border/50 shadow-md backdrop-blur-sm">
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground mb-0.5 uppercase tracking-wide">Invoice Number</p>
-                          <p className="text-sm font-bold text-foreground">{dashboardData.pendingInvoice.invoiceNumber}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-semibold text-muted-foreground mb-0.5 uppercase tracking-wide">Due Date</p>
-                          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                            {new Date(dashboardData.pendingInvoice.dueDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric"
-                            })}
-                          </p>
-                        </div>
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Invoice Info */}
+                    <div className="flex-1 space-y-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-foreground mb-0.5">
+                          Invoice & Receipt
+                        </h3>
+                        <p className="text-xs text-muted-foreground font-medium">
+                          Payment required
+                        </p>
                       </div>
-                      <div className="pt-2.5 border-t border-border">
-                        {dashboardData.pendingInvoice.items.map((item, index) => (
-                          <div key={index} className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm text-muted-foreground">{item.name}</span>
-                            <span className="text-sm font-semibold text-foreground">
-                              Rp {item.total.toLocaleString("id-ID")}
+
+                      <div className="p-4 bg-card/90 rounded-xl border border-border/50 shadow-md backdrop-blur-sm">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-0.5 uppercase tracking-wide">
+                              Invoice Number
+                            </p>
+                            <p className="text-sm font-bold text-foreground">
+                              {dashboardData.pendingInvoice.invoiceNumber}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs font-semibold text-muted-foreground mb-0.5 uppercase tracking-wide">
+                              Due Date
+                            </p>
+                            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                              {new Date(
+                                dashboardData.pendingInvoice.dueDate
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="pt-2.5 border-t border-border">
+                          {dashboardData.pendingInvoice.items.map(
+                            (item, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between mb-1.5"
+                              >
+                                <span className="text-sm text-muted-foreground">
+                                  {item.name}
+                                </span>
+                                <span className="text-sm font-semibold text-foreground">
+                                  Rp {item.total.toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                            )
+                          )}
+                          <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
+                            <span className="text-sm font-bold text-foreground">
+                              Total Amount
+                            </span>
+                            <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                              Rp{" "}
+                              {dashboardData.pendingInvoice.total.toLocaleString(
+                                "id-ID"
+                              )}
                             </span>
                           </div>
-                        ))}
-                        <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
-                          <span className="text-sm font-bold text-foreground">Total Amount</span>
-                          <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                            Rp {dashboardData.pendingInvoice.total.toLocaleString("id-ID")}
-                          </span>
                         </div>
                       </div>
+
+                      {/* Medication Receipt */}
+                      {dashboardData.pendingInvoice.medicationReceipt.medicines
+                        .length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Pill className="w-3.5 h-3.5 text-primary" />
+                            </div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Medication Receipt
+                            </p>
+                          </div>
+                          {dashboardData.pendingInvoice.medicationReceipt.medicines.map(
+                            (medicine, index) => (
+                              <div
+                                key={index}
+                                className="p-3 bg-accent/10 rounded-xl border border-accent/30 shadow-sm mb-2"
+                              >
+                                <p className="text-sm font-semibold text-foreground mb-1">
+                                  {medicine.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-1.5">
+                                  {medicine.dosage} • Qty: {medicine.quantity}
+                                </p>
+                                <p className="text-sm font-bold text-accent">
+                                  Rp {medicine.price.toLocaleString("id-ID")}
+                                </p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Medication Receipt */}
-                    {dashboardData.pendingInvoice.medicationReceipt.medicines.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Pill className="w-3.5 h-3.5 text-primary" />
-                          </div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medication Receipt</p>
-                        </div>
-                        {dashboardData.pendingInvoice.medicationReceipt.medicines.map((medicine, index) => (
-                          <div key={index} className="p-3 bg-accent/10 rounded-xl border border-accent/30 shadow-sm mb-2">
-                            <p className="text-sm font-semibold text-foreground mb-1">{medicine.name}</p>
-                            <p className="text-xs text-muted-foreground mb-1.5">
-                              {medicine.dosage} • Qty: {medicine.quantity}
-                            </p>
-                            <p className="text-sm font-bold text-accent">Rp {medicine.price.toLocaleString("id-ID")}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Section */}
-                  <div className="lg:w-80 flex flex-col justify-between gap-4">
-                    <div className="space-y-4">
-                      {/* Doctor Information */}
-                      {dashboardData.pendingInvoice.doctor && (
-                        <div className="p-4 bg-card/90 rounded-xl border border-border/50 shadow-md backdrop-blur-sm">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-1 ring-primary/10">
-                              {dashboardData.pendingInvoice.doctor.image ? (
-                                <>
-                                  <Image
-                                    src={dashboardData.pendingInvoice.doctor.image}
-                                    alt={dashboardData.pendingInvoice.doctor.name}
-                                    fill
-                                    className="object-cover"
-                                    unoptimized
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement
-                                      target.style.display = 'none'
-                                      const parent = target.parentElement
-                                      if (parent) {
-                                        const fallback = parent.querySelector('.doctor-fallback') as HTMLElement
-                                        if (fallback) fallback.style.display = 'flex'
+                    {/* Action Section */}
+                    <div className="lg:w-80 flex flex-col justify-between gap-4">
+                      <div className="space-y-4">
+                        {/* Doctor Information */}
+                        {dashboardData.pendingInvoice.doctor && (
+                          <div className="p-4 bg-card/90 rounded-xl border border-border/50 shadow-md backdrop-blur-sm">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-border/50 flex-shrink-0 shadow-md ring-1 ring-primary/10">
+                                {dashboardData.pendingInvoice.doctor.image ? (
+                                  <>
+                                    <Image
+                                      src={
+                                        dashboardData.pendingInvoice.doctor
+                                          .image
                                       }
-                                    }}
-                                  />
-                                  <div className="doctor-fallback hidden w-full h-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
+                                      alt={
+                                        dashboardData.pendingInvoice.doctor.name
+                                      }
+                                      fill
+                                      className="object-cover"
+                                      unoptimized
+                                      onError={(e) => {
+                                        const target =
+                                          e.target as HTMLImageElement;
+                                        target.style.display = "none";
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                          const fallback = parent.querySelector(
+                                            ".doctor-fallback"
+                                          ) as HTMLElement;
+                                          if (fallback)
+                                            fallback.style.display = "flex";
+                                        }
+                                      }}
+                                    />
+                                    <div className="doctor-fallback hidden w-full h-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
+                                      {dashboardData.pendingInvoice.doctor.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .toUpperCase()}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
                                     {dashboardData.pendingInvoice.doctor.name
                                       .split(" ")
-                                      .map(n => n[0])
+                                      .map((n) => n[0])
                                       .join("")
                                       .toUpperCase()}
                                   </div>
-                                </>
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-base">
-                                  {dashboardData.pendingInvoice.doctor.name
-                                    .split(" ")
-                                    .map(n => n[0])
-                                    .join("")
-                                    .toUpperCase()}
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-foreground text-base truncate mb-0.5">
+                                  {dashboardData.pendingInvoice.doctor.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate mb-2">
+                                  {
+                                    dashboardData.pendingInvoice.doctor
+                                      .specialization
+                                  }
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-xs font-bold text-foreground">
+                                    {dashboardData.pendingInvoice.doctor.rating}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    (
+                                    {
+                                      dashboardData.pendingInvoice.doctor
+                                        .totalReviews
+                                    }{" "}
+                                    reviews)
+                                  </span>
                                 </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-foreground text-base truncate mb-0.5">
-                                {dashboardData.pendingInvoice.doctor.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate mb-2">
-                                {dashboardData.pendingInvoice.doctor.specialization}
-                              </p>
-                              <div className="flex items-center gap-1.5">
-                                <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                                <span className="text-xs font-bold text-foreground">
-                                  {dashboardData.pendingInvoice.doctor.rating}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  ({dashboardData.pendingInvoice.doctor.totalReviews} reviews)
-                                </span>
                               </div>
                             </div>
+                            <div className="pt-3 border-t border-border/50">
+                              <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">
+                                Clinic
+                              </p>
+                              <p className="text-sm font-medium text-foreground">
+                                {dashboardData.pendingInvoice.doctor.clinic}
+                              </p>
+                            </div>
                           </div>
-                          <div className="pt-3 border-t border-border/50">
-                            <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Clinic</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {dashboardData.pendingInvoice.doctor.clinic}
+                        )}
+
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/50 rounded-xl shadow-sm">
+                          <div className="flex items-start gap-2.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
+                              Payment is due in{" "}
+                              {dashboardData.pendingInvoice.daysUntilDue}{" "}
+                              {dashboardData.pendingInvoice.daysUntilDue === 1
+                                ? "day"
+                                : "days"}
+                              . Please complete payment to avoid service
+                              interruption.
                             </p>
                           </div>
                         </div>
-                      )}
+                      </div>
+                      <div className="space-y-3">
+                        <Button
+                          onClick={async () => {
+                            if (!dashboardData.pendingInvoice) return;
 
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/50 rounded-xl shadow-sm">
-                        <div className="flex items-start gap-2.5">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
-                            Payment is due in {dashboardData.pendingInvoice.daysUntilDue} {dashboardData.pendingInvoice.daysUntilDue === 1 ? 'day' : 'days'}. Please complete payment to avoid service interruption.
-                          </p>
-                        </div>
+                            try {
+                              setIsProcessingPayment(true);
+                              const token =
+                                localStorage.getItem("medqueue_token");
+                              if (!token) {
+                                await Swal.fire({
+                                  icon: "warning",
+                                  title: "Authentication Required",
+                                  text: "Please login to process payment",
+                                  confirmButtonColor: "#3b82f6",
+                                });
+                                return;
+                              }
+
+                              // Create Midtrans payment transaction
+                              const response = await fetch(
+                                `/api/payment/midtrans/create`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: token,
+                                  },
+                                  body: JSON.stringify({
+                                    invoiceId:
+                                      dashboardData.pendingInvoice.invoiceId,
+                                  }),
+                                }
+                              );
+
+                              if (!response.ok) {
+                                const errorData = await response
+                                  .json()
+                                  .catch(() => null);
+                                await Swal.fire({
+                                  icon: "error",
+                                  title: "Payment Failed",
+                                  text:
+                                    errorData?.error ||
+                                    "Failed to create payment",
+                                  confirmButtonColor: "#ef4444",
+                                });
+                                return;
+                              }
+
+                              const data = await response.json();
+                              const { token: snapToken, redirect_url } = data;
+
+                              // Load Midtrans Snap script dynamically
+                              const clientKey =
+                                process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+                              if (!clientKey) {
+                                await Swal.fire({
+                                  icon: "error",
+                                  title: "Configuration Error",
+                                  text: "Payment configuration is missing. Please contact support.",
+                                  confirmButtonColor: "#ef4444",
+                                });
+                                return;
+                              }
+                              const script = document.createElement("script");
+                              script.src =
+                                "https://app.sandbox.midtrans.com/snap/snap.js";
+                              script.setAttribute("data-client-key", clientKey);
+                              script.onload = () => {
+                                // @ts-ignore - Midtrans Snap is loaded globally
+                                if (window.snap) {
+                                  // @ts-ignore
+                                  window.snap.pay(snapToken, {
+                                    onSuccess: async (result: any) => {
+                                      console.log("Payment success:", result);
+                                      // Refresh dashboard data
+                                      await fetchDashboard();
+                                      await Swal.fire({
+                                        icon: "success",
+                                        title: "Payment Successful!",
+                                        text: "Your payment has been processed successfully.",
+                                        confirmButtonColor: "#10b981",
+                                      });
+                                    },
+                                    onPending: (result: any) => {
+                                      console.log("Payment pending:", result);
+                                      Swal.fire({
+                                        icon: "info",
+                                        title: "Payment Pending",
+                                        text: "Payment is pending. Please complete the payment.",
+                                        confirmButtonColor: "#3b82f6",
+                                      });
+                                    },
+                                    onError: (result: any) => {
+                                      console.error("Payment error:", result);
+                                      Swal.fire({
+                                        icon: "error",
+                                        title: "Payment Failed",
+                                        text: "Payment failed. Please try again.",
+                                        confirmButtonColor: "#ef4444",
+                                      });
+                                    },
+                                    onClose: () => {
+                                      console.log("Payment popup closed");
+                                    },
+                                  });
+                                } else {
+                                  // Fallback to redirect if Snap is not available
+                                  window.location.href = redirect_url;
+                                }
+                              };
+                              script.onerror = () => {
+                                // Fallback to redirect if script fails to load
+                                window.location.href = redirect_url;
+                              };
+                              document.body.appendChild(script);
+                            } catch (error) {
+                              console.error("Error processing payment:", error);
+                              await Swal.fire({
+                                icon: "error",
+                                title: "Error",
+                                text: "Failed to process payment",
+                                confirmButtonColor: "#ef4444",
+                              });
+                            } finally {
+                              setIsProcessingPayment(false);
+                            }
+                          }}
+                          disabled={
+                            isProcessingPayment || !dashboardData.pendingInvoice
+                          }
+                          className="w-full h-11 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          {isProcessingPayment
+                            ? "Processing..."
+                            : "Process Payment"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (dashboardData.pendingInvoice.bookingId) {
+                              router.push(
+                                `/patient/invoices?bookingId=${dashboardData.pendingInvoice.bookingId}&status=${dashboardData.pendingInvoice.status}`
+                              );
+                            } else {
+                              router.push("/patient/invoices");
+                            }
+                          }}
+                          className="w-full h-10 border-2 border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 font-medium gap-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          View Details
+                        </Button>
                       </div>
                     </div>
-                    <div className="space-y-3">
-                      <Button
-                        onClick={async () => {
-                          if (!dashboardData.pendingInvoice) return;
-                          
-                          try {
-                            setIsProcessingPayment(true);
-                            const token = localStorage.getItem("medqueue_token");
-                            if (!token) {
-                              await Swal.fire({
-                                icon: "warning",
-                                title: "Authentication Required",
-                                text: "Please login to process payment",
-                                confirmButtonColor: "#3b82f6",
-                              });
-                              return;
-                            }
-
-                            // Create Midtrans payment transaction
-                            const response = await fetch(`/api/payment/midtrans/create`, {
-                              method: "POST",
-                              headers: {
-                                "Content-Type": "application/json",
-                                Authorization: `Bearer ${token}`,
-                              },
-                              body: JSON.stringify({
-                                invoiceId: dashboardData.pendingInvoice.invoiceId,
-                              }),
-                            });
-
-                            if (!response.ok) {
-                              const errorData = await response.json().catch(() => null);
-                              await Swal.fire({
-                                icon: "error",
-                                title: "Payment Failed",
-                                text: errorData?.error || "Failed to create payment",
-                                confirmButtonColor: "#ef4444",
-                              });
-                              return;
-                            }
-
-                            const data = await response.json();
-                            const { token: snapToken, redirect_url } = data;
-
-                            // Load Midtrans Snap script dynamically
-                            const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
-                            if (!clientKey) {
-                              await Swal.fire({
-                                icon: "error",
-                                title: "Configuration Error",
-                                text: "Payment configuration is missing. Please contact support.",
-                                confirmButtonColor: "#ef4444",
-                              });
-                              return;
-                            }
-                            const script = document.createElement("script");
-                            script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
-                            script.setAttribute("data-client-key", clientKey);
-                            script.onload = () => {
-                              // @ts-ignore - Midtrans Snap is loaded globally
-                              if (window.snap) {
-                                // @ts-ignore
-                                window.snap.pay(snapToken, {
-                                  onSuccess: async (result: any) => {
-                                    console.log("Payment success:", result);
-                                    // Refresh dashboard data
-                                    await fetchDashboard();
-                                    await Swal.fire({
-                                      icon: "success",
-                                      title: "Payment Successful!",
-                                      text: "Your payment has been processed successfully.",
-                                      confirmButtonColor: "#10b981",
-                                    });
-                                  },
-                                  onPending: (result: any) => {
-                                    console.log("Payment pending:", result);
-                                    Swal.fire({
-                                      icon: "info",
-                                      title: "Payment Pending",
-                                      text: "Payment is pending. Please complete the payment.",
-                                      confirmButtonColor: "#3b82f6",
-                                    });
-                                  },
-                                  onError: (result: any) => {
-                                    console.error("Payment error:", result);
-                                    Swal.fire({
-                                      icon: "error",
-                                      title: "Payment Failed",
-                                      text: "Payment failed. Please try again.",
-                                      confirmButtonColor: "#ef4444",
-                                    });
-                                  },
-                                  onClose: () => {
-                                    console.log("Payment popup closed");
-                                  },
-                                });
-                              } else {
-                                // Fallback to redirect if Snap is not available
-                                window.location.href = redirect_url;
-                              }
-                            };
-                            script.onerror = () => {
-                              // Fallback to redirect if script fails to load
-                              window.location.href = redirect_url;
-                            };
-                            document.body.appendChild(script);
-                          } catch (error) {
-                            console.error("Error processing payment:", error);
-                            await Swal.fire({
-                              icon: "error",
-                              title: "Error",
-                              text: "Failed to process payment",
-                              confirmButtonColor: "#ef4444",
-                            });
-                          } finally {
-                            setIsProcessingPayment(false);
-                          }
-                        }}
-                        disabled={isProcessingPayment || !dashboardData.pendingInvoice}
-                        className="w-full h-11 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white gap-2 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        {isProcessingPayment ? "Processing..." : "Process Payment"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (dashboardData.pendingInvoice.bookingId) {
-                            router.push(`/patient/invoices?bookingId=${dashboardData.pendingInvoice.bookingId}&status=${dashboardData.pendingInvoice.status}`)
-                          } else {
-                            router.push("/patient/invoices")
-                          }
-                        }}
-                        className="w-full h-10 border-2 border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 font-medium gap-2"
-                      >
-                        <FileText className="w-4 h-4" />
-                        View Details
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              </Card>
-            </div>
-          </FadeIn>
+                </Card>
+              </div>
+            </FadeIn>
           )}
 
           {/* Recommended Doctors Section */}
@@ -621,8 +770,12 @@ export default function PatientDashboardPage() {
             <div className="mt-12 lg:mt-16">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div>
-                  <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">Recommended Doctors</h2>
-                  <p className="text-sm text-muted-foreground">Top-rated healthcare professionals for you</p>
+                  <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">
+                    Recommended Doctors
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Top-rated healthcare professionals for you
+                  </p>
                 </div>
                 <Button
                   variant="outline"
@@ -636,8 +789,11 @@ export default function PatientDashboardPage() {
 
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 {isLoading ? (
-                  <div className="col-span-4 text-center py-8 text-muted-foreground">Loading doctors...</div>
-                ) : dashboardData?.recommendedDoctors && dashboardData.recommendedDoctors.length > 0 ? (
+                  <div className="col-span-4 text-center py-8 text-muted-foreground">
+                    Loading doctors...
+                  </div>
+                ) : dashboardData?.recommendedDoctors &&
+                  dashboardData.recommendedDoctors.length > 0 ? (
                   dashboardData.recommendedDoctors.map((doctor) => (
                     <DoctorCardGrid
                       key={doctor.doctorId}
@@ -653,7 +809,9 @@ export default function PatientDashboardPage() {
                     />
                   ))
                 ) : (
-                  <div className="col-span-4 text-center py-8 text-muted-foreground">No recommended doctors available</div>
+                  <div className="col-span-4 text-center py-8 text-muted-foreground">
+                    No recommended doctors available
+                  </div>
                 )}
               </div>
             </div>
@@ -661,5 +819,5 @@ export default function PatientDashboardPage() {
         </main>
       </div>
     </ProtectedRoute>
-  )
+  );
 }

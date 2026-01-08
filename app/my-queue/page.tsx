@@ -77,7 +77,9 @@ export default function MyQueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(null);
+  const [patientProfile, setPatientProfile] = useState<ProfileUser | null>(
+    null
+  );
   const [queuePosition, setQueuePosition] = useState<{
     patientsAhead: number;
     estimatedTime: number;
@@ -119,15 +121,15 @@ export default function MyQueuePage() {
 
       const res = await fetch("/api/patient/my-queue", {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
         },
       });
 
       if (res.ok) {
         const data = await res.json();
-        console.log("[my-queue page] ====== API RESPONSE RECEIVED ======")
-        console.log("[my-queue page] Total queues:", data.queues?.length)
-        
+        console.log("[my-queue page] ====== API RESPONSE RECEIVED ======");
+        console.log("[my-queue page] Total queues:", data.queues?.length);
+
         // Log ALL queues, not just F-007
         data.queues?.forEach((q: QueueItem, index: number) => {
           console.log(`[my-queue page] Queue ${index + 1}:`, {
@@ -137,26 +139,44 @@ export default function MyQueuePage() {
             appointmentTime: q.appointmentTime,
             appointmentTimeType: typeof q.appointmentTime,
             timeRange: q.timeRange,
-            scheduleDate: q.scheduleDate
-          })
+            scheduleDate: q.scheduleDate,
+          });
           if (q.appointmentTime) {
             try {
-              const testDate = new Date(q.appointmentTime)
-              console.log(`[my-queue page] Queue ${index + 1} appointmentTime parsed:`, {
-                iso: testDate.toISOString(),
-                local: testDate.toString(),
-                hours: testDate.getHours(),
-                minutes: testDate.getMinutes(),
-                formatted: `${testDate.getHours().toString().padStart(2, "0")}:${testDate.getMinutes().toString().padStart(2, "0")}`
-              })
+              const testDate = new Date(q.appointmentTime);
+              console.log(
+                `[my-queue page] Queue ${index + 1} appointmentTime parsed:`,
+                {
+                  iso: testDate.toISOString(),
+                  local: testDate.toString(),
+                  hours: testDate.getHours(),
+                  minutes: testDate.getMinutes(),
+                  formatted: `${testDate
+                    .getHours()
+                    .toString()
+                    .padStart(2, "0")}:${testDate
+                    .getMinutes()
+                    .toString()
+                    .padStart(2, "0")}`,
+                }
+              );
             } catch (e) {
-              console.error(`[my-queue page] Error parsing appointmentTime for queue ${index + 1}:`, e)
+              console.error(
+                `[my-queue page] Error parsing appointmentTime for queue ${
+                  index + 1
+                }:`,
+                e
+              );
             }
           } else {
-            console.warn(`[my-queue page] ⚠️ Queue ${index + 1} appointmentTime is NULL or UNDEFINED!`)
+            console.warn(
+              `[my-queue page] ⚠️ Queue ${
+                index + 1
+              } appointmentTime is NULL or UNDEFINED!`
+            );
           }
-        })
-        
+        });
+
         setQueues(data.queues || []);
         return;
       }
@@ -188,7 +208,7 @@ export default function MyQueuePage() {
 
       const res = await fetch("/api/patient/queue/active", {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
         },
       });
 
@@ -229,13 +249,16 @@ export default function MyQueuePage() {
 
   // Filter active queues (confirmed or in-progress)
   const activeQueues = useMemo(
-    () => queues.filter((q) => q.status === "confirmed" || q.status === "in-progress"),
+    () =>
+      queues.filter(
+        (q) => q.status === "confirmed" || q.status === "in-progress"
+      ),
     [queues]
   );
 
   // Get current active queue (first active queue)
   const currentQueue = useMemo(() => {
-    return activeQueues[0] || null
+    return activeQueues[0] || null;
   }, [activeQueues]);
 
   // Cancelled appointments
@@ -247,50 +270,52 @@ export default function MyQueuePage() {
   // Past appointments: completed, atau appointmentTime sudah lewat (tapi bukan yang masih active atau cancelled)
   // Ini untuk counter "Completed" - hanya completed, bukan cancelled
   const completedQueues = useMemo(
-    () => queues.filter((q) => {
-      // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk completed
-      if (q.status === "confirmed" || q.status === "in-progress") {
+    () =>
+      queues.filter((q) => {
+        // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk completed
+        if (q.status === "confirmed" || q.status === "in-progress") {
+          return false;
+        }
+        // Exclude cancelled queues - mereka punya counter sendiri
+        if (q.status === "cancelled") {
+          return false;
+        }
+        // Past appointments: completed, atau appointmentTime sudah lewat
+        if (q.status === "completed") {
+          return true;
+        }
+        // Jika appointmentTime sudah lewat, juga termasuk sebagai past (tapi bukan yang masih active atau cancelled)
+        if (q.appointmentTime) {
+          const appointmentDate = new Date(q.appointmentTime);
+          const now = new Date();
+          return appointmentDate < now;
+        }
         return false;
-      }
-      // Exclude cancelled queues - mereka punya counter sendiri
-      if (q.status === "cancelled") {
-        return false;
-      }
-      // Past appointments: completed, atau appointmentTime sudah lewat
-      if (q.status === "completed") {
-        return true;
-      }
-      // Jika appointmentTime sudah lewat, juga termasuk sebagai past (tapi bukan yang masih active atau cancelled)
-      if (q.appointmentTime) {
-        const appointmentDate = new Date(q.appointmentTime);
-        const now = new Date();
-        return appointmentDate < now;
-      }
-      return false;
-    }),
+      }),
     [queues]
   );
 
   // Past appointments untuk display: semua status past (completed, cancelled, atau appointmentTime sudah lewat)
   // Tapi exclude yang masih active (confirmed/in-progress)
   const pastAppointments = useMemo(
-    () => queues.filter((q) => {
-      // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk past
-      if (q.status === "confirmed" || q.status === "in-progress") {
+    () =>
+      queues.filter((q) => {
+        // Exclude active queues (confirmed or in-progress) - mereka tidak termasuk past
+        if (q.status === "confirmed" || q.status === "in-progress") {
+          return false;
+        }
+        // Include completed dan cancelled
+        if (q.status === "completed" || q.status === "cancelled") {
+          return true;
+        }
+        // Jika appointmentTime sudah lewat, juga termasuk sebagai past
+        if (q.appointmentTime) {
+          const appointmentDate = new Date(q.appointmentTime);
+          const now = new Date();
+          return appointmentDate < now;
+        }
         return false;
-      }
-      // Include completed dan cancelled
-      if (q.status === "completed" || q.status === "cancelled") {
-        return true;
-      }
-      // Jika appointmentTime sudah lewat, juga termasuk sebagai past
-      if (q.appointmentTime) {
-        const appointmentDate = new Date(q.appointmentTime);
-        const now = new Date();
-        return appointmentDate < now;
-      }
-      return false;
-    }),
+      }),
     [queues]
   );
 
@@ -305,7 +330,10 @@ export default function MyQueuePage() {
 
   // Countdown timer effect
   useEffect(() => {
-    if (!queuePosition?.estimatedCallTimeTimestamp || currentQueue?.status === "completed") {
+    if (
+      !queuePosition?.estimatedCallTimeTimestamp ||
+      currentQueue?.status === "completed"
+    ) {
       setCountdown(null);
       return;
     }
@@ -317,9 +345,8 @@ export default function MyQueuePage() {
         return;
       }
 
-      const callTime = timestamp instanceof Date 
-        ? timestamp 
-        : new Date(timestamp);
+      const callTime =
+        timestamp instanceof Date ? timestamp : new Date(timestamp);
       const now = new Date();
       const diff = callTime.getTime() - now.getTime();
 
@@ -335,7 +362,9 @@ export default function MyQueuePage() {
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -359,7 +388,12 @@ export default function MyQueuePage() {
 
   // Socket.IO real-time updates
   useEffect(() => {
-    if (!user || user.role !== "patient" || !currentQueue || currentQueue.status === "completed") {
+    if (
+      !user ||
+      user.role !== "patient" ||
+      !currentQueue ||
+      currentQueue.status === "completed"
+    ) {
       return;
     }
 
@@ -367,97 +401,103 @@ export default function MyQueuePage() {
     const bookingId = currentQueue.bookingId;
 
     // Dynamic import untuk client-side only
-    import("@/lib/socket-client").then(({ getSocket, joinQueueRoom, leaveQueueRoom }) => {
-      const socket = getSocket();
-      if (!socket) {
-        console.warn("⚠️ Socket not available - token may be missing");
-        return;
-      }
+    import("@/lib/socket-client").then(
+      ({ getSocket, joinQueueRoom, leaveQueueRoom }) => {
+        const socket = getSocket();
+        if (!socket) {
+          console.warn("⚠️ Socket not available - token may be missing");
+          return;
+        }
 
-      console.log("🔌 Setting up Socket.IO for booking:", bookingId);
+        console.log("🔌 Setting up Socket.IO for booking:", bookingId);
 
-      // Wait for socket to connect before joining room
-      if (socket.connected) {
-        joinQueueRoom(bookingId);
-      } else {
-        socket.once("connect", () => {
-          console.log("✅ Socket connected, joining queue room");
+        // Wait for socket to connect before joining room
+        if (socket.connected) {
           joinQueueRoom(bookingId);
-        });
+        } else {
+          socket.once("connect", () => {
+            console.log("✅ Socket connected, joining queue room");
+            joinQueueRoom(bookingId);
+          });
+        }
+
+        // Listen for queue position updates
+        const handlePositionUpdate = (data: {
+          bookingId: string;
+          currentlyServing: string;
+          patientsAhead: number;
+          queueNumber: string;
+        }) => {
+          if (data.bookingId === bookingId) {
+            setQueuePosition((prev) => ({
+              patientsAhead: data.patientsAhead,
+              estimatedTime: prev?.estimatedTime || 0,
+              currentlyServing: data.currentlyServing,
+            }));
+          }
+        };
+
+        // Listen for call time updates
+        // NOTE: estimatedCallTime dari socket adalah untuk countdown timer, BUKAN untuk Call Time display
+        // Call Time display menggunakan appointmentTime dari booking (tidak terpengaruh socket)
+        const handleCallTimeUpdate = (data: {
+          bookingId: string;
+          estimatedCallTime: string;
+          estimatedCallTimeTimestamp: string;
+          patientsAhead: number;
+          estimatedTime: number;
+          averageServiceTime?: number;
+        }) => {
+          if (data.bookingId === bookingId) {
+            console.log("[my-queue page] Socket call-time-update received:", {
+              estimatedCallTime: data.estimatedCallTime,
+              bookingId: data.bookingId,
+            });
+            // NOTE: estimatedCallTime ini hanya untuk countdown timer, TIDAK mengubah appointmentTime
+            setQueuePosition((prev) => ({
+              patientsAhead: data.patientsAhead,
+              estimatedTime: data.estimatedTime,
+              currentlyServing: prev?.currentlyServing || "",
+              estimatedCallTime: data.estimatedCallTime,
+              estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
+              averageServiceTime:
+                data.averageServiceTime || prev?.averageServiceTime,
+            }));
+          }
+        };
+
+        // Listen for queue status changes
+        const handleStatusChange = (data: {
+          bookingId: string;
+          queueStatus: "waiting" | "being-served" | "completed" | "cancelled";
+          estimatedCallTime?: string;
+          estimatedCallTimeTimestamp?: string;
+        }) => {
+          if (data.bookingId === bookingId) {
+            console.log(
+              "[my-queue page] Socket status-change received, refreshing queues:",
+              {
+                queueStatus: data.queueStatus,
+                bookingId: data.bookingId,
+              }
+            );
+            // Refresh queues when status changes (ini akan fetch ulang dari API, appointmentTime tetap dari booking)
+            fetchQueues();
+          }
+        };
+
+        socket.on("queue:position-update", handlePositionUpdate);
+        socket.on("queue:call-time-update", handleCallTimeUpdate);
+        socket.on("queue:status-change", handleStatusChange);
+
+        socketCleanup = () => {
+          socket.off("queue:position-update", handlePositionUpdate);
+          socket.off("queue:call-time-update", handleCallTimeUpdate);
+          socket.off("queue:status-change", handleStatusChange);
+          leaveQueueRoom(bookingId);
+        };
       }
-
-      // Listen for queue position updates
-      const handlePositionUpdate = (data: {
-        bookingId: string;
-        currentlyServing: string;
-        patientsAhead: number;
-        queueNumber: string;
-      }) => {
-        if (data.bookingId === bookingId) {
-          setQueuePosition((prev) => ({
-            patientsAhead: data.patientsAhead,
-            estimatedTime: prev?.estimatedTime || 0,
-            currentlyServing: data.currentlyServing,
-          }));
-        }
-      };
-
-      // Listen for call time updates
-      // NOTE: estimatedCallTime dari socket adalah untuk countdown timer, BUKAN untuk Call Time display
-      // Call Time display menggunakan appointmentTime dari booking (tidak terpengaruh socket)
-      const handleCallTimeUpdate = (data: {
-        bookingId: string;
-        estimatedCallTime: string;
-        estimatedCallTimeTimestamp: string;
-        patientsAhead: number;
-        estimatedTime: number;
-        averageServiceTime?: number;
-      }) => {
-        if (data.bookingId === bookingId) {
-          console.log("[my-queue page] Socket call-time-update received:", {
-            estimatedCallTime: data.estimatedCallTime,
-            bookingId: data.bookingId
-          })
-          // NOTE: estimatedCallTime ini hanya untuk countdown timer, TIDAK mengubah appointmentTime
-          setQueuePosition((prev) => ({
-            patientsAhead: data.patientsAhead,
-            estimatedTime: data.estimatedTime,
-            currentlyServing: prev?.currentlyServing || "",
-            estimatedCallTime: data.estimatedCallTime,
-            estimatedCallTimeTimestamp: data.estimatedCallTimeTimestamp,
-            averageServiceTime: data.averageServiceTime || prev?.averageServiceTime,
-          }));
-        }
-      };
-
-      // Listen for queue status changes
-      const handleStatusChange = (data: {
-        bookingId: string;
-        queueStatus: "waiting" | "being-served" | "completed" | "cancelled";
-        estimatedCallTime?: string;
-        estimatedCallTimeTimestamp?: string;
-      }) => {
-        if (data.bookingId === bookingId) {
-          console.log("[my-queue page] Socket status-change received, refreshing queues:", {
-            queueStatus: data.queueStatus,
-            bookingId: data.bookingId
-          })
-          // Refresh queues when status changes (ini akan fetch ulang dari API, appointmentTime tetap dari booking)
-          fetchQueues();
-        }
-      };
-
-      socket.on("queue:position-update", handlePositionUpdate);
-      socket.on("queue:call-time-update", handleCallTimeUpdate);
-      socket.on("queue:status-change", handleStatusChange);
-
-      socketCleanup = () => {
-        socket.off("queue:position-update", handlePositionUpdate);
-        socket.off("queue:call-time-update", handleCallTimeUpdate);
-        socket.off("queue:status-change", handleStatusChange);
-        leaveQueueRoom(bookingId);
-      };
-    });
+    );
 
     return () => {
       if (socketCleanup) {
@@ -588,10 +628,10 @@ export default function MyQueuePage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
         },
         body: JSON.stringify({
-          cancelReason: "Cancelled by patient from my queue page"
+          cancelReason: "Cancelled by patient from my queue page",
         }),
       });
 
@@ -624,7 +664,6 @@ export default function MyQueuePage() {
       setCancellingId(null);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -660,7 +699,9 @@ export default function MyQueuePage() {
                   </span>
                 </h1>
                 <p className="text-base md:text-lg text-muted-foreground max-w-2xl">
-                  Monitor your queue position in real-time, manage appointments, and handle payments seamlessly. Everything you need for your visit is right here.
+                  Monitor your queue position in real-time, manage appointments,
+                  and handle payments seamlessly. Everything you need for your
+                  visit is right here.
                 </p>
               </div>
 
@@ -738,7 +779,7 @@ export default function MyQueuePage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-6">
                       {countdown.days > 0 && (
                         <div className="text-center">
@@ -804,7 +845,6 @@ export default function MyQueuePage() {
       )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-
         {isLoadingQueue ? (
           <div className="min-h-[320px] flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
@@ -833,7 +873,9 @@ export default function MyQueuePage() {
                   No Active Bookings Yet
                 </h3>
                 <p className="text-muted-foreground mb-8 leading-relaxed text-base">
-                  You don't have any active appointments in queue. Book a doctor to see your queue, track your appointment status, and manage invoices here.
+                  You don't have any active appointments in queue. Book a doctor
+                  to see your queue, track your appointment status, and manage
+                  invoices here.
                 </p>
                 <Button
                   onClick={() => router.push("/doctors")}
@@ -851,7 +893,11 @@ export default function MyQueuePage() {
             <div className="lg:col-span-2 space-y-6">
               {currentQueue && (
                 <QueueCard
-                  currentlyServing={queuePosition?.currentlyServing || currentQueue.queueNumber || ""}
+                  currentlyServing={
+                    queuePosition?.currentlyServing ||
+                    currentQueue.queueNumber ||
+                    ""
+                  }
                   patientsAhead={queuePosition?.patientsAhead ?? 0}
                   estimatedTime={queuePosition?.estimatedTime ?? 0}
                   doctorName={currentQueue.doctor?.name || "Doctor"}
@@ -889,7 +935,8 @@ export default function MyQueuePage() {
                       : undefined
                   }
                   onCancel={
-                    currentQueue.status === "confirmed" || currentQueue.status === "in-progress"
+                    currentQueue.status === "confirmed" ||
+                    currentQueue.status === "in-progress"
                       ? () => handleCancelBooking(currentQueue.bookingId)
                       : undefined
                   }
@@ -902,7 +949,11 @@ export default function MyQueuePage() {
                     currentQueue.hasInvoice
                       ? () => {
                           router.push(
-                            `/patient/invoices?bookingId=${currentQueue.bookingId}&status=${currentQueue.invoice?.status || "pending"}`
+                            `/patient/invoices?bookingId=${
+                              currentQueue.bookingId
+                            }&status=${
+                              currentQueue.invoice?.status || "pending"
+                            }`
                           );
                         }
                       : undefined
@@ -919,7 +970,9 @@ export default function MyQueuePage() {
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg ring-2 ring-primary/10">
                       <User className="w-5 h-5 text-white" />
                     </div>
-                    <h3 className="text-lg font-bold text-foreground">Patient Profile</h3>
+                    <h3 className="text-lg font-bold text-foreground">
+                      Patient Profile
+                    </h3>
                   </div>
                   <div className="space-y-5">
                     <div className="flex items-center gap-4">
@@ -945,14 +998,18 @@ export default function MyQueuePage() {
                               }}
                             />
                             <div className="image-fallback hidden w-full h-full items-center justify-center text-white font-bold text-2xl">
-                              {patientProfile?.fullName?.charAt(0).toUpperCase() ||
+                              {patientProfile?.fullName
+                                ?.charAt(0)
+                                .toUpperCase() ||
                                 user?.name?.charAt(0).toUpperCase() ||
                                 "P"}
                             </div>
                           </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-white font-bold text-2xl">
-                            {patientProfile?.fullName?.charAt(0).toUpperCase() ||
+                            {patientProfile?.fullName
+                              ?.charAt(0)
+                              .toUpperCase() ||
                               user?.name?.charAt(0).toUpperCase() ||
                               "P"}
                           </div>
@@ -973,7 +1030,9 @@ export default function MyQueuePage() {
                           <Mail className="w-4 h-4 text-primary" />
                         </div>
                         <span className="text-muted-foreground truncate font-medium">
-                          {patientProfile?.email || user?.email || "patient@example.com"}
+                          {patientProfile?.email ||
+                            user?.email ||
+                            "patient@example.com"}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-sm">
@@ -990,7 +1049,9 @@ export default function MyQueuePage() {
                             <Calendar className="w-4 h-4 text-primary" />
                           </div>
                           <span className="text-muted-foreground font-medium">
-                            {new Date(patientProfile.dateOfBirth).toLocaleDateString("id-ID", {
+                            {new Date(
+                              patientProfile.dateOfBirth
+                            ).toLocaleDateString("id-ID", {
                               year: "numeric",
                               month: "long",
                               day: "numeric",
@@ -1073,7 +1134,9 @@ export default function MyQueuePage() {
                           disabled={isProcessingPayment}
                         >
                           <CreditCard className="w-5 h-5" />
-                          {isProcessingPayment ? "Processing..." : "Process Payment"}
+                          {isProcessingPayment
+                            ? "Processing..."
+                            : "Process Payment"}
                         </Button>
                       )}
                       {currentQueue.invoice.status === "paid" && (
@@ -1088,7 +1151,11 @@ export default function MyQueuePage() {
                           className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300"
                           onClick={() => {
                             router.push(
-                              `/patient/invoices?bookingId=${currentQueue.bookingId}&status=${currentQueue.invoice?.status || "pending"}`
+                              `/patient/invoices?bookingId=${
+                                currentQueue.bookingId
+                              }&status=${
+                                currentQueue.invoice?.status || "pending"
+                              }`
                             );
                           }}
                         >
@@ -1257,44 +1324,57 @@ export default function MyQueuePage() {
                                 })
                               : ""}
                           </p>
-                          <StatusBadge 
-                            status={appointment.status === "cancelled" ? "cancelled" : appointment.status === "completed" ? "completed" : "confirmed"}
+                          <StatusBadge
+                            status={
+                              appointment.status === "cancelled"
+                                ? "cancelled"
+                                : appointment.status === "completed"
+                                ? "completed"
+                                : "confirmed"
+                            }
                           />
                         </div>
-                        {appointment.doctor?.rating && appointment.doctor.rating > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                            <span className="text-base font-bold text-foreground">
-                              {appointment.doctor.rating.toFixed(1)}
-                            </span>
-                            {appointment.doctor.totalReviews && appointment.doctor.totalReviews > 0 && (
-                              <span className="text-sm text-muted-foreground">
-                                ({appointment.doctor.totalReviews})
+                        {appointment.doctor?.rating &&
+                          appointment.doctor.rating > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                              <span className="text-base font-bold text-foreground">
+                                {appointment.doctor.rating.toFixed(1)}
                               </span>
-                            )}
-                          </div>
-                        )}
+                              {appointment.doctor.totalReviews &&
+                                appointment.doctor.totalReviews > 0 && (
+                                  <span className="text-sm text-muted-foreground">
+                                    ({appointment.doctor.totalReviews})
+                                  </span>
+                                )}
+                            </div>
+                          )}
                       </div>
                       {/* Action Buttons for Completed Appointments */}
                       {appointment.status === "completed" && (
                         <div className="pt-4 border-t border-border/50 space-y-2">
-                          {!appointment.hasReview && appointment.invoice?.status === "paid" && (
-                            <Button
-                              onClick={() => {
-                                setSelectedDoctor(appointment.doctor?.name || "");
-                                setShowRatingModal(true);
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              Review Doctor
-                            </Button>
-                          )}
+                          {!appointment.hasReview &&
+                            appointment.invoice?.status === "paid" && (
+                              <Button
+                                onClick={() => {
+                                  setSelectedDoctor(
+                                    appointment.doctor?.name || ""
+                                  );
+                                  setShowRatingModal(true);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                Review Doctor
+                              </Button>
+                            )}
                           {appointment.hasMedicalRecord && (
                             <Button
-                              onClick={() => router.push("/patient/medical-record")}
+                              onClick={() =>
+                                router.push("/patient/medical-record")
+                              }
                               variant="outline"
                               size="sm"
                               className="w-full border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
@@ -1307,7 +1387,11 @@ export default function MyQueuePage() {
                             <Button
                               onClick={() => {
                                 router.push(
-                                  `/patient/invoices?bookingId=${appointment.bookingId}&status=${appointment.invoice?.status || "pending"}`
+                                  `/patient/invoices?bookingId=${
+                                    appointment.bookingId
+                                  }&status=${
+                                    appointment.invoice?.status || "pending"
+                                  }`
                                 );
                               }}
                               variant="outline"

@@ -12,21 +12,15 @@ export async function GET(req: Request) {
   try {
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     let decoded;
     try {
       decoded = verifyToken(authHeader);
     } catch (error) {
-      return NextResponse.json(
-        { error: "Invalid token" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     // ✅ 2. Verify patient role
@@ -48,37 +42,40 @@ export async function GET(req: Request) {
     // Active Queue count (bookings dengan status confirmed atau in-progress)
     const activeQueue = await bookingsCollection.countDocuments({
       patientId: patientObjectId,
-      status: { $in: ["confirmed", "in-progress"] }
+      status: { $in: ["confirmed", "in-progress"] },
     });
 
     // Pending Payments count (invoices dengan status pending yang valid)
-    const pendingInvoices = await invoicesCollection.find({
-      patientId: patientObjectId,
-      status: "pending"
-    }).toArray();
+    const pendingInvoices = await invoicesCollection
+      .find({
+        patientId: patientObjectId,
+        status: "pending",
+      })
+      .toArray();
 
     // Validate pending invoices (harus punya medical record lengkap)
     let validPendingCount = 0;
     const medicalRecordsCollection = db.collection("medicalrecords");
-    
+
     for (const invoice of pendingInvoices) {
       if (invoice.medicalRecordId) {
         const medicalRecord = await medicalRecordsCollection.findOne({
-          _id: new ObjectId(invoice.medicalRecordId)
+          _id: new ObjectId(invoice.medicalRecordId),
         });
-        
+
         // Medical record valid jika punya prescriptions ATAU service
-        const hasPrescriptions = medicalRecord && 
-            medicalRecord.prescriptions && 
-            medicalRecord.prescriptions.length > 0;
+        const hasPrescriptions =
+          medicalRecord &&
+          medicalRecord.prescriptions &&
+          medicalRecord.prescriptions.length > 0;
         const hasService = medicalRecord && !!medicalRecord.serviceId;
-        
+
         if (hasPrescriptions || hasService) {
           // Check booking status
           const booking = await bookingsCollection.findOne({
-            _id: new ObjectId(invoice.bookingId)
+            _id: new ObjectId(invoice.bookingId),
           });
-          
+
           if (booking && booking.status === "completed") {
             validPendingCount++;
           }
@@ -91,17 +88,17 @@ export async function GET(req: Request) {
     const upcomingAppointments = await bookingsCollection.countDocuments({
       patientId: patientObjectId,
       status: "confirmed",
-      appointmentTime: { $gt: now }
+      appointmentTime: { $gt: now },
     });
 
     // ✅ 4. Get Pending Invoice (terbaru yang valid)
     const pendingInvoice = await invoicesCollection.findOne(
       {
         patientId: patientObjectId,
-        status: "pending"
+        status: "pending",
       },
       {
-        sort: { dueDate: 1 } // Sort by due date ascending (terdekat dulu)
+        sort: { dueDate: 1 }, // Sort by due date ascending (terdekat dulu)
       }
     );
 
@@ -110,14 +107,14 @@ export async function GET(req: Request) {
       // ✅ Validasi: Pastikan medical record ada dan lengkap
       const medicalRecord = pendingInvoice.medicalRecordId
         ? await medicalRecordsCollection.findOne({
-            _id: new ObjectId(pendingInvoice.medicalRecordId)
+            _id: new ObjectId(pendingInvoice.medicalRecordId),
           })
         : null;
 
       // ✅ Validasi: Pastikan booking sudah completed
       const booking = pendingInvoice.bookingId
         ? await bookingsCollection.findOne({
-            _id: new ObjectId(pendingInvoice.bookingId)
+            _id: new ObjectId(pendingInvoice.bookingId),
           })
         : null;
 
@@ -125,8 +122,9 @@ export async function GET(req: Request) {
       // 1. Medical record ada
       // 2. Medical record punya prescription ATAU service (lengkap)
       // 3. Booking status = completed
-      const hasPrescriptions = medicalRecord && 
-        medicalRecord.prescriptions && 
+      const hasPrescriptions =
+        medicalRecord &&
+        medicalRecord.prescriptions &&
         medicalRecord.prescriptions.length > 0;
       const hasService = medicalRecord && !!medicalRecord.serviceId;
       const hasValidMedicalRecord = hasPrescriptions || hasService;
@@ -138,14 +136,15 @@ export async function GET(req: Request) {
         const doctor = await DoctorModel.getDoctorById(pendingInvoice.doctorId);
 
         // Format medication receipt dari medical record (jika ada prescriptions)
-        const medicationReceipt = (medicalRecord.prescriptions && medicalRecord.prescriptions.length > 0)
-          ? medicalRecord.prescriptions.map((prescription: any) => ({
-              name: prescription.medicineName,
-              dosage: prescription.dosage,
-              quantity: prescription.quantity,
-              price: prescription.unitPrice * prescription.quantity
-            }))
-          : [];
+        const medicationReceipt =
+          medicalRecord.prescriptions && medicalRecord.prescriptions.length > 0
+            ? medicalRecord.prescriptions.map((prescription: any) => ({
+                name: prescription.medicineName,
+                dosage: prescription.dosage,
+                quantity: prescription.quantity,
+                price: prescription.unitPrice * prescription.quantity,
+              }))
+            : [];
 
         // Calculate days until due
         const dueDate = new Date(pendingInvoice.dueDate);
@@ -163,20 +162,22 @@ export async function GET(req: Request) {
           subtotal: pendingInvoice.subtotal,
           total: pendingInvoice.total,
           medicationReceipt: {
-            medicines: medicationReceipt
+            medicines: medicationReceipt,
           },
-          doctor: doctor ? {
-            doctorId: doctor._id.toString(),
-            name: doctor.name,
-            specialization: doctor.specialization,
-            clinic: doctor.clinic,
-            rating: doctor.averageRating || 0,
-            totalReviews: doctor.totalReviews || 0,
-            image: doctor.image
-          } : null,
+          doctor: doctor
+            ? {
+                doctorId: doctor._id.toString(),
+                name: doctor.name,
+                specialization: doctor.specialization,
+                clinic: doctor.clinic,
+                rating: doctor.averageRating || 0,
+                totalReviews: doctor.totalReviews || 0,
+                image: doctor.image,
+              }
+            : null,
           daysUntilDue: Math.max(0, daysUntilDue),
           bookingId: pendingInvoice.bookingId?.toString(),
-          medicalRecordId: pendingInvoice.medicalRecordId?.toString()
+          medicalRecordId: pendingInvoice.medicalRecordId?.toString(),
         };
       }
     }
@@ -185,7 +186,7 @@ export async function GET(req: Request) {
     const doctorsCollection = db.collection("doctors");
     const recommendedDoctors = await doctorsCollection
       .find({
-        isActive: true
+        isActive: true,
       })
       .sort({ averageRating: -1, totalReviews: -1 }) // Sort by rating descending
       .limit(4)
@@ -208,7 +209,7 @@ export async function GET(req: Request) {
           totalReviews: doctor.totalReviews || 0,
           image: doctor.image,
           consultationFee: doctor.consultationFee || 0,
-          isTopRated: (doctor.averageRating || 0) >= 4.5
+          isTopRated: (doctor.averageRating || 0) >= 4.5,
         };
       })
     );
@@ -218,10 +219,10 @@ export async function GET(req: Request) {
       summary: {
         activeQueue,
         pendingPayments: validPendingCount,
-        upcomingAppointments
+        upcomingAppointments,
       },
       pendingInvoice: pendingInvoiceData,
-      recommendedDoctors: recommendedDoctorsData
+      recommendedDoctors: recommendedDoctorsData,
     });
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
@@ -231,4 +232,3 @@ export async function GET(req: Request) {
     );
   }
 }
-
