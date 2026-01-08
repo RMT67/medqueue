@@ -87,16 +87,20 @@ export default class BookingModel {
     if (bookingsOnDate.length === 0) {
       // Create appointmentTime using the scheduleDate's year, month, day
       const scheduleDate = new Date(bookingData.scheduleDate);
-      
+
       // Get startTime from selectedDaySchedule or use schedule's dayOfWeek
       let startHour = 9; // default
       let startMinute = 0; // default
-      
+
       if (selectedDaySchedule) {
         [startHour, startMinute] = selectedDaySchedule.startTime
           .split(":")
           .map(Number);
-      } else if (schedule && schedule.dayOfWeek && schedule.dayOfWeek.length > 0) {
+      } else if (
+        schedule &&
+        schedule.dayOfWeek &&
+        schedule.dayOfWeek.length > 0
+      ) {
         // Get the day of week from scheduleDate
         const dayIndex = scheduleDate.getDay();
         const dayMap: { [key: number]: string } = {
@@ -111,10 +115,12 @@ export default class BookingModel {
         const dayName = dayMap[dayIndex];
         const daySchedule = schedule.dayOfWeek.find((d) => d.hari === dayName);
         if (daySchedule) {
-          [startHour, startMinute] = daySchedule.startTime.split(":").map(Number);
+          [startHour, startMinute] = daySchedule.startTime
+            .split(":")
+            .map(Number);
         }
       }
-      
+
       // Create a new date with the correct date and time
       bookingData.appointmentTime = new Date(
         scheduleDate.getFullYear(),
@@ -136,21 +142,21 @@ export default class BookingModel {
         ).getTime();
         return currentTime > latestTime ? current : latest;
       });
-      
+
       const lastAppointmentTime = new Date(
-        (lastBookingOnDate.appointmentTime as Date) || 
-        (lastBookingOnDate.scheduleDate as Date)
+        (lastBookingOnDate.appointmentTime as Date) ||
+          (lastBookingOnDate.scheduleDate as Date)
       );
-      
+
       // Extract hour and minute from last appointment time
       const lastHour = lastAppointmentTime.getHours();
       const lastMinute = lastAppointmentTime.getMinutes();
-      
+
       // Calculate new time by adding average time per patient
       const totalMinutes = lastHour * 60 + lastMinute + averageTimePerPatient;
       const newHour = Math.floor(totalMinutes / 60);
       const newMinute = totalMinutes % 60;
-      
+
       // Create new appointmentTime with scheduleDate's date but calculated time
       const scheduleDate = new Date(bookingData.scheduleDate);
       bookingData.appointmentTime = new Date(
@@ -167,17 +173,17 @@ export default class BookingModel {
 
     // get last queue number for this specific doctor on this date
     const queuePrefix = (doctorQueueCode || "Z").toUpperCase();
-    
+
     // Get the last booking for THIS DOCTOR on THIS DATE
     const lastDoctorBookingOnDate = await collection
       .find({
         doctorId: bookingData.doctorId,
-        bookingNumber: { $regex: `^MQ-${year}-${month}-${day}` }
+        bookingNumber: { $regex: `^MQ-${year}-${month}-${day}` },
       })
       .sort({ createdAt: -1 })
       .limit(1)
       .toArray();
-    
+
     let queueNumber;
     if (lastDoctorBookingOnDate.length === 0) {
       // First booking for this doctor on this date
@@ -187,7 +193,9 @@ export default class BookingModel {
       const lastQueueNumber = lastDoctorBookingOnDate[0].queueNumber as string;
       const lastQueueNumPart = parseInt(lastQueueNumber.split("-")[1], 10);
       const newQueueNumPart = lastQueueNumPart + 1;
-      queueNumber = `${queuePrefix}-${newQueueNumPart.toString().padStart(3, "0")}`;
+      queueNumber = `${queuePrefix}-${newQueueNumPart
+        .toString()
+        .padStart(3, "0")}`;
     }
 
     bookingData = {
@@ -223,22 +231,27 @@ export default class BookingModel {
     const collection = await this.collection();
     const result = await collection.updateOne(
       { _id: new ObjectId(bookingId) },
-      { 
-        $set: { 
-          status, 
-          updatedAt: new Date() 
-        } 
+      {
+        $set: {
+          status,
+          updatedAt: new Date(),
+        },
       }
     );
     return result;
   }
 
-  static async cancelAndAdjustTimes(bookingId: string, averageTimePerPatient: number) {
+  static async cancelAndAdjustTimes(
+    bookingId: string,
+    averageTimePerPatient: number
+  ) {
     const collection = await this.collection();
-    
+
     // Get the booking that will be cancelled
-    const cancelledBooking = await collection.findOne({ _id: new ObjectId(bookingId) });
-    
+    const cancelledBooking = await collection.findOne({
+      _id: new ObjectId(bookingId),
+    });
+
     if (!cancelledBooking) {
       throw new Error("Booking not found");
     }
@@ -246,33 +259,36 @@ export default class BookingModel {
     // Cancel the booking
     await collection.updateOne(
       { _id: new ObjectId(bookingId) },
-      { 
-        $set: { 
-          status: "cancelled", 
-          updatedAt: new Date() 
-        } 
+      {
+        $set: {
+          status: "cancelled",
+          updatedAt: new Date(),
+        },
       }
     );
 
     // Get all confirmed bookings for the same doctor on the same date with later appointment times
     const scheduleDate = new Date(cancelledBooking.scheduleDate);
-    const cancelledAppointmentTime = cancelledBooking.appointmentTime 
-      ? new Date(cancelledBooking.appointmentTime) 
+    const cancelledAppointmentTime = cancelledBooking.appointmentTime
+      ? new Date(cancelledBooking.appointmentTime)
       : null;
 
     if (!cancelledAppointmentTime) {
       return; // No need to adjust if cancelled booking has no appointment time
     }
 
-    const bookingsToAdjust = await collection.find({
-      doctorId: cancelledBooking.doctorId,
-      scheduleDate: {
-        $gte: new Date(scheduleDate.setHours(0, 0, 0, 0)),
-        $lt: new Date(scheduleDate.setHours(23, 59, 59, 999))
-      },
-      status: "confirmed",
-      appointmentTime: { $gt: cancelledAppointmentTime }
-    }).sort({ appointmentTime: 1 }).toArray();
+    const bookingsToAdjust = await collection
+      .find({
+        doctorId: cancelledBooking.doctorId,
+        scheduleDate: {
+          $gte: new Date(scheduleDate.setHours(0, 0, 0, 0)),
+          $lt: new Date(scheduleDate.setHours(23, 59, 59, 999)),
+        },
+        status: "confirmed",
+        appointmentTime: { $gt: cancelledAppointmentTime },
+      })
+      .sort({ appointmentTime: 1 })
+      .toArray();
 
     // Adjust appointment times by moving them earlier
     const adjustmentMs = averageTimePerPatient * 60 * 1000; // Convert minutes to milliseconds
@@ -280,73 +296,83 @@ export default class BookingModel {
     for (const booking of bookingsToAdjust) {
       const currentTime = new Date(booking.appointmentTime);
       const newTime = new Date(currentTime.getTime() - adjustmentMs);
-      
+
       await collection.updateOne(
         { _id: booking._id },
-        { 
-          $set: { 
+        {
+          $set: {
             appointmentTime: newTime,
-            updatedAt: new Date() 
-          } 
+            updatedAt: new Date(),
+          },
         }
       );
     }
   }
 
-  static async completeAndAdjustTimes(bookingId: string, actualDurationMinutes: number) {
+  static async completeAndAdjustTimes(
+    bookingId: string,
+    actualDurationMinutes: number
+  ) {
     const collection = await this.collection();
-    
+
     // Get the booking that will be completed
-    const completedBooking = await collection.findOne({ _id: new ObjectId(bookingId) });
-    
+    const completedBooking = await collection.findOne({
+      _id: new ObjectId(bookingId),
+    });
+
     if (!completedBooking) {
       throw new Error("Booking not found");
     }
 
-    const completedAppointmentTime = completedBooking.appointmentTime 
-      ? new Date(completedBooking.appointmentTime) 
+    const completedAppointmentTime = completedBooking.appointmentTime
+      ? new Date(completedBooking.appointmentTime)
       : null;
 
     if (!completedAppointmentTime) {
       // Just mark as completed if no appointment time
       await collection.updateOne(
         { _id: new ObjectId(bookingId) },
-        { 
-          $set: { 
-            status: "completed", 
-            updatedAt: new Date() 
-          } 
+        {
+          $set: {
+            status: "completed",
+            updatedAt: new Date(),
+          },
         }
       );
       return;
     }
 
     // Calculate actual finish time
-    const actualFinishTime = new Date(completedAppointmentTime.getTime() + (actualDurationMinutes * 60 * 1000));
+    const actualFinishTime = new Date(
+      completedAppointmentTime.getTime() + actualDurationMinutes * 60 * 1000
+    );
 
     // Mark booking as completed
     await collection.updateOne(
       { _id: new ObjectId(bookingId) },
-      { 
-        $set: { 
-          status: "completed", 
-          updatedAt: new Date() 
-        } 
+      {
+        $set: {
+          status: "completed",
+          updatedAt: new Date(),
+        },
       }
     );
 
     // Get all confirmed bookings for the same doctor on the same date with later appointment times
     const scheduleDate = new Date(completedBooking.scheduleDate);
-    
-    const bookingsToAdjust = await collection.find({
-      doctorId: completedBooking.doctorId,
-      scheduleDate: {
-        $gte: new Date(scheduleDate.setHours(0, 0, 0, 0)),
-        $lt: new Date(scheduleDate.setHours(23, 59, 59, 999))
-      },
-      status: "confirmed",
-      appointmentTime: { $gt: completedAppointmentTime }
-    }).sort({ appointmentTime: 1 }).toArray();
+
+    const bookingsToAdjust = await collection
+      .find({
+        doctorId: completedBooking.doctorId,
+        scheduleDate: {
+          $gte: new Date(scheduleDate.setHours(0, 0, 0, 0)),
+          $lt: new Date(scheduleDate.setHours(23, 59, 59, 999)),
+        },
+        status: "confirmed",
+        appointmentTime: { $gt: completedAppointmentTime },
+      })
+      .sort({ appointmentTime: 1 })
+      .toArray();
 
     if (bookingsToAdjust.length === 0) {
       return; // No subsequent bookings to adjust
@@ -355,7 +381,9 @@ export default class BookingModel {
     // Get doctor's updated average time per patient from doctors collection
     const db = await getDb();
     const doctorsCollection = db.collection("doctors");
-    const doctor = await doctorsCollection.findOne({ _id: completedBooking.doctorId });
+    const doctor = await doctorsCollection.findOne({
+      _id: completedBooking.doctorId,
+    });
     const newAverageTime = doctor?.averageTimePerPatient || 15; // fallback to 15 if not found
 
     // Adjust all subsequent bookings:
@@ -367,16 +395,31 @@ export default class BookingModel {
       // Set new appointment time based on when the previous patient finishes
       await collection.updateOne(
         { _id: booking._id },
-        { 
-          $set: { 
+        {
+          $set: {
             appointmentTime: previousAppointmentTime,
-            updatedAt: new Date() 
-          } 
+            updatedAt: new Date(),
+          },
         }
       );
-      
+
       // Calculate next appointment time for the next iteration
-      previousAppointmentTime = new Date(previousAppointmentTime.getTime() + (newAverageTime * 60 * 1000));
+      previousAppointmentTime = new Date(
+        previousAppointmentTime.getTime() + newAverageTime * 60 * 1000
+      );
     }
+  }
+
+  // check kalo pasient sudah punya appointment / booking
+  static async hasExistingBooking(patientId: string) {
+    const patientObjectId = new ObjectId(patientId);
+    const activeStatuses = ["confirmed"];
+
+    const collection = await this.collection();
+    const activeBooking = await collection.findOne({
+      patientId: patientObjectId,
+      status: { $in: activeStatuses },
+    });
+    return activeBooking;
   }
 }

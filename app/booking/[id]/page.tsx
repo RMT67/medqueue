@@ -132,12 +132,6 @@ export default function BookingPage({
 
   const { id } = use(params);
 
-  useEffect(() => {
-    if (id) {
-      console.log("[booking] param id:", id);
-    }
-  }, [id]);
-
   // Fetch doctor data from API
   useEffect(() => {
     const fetchDoctor = async () => {
@@ -524,19 +518,23 @@ export default function BookingPage({
       setLoading(true);
       const bookingUrl = buildApiUrl(`/api/booking`);
 
+      const formBooking = {
+        patientId: user?._id || "10" /* dummy patient ID */,
+        doctorId: id,
+        scheduleDate: selectedDate,
+        timeRange: timeRange,
+        complaint: patientComplaint,
+      };
+
       // call API to create booking
+      // lempar authorization ke header
       const res = await fetch(bookingUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: localStorage.getItem("medqueue_token") || "",
         },
-        body: JSON.stringify({
-          patientId: user?._id || "10" /* dummy patient ID */,
-          doctorId: id,
-          scheduleDate: selectedDate,
-          timeRange: timeRange,
-          complaint: patientComplaint,
-        }),
+        body: JSON.stringify(formBooking),
       });
 
       if (!res.ok) {

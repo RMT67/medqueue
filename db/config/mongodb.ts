@@ -8,24 +8,7 @@ if (!uri) {
   );
 }
 
-// Extract database name from URI if specified, otherwise use default
-function getDatabaseName(): string {
-  try {
-    const url = new URL(uri);
-    const dbName = url.pathname.replace("/", "");
-    return dbName || "medqueue";
-  } catch {
-    // If URI parsing fails, try to extract from connection string
-    const dbMatch = uri.match(/\/([^?]+)(\?|$)/);
-    if (dbMatch && dbMatch[1]) {
-      return dbMatch[1];
-    }
-    // Fallback to default
-    return "medqueue";
-  }
-}
-
-const databaseName = getDatabaseName();
+const databaseName = "medqueue_test";
 
 // Singleton pattern untuk MongoClient
 declare global {

@@ -208,6 +208,8 @@ export default class DoctorModel {
       doctorData.queueCode = generateQueueCode(doctorCount);
     }
 
+    // change type of
+
     doctorData = {
       ...doctorData,
       createdAt: new Date(),

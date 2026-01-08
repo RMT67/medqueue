@@ -9,6 +9,7 @@ import { Doctor } from "@/types/docterTypes";
 import { ObjectId } from "mongodb";
 import { verifyToken } from "@/lib/auth-helper";
 import { getDb } from "@/db/config/mongodb";
+import { Prescription } from "@/db/models/MedicalRecord";
 
 interface PatientData {
   _id: ObjectId;
@@ -147,7 +148,7 @@ export async function POST(req: Request) {
   try {
     // ✅ 0. Authentication - Verify patient token
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
@@ -158,6 +159,7 @@ export async function POST(req: Request) {
       userId = decoded.userId;
       role = decoded.role;
     } catch (error) {
+      console.log("🚀 ~ POST ~ error:", error);
       return NextResponse.json(
         { message: "Invalid authentication token" },
         { status: 401 }
@@ -182,28 +184,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ 3. Check if patient already has an active appointment (confirmed or in-progress)
-    const db = await getDb();
-    const bookingsCollection = db.collection("bookings");
-    const patientObjectId = new ObjectId(userId);
+    // ✅ 3. Check if patient already has an active appointment (confirmed)
+    const activeBooking = await Booking.hasExistingBooking(
+      body.patientId.toString()
+    );
 
-    const activeBookings = await bookingsCollection
-      .find({
-        patientId: patientObjectId,
-        status: { $in: ["confirmed", "in-progress"] },
-      })
-      .toArray();
-
-    if (activeBookings.length > 0) {
+    if (activeBooking) {
       return NextResponse.json(
         {
           message:
             "You already have an active appointment. Please complete or cancel your current appointment before booking a new one.",
           existingBooking: {
-            bookingId: activeBookings[0]._id.toString(),
-            bookingNumber: activeBookings[0].bookingNumber,
-            status: activeBookings[0].status,
-            appointmentTime: activeBookings[0].appointmentTime,
+            bookingId: activeBooking._id.toString(),
+            bookingNumber: activeBooking.bookingNumber,
+            status: activeBooking.status,
+            appointmentTime: activeBooking.appointmentTime,
           },
         },
         { status: 400 }
@@ -412,14 +407,16 @@ export async function PATCH(req: Request) {
           if (!existingRecord) {
             // Map consultationResult to medical record format
             const prescriptions =
-              consultationResult.prescribedMedicines?.map((med) => ({
-                medicineId: med.medicineId,
-                medicineName: med.medicineName,
-                dosage: med.dosage,
-                quantity: med.quantity,
-                unitPrice: med.unitPrice,
-                notes: undefined, // consultationResult doesn't have notes per medicine
-              })) || [];
+              consultationResult.prescribedMedicines?.map(
+                (med: Prescription) => ({
+                  medicineId: med.medicineId,
+                  medicineName: med.medicineName,
+                  dosage: med.dosage,
+                  quantity: med.quantity,
+                  unitPrice: med.unitPrice,
+                  notes: undefined, // consultationResult doesn't have notes per medicine
+                })
+              ) || [];
 
             const medicalRecordData = {
               patientId: new ObjectId(booking.patientId),

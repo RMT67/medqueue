@@ -8,25 +8,25 @@ export async function GET(
   { params }: { params: Promise<{ _id: string }> }
 ) {
   try {
-    const { _id: userId } = await params;
-    console.log("[api/doctor/:_id] incoming request", { userId });
+    const { _id } = await params;
+    console.log("[api/doctor/:_id] incoming request", { _id });
 
-    if (!userId) {
+    if (!_id) {
       return NextResponse.json(
         { error: "Doctor ID is required" },
         { status: 400 }
       );
     }
 
-    const doctor = await DoctorModel.getDoctorByUserId(userId);
+    const doctor = await DoctorModel.getDoctorById(_id);
 
     if (!doctor) {
-      console.log("[api/doctor/:_id] doctor not found", { userId });
+      console.log("[api/doctor/:_id] doctor not found", { _id });
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
     console.log("[api/doctor/:_id] doctor found", {
-      doctorId: doctor._id?.toString?.() || userId,
+      doctorId: doctor._id?.toString?.() || _id,
     });
     return NextResponse.json({ doctor }, { status: 200 });
   } catch (error) {
