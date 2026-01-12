@@ -104,7 +104,7 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { _id: string } }
+  { params }: { params: Promise<{ _id: string }> }
 ) {
   try {
     const { _id: doctorId } = await params;

@@ -10,7 +10,7 @@ import MedicineModel from "@/db/models/Medicine";
 
 export async function GET(
   req: Request,
-  { params }: { params: { recordId: string } }
+  { params }: { params: Promise<{ recordId: string }> }
 ) {
   try {
     // ✅ 1. Authentication
@@ -41,7 +41,7 @@ export async function GET(
     }
 
     const patientId = decoded.userId;
-    const recordId = params.recordId;
+    const { recordId } = await params;
 
     // ✅ 3. Get medical record
     const record = await MedicalRecordModel.getById(recordId);

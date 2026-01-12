@@ -11,7 +11,7 @@ import { generateInvoiceNumber, calculateDueDate } from "@/lib/invoice-utils";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { bookingId: string } }
+  { params }: { params: Promise<{ bookingId: string }> }
 ) {
   try {
     // ✅ 1. Authentication
@@ -31,7 +31,7 @@ export async function PATCH(
       );
     }
 
-    const { bookingId } = params;
+    const { bookingId } = await params;
     const db = await getDb();
     const patientObjectId = new ObjectId(userId);
     const bookingsCollection = db.collection("bookings");

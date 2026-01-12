@@ -10,7 +10,7 @@ import DoctorModel from "@/db/models/Doctor";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ bookingId: string }> | { bookingId: string } }
+  { params }: { params: Promise<{ bookingId: string }> }
 ) {
   try {
     // ✅ 1. Authentication
@@ -27,9 +27,8 @@ export async function PATCH(
       );
     }
 
-    // ✅ Handle Next.js 15 params (can be Promise)
-    const resolvedParams = params instanceof Promise ? await params : params;
-    const { bookingId } = resolvedParams;
+    // ✅ Handle Next.js 16 params (Promise)
+    const { bookingId } = await params;
 
     // ✅ 2. Validate bookingId format
     if (!bookingId || !ObjectId.isValid(bookingId)) {
