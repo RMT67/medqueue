@@ -46,12 +46,13 @@ export interface Invoice {
   discount?: number;
   total: number;
   paymentStatus: PaymentStatus;
-  paymentMethod: string | null;
+  paymentMethod?: string | null;
   paymentReference: string | null;
-  paidAt: Date | string | null;
+  paidAt?: Date | string | null;
   notes?: string;
   createdAt: Date | string;
   updatedAt: Date | string;
+  status?: "pending" | "paid" | "cancelled";
 }
 
 // Helper type for creating new invoices (without _id, createdAt, updatedAt)

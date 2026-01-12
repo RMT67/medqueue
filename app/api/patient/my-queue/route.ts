@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
-import DoctorScheduleModel from "@/db/models/DoctorSchedule";
+import DoctorScheduleModel, { DayOfWeek } from "@/db/models/DoctorSchedule";
 import MedicalRecordModel from "@/db/models/MedicalRecord";
 import ReviewModel from "@/db/models/Review";
 
@@ -104,8 +104,9 @@ export async function GET(req: Request) {
 
             // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
             // NOTE: Field di database adalah "availabel" (dengan typo), bukan "available"
+
             const daySchedule = schedule.dayOfWeek.find(
-              (d) =>
+              (d: DayOfWeek) =>
                 (d.hari === dayNameIndonesian || d.hari === dayNameEnglish) &&
                 (d.availabel === true || (d.startTime && d.endTime)) // Cek available atau minimal punya startTime/endTime
             );
@@ -165,7 +166,7 @@ export async function GET(req: Request) {
 
             // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
             const availableDay = defaultSchedule.dayOfWeek.find(
-              (d) =>
+              (d: DayOfWeek) =>
                 (d.hari === dayNameIndonesian || d.hari === dayNameEnglish) &&
                 (d.availabel === true || (d.startTime && d.endTime))
             );

@@ -34,7 +34,9 @@ export default class InvoiceModel {
     return db.collection("invoices");
   }
 
-  static async create(invoiceData: Omit<Invoice, "_id" | "createdAt" | "updatedAt">) {
+  static async create(
+    invoiceData: Omit<Invoice, "_id" | "createdAt" | "updatedAt">
+  ) {
     const collection = await this.collection();
     const invoice = {
       ...invoiceData,
@@ -55,7 +57,9 @@ export default class InvoiceModel {
 
   static async getByMedicalRecordId(medicalRecordId: string) {
     const collection = await this.collection();
-    return collection.findOne({ medicalRecordId: new ObjectId(medicalRecordId) });
+    return collection.findOne({
+      medicalRecordId: new ObjectId(medicalRecordId),
+    });
   }
 
   static async getByPatientId(patientId: string, status?: string) {
@@ -71,14 +75,13 @@ export default class InvoiceModel {
     const collection = await this.collection();
     await collection.updateOne(
       { _id: new ObjectId(invoiceId) },
-      { 
+      {
         $set: {
           ...updateData,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       }
     );
     return await this.getById(invoiceId);
   }
 }
-

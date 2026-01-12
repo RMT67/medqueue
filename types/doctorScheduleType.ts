@@ -2,7 +2,8 @@ import { ObjectId } from "mongodb";
 
 interface DayOfWeek {
   hari: string;
-  available: boolean;
+  available?: boolean;
+  availabel?: boolean;
   startTime: string;
   endTime: string;
 }

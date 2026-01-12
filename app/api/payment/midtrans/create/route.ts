@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
 import { verifyToken } from "@/lib/auth-helper";
 import InvoiceModel from "@/db/models/Invoice";
 import connectDB from "@/lib/db";
@@ -99,11 +98,11 @@ export async function POST(req: Request) {
         order_id: `INV-${invoice.invoiceNumber}-${Date.now()}`,
         gross_amount: invoice.total,
       },
-      item_details: invoice.items.map((item) => ({
+      item_details: invoice.items.map((item: { type: string; unitPrice: number; quantity: number; name?: string; serviceName?: string; medicineName?: string }) => ({
         id: item.type,
         price: item.unitPrice,
         quantity: item.quantity,
-        name: item.name,
+        name: item.name || item.serviceName || item.medicineName || item.type,
       })),
       customer_details: {
         first_name: patient.fullName || "Patient",
@@ -143,10 +142,10 @@ export async function POST(req: Request) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating Midtrans payment:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create payment" },
+      { error: error instanceof Error ? error.message : "Failed to create payment" },
       { status: 500 }
     );
   }

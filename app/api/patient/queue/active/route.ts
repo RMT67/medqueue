@@ -4,7 +4,7 @@ import { getDb } from "@/db/config/mongodb";
 import { verifyToken } from "@/lib/auth-helper";
 import BookingModel from "@/db/models/Booking";
 import DoctorModel from "@/db/models/Doctor";
-import DoctorScheduleModel from "@/db/models/DoctorSchedule";
+import DoctorScheduleModel, { DayOfWeek } from "@/db/models/DoctorSchedule";
 import { calculateEstimatedCallTime } from "@/lib/queue-utils";
 import {
   emitQueuePositionUpdate,
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
           // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
           // NOTE: Field di database adalah "availabel" (dengan typo), bukan "available"
           const bookingDaySchedule = schedule.dayOfWeek.find(
-            (day) =>
+            (day: DayOfWeek) =>
               (day.hari === dayNameIndonesian || day.hari === dayNameEnglish) &&
               (day.availabel === true || (day.startTime && day.endTime))
           );
@@ -166,7 +166,7 @@ export async function GET(req: Request) {
           // Cari daySchedule yang sesuai dengan hari booking (coba kedua format)
           // NOTE: Field di database adalah "availabel" (dengan typo), bukan "available"
           const bookingDaySchedule = defaultSchedule.dayOfWeek.find(
-            (day) =>
+            (day: DayOfWeek) =>
               (day.hari === dayNameIndonesian || day.hari === dayNameEnglish) &&
               (day.availabel === true || (day.startTime && day.endTime))
           );
@@ -241,7 +241,7 @@ export async function GET(req: Request) {
       : currentQueueIndex;
 
     // ✅ 6. Get average service time from doctor
-    const averageServiceTime = doctor.averageServiceTime || 10; // default 10 minutes
+    const averageServiceTime = doctor.averageTimePerPatient || 10; // default 10 minutes
 
     // ✅ 7. Get actual session start time (when doctor started the session)
     // Check if there's any booking that's "in-progress" or "completed" to get actual start time
