@@ -1,5 +1,6 @@
 import { Server as SocketIOServer } from "socket.io";
 import { Server as HTTPServer } from "http";
+import { DayOfWeek } from "@/db/models/DoctorSchedule";
 
 // Get Socket.IO instance from global (set by server.js)
 export function getSocketIO(): SocketIOServer | null {
@@ -119,12 +120,14 @@ export async function recalculateAndEmitCallTimeUpdates(
       return;
     }
 
-    const averageServiceTime = doctor.averageServiceTime || 10;
+    const averageServiceTime = doctor.averageTimePerPatient || 10;
 
     // Get schedule startTime
     let scheduleStartTime: string | null = null;
-    if (doctor.scheduleId) {
-      const schedule = await DoctorScheduleModel.getById(doctor.scheduleId);
+    if (doctor._id) {
+      const schedule = await DoctorScheduleModel.getScheduleByDoctorId(
+        doctor._id
+      );
       if (schedule && schedule.dayOfWeek && schedule.dayOfWeek.length > 0) {
         const dayNames = [
           "Minggu",
@@ -137,7 +140,7 @@ export async function recalculateAndEmitCallTimeUpdates(
         ];
         const dayName = dayNames[targetDate.getDay()];
         const daySchedule = schedule.dayOfWeek.find(
-          (day) => day.hari === dayName
+          (day: DayOfWeek) => day.hari === dayName
         );
         if (daySchedule && daySchedule.startTime) {
           scheduleStartTime = daySchedule.startTime;
@@ -166,7 +169,7 @@ export async function recalculateAndEmitCallTimeUpdates(
         ];
         const dayName = dayNames[targetDate.getDay()];
         const daySchedule = defaultSchedule.dayOfWeek.find(
-          (day) => day.hari === dayName
+          (day: DayOfWeek) => day.hari === dayName
         );
         if (daySchedule && daySchedule.startTime) {
           scheduleStartTime = daySchedule.startTime;

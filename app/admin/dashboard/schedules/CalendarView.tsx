@@ -78,7 +78,9 @@ export function CalendarView({ schedules }: CalendarViewProps) {
             {/* Header - Days of Week */}
             <div className="grid grid-cols-8 border-b-2 border-border bg-muted/50 sticky top-0 z-20">
               <div className="p-4 border-r border-border bg-muted/70">
-                <span className="font-semibold text-sm text-foreground uppercase tracking-wide">Doctor</span>
+                <span className="font-semibold text-sm text-foreground uppercase tracking-wide">
+                  Doctor
+                </span>
               </div>
               {DAYS.map((day) => (
                 <div
@@ -112,7 +114,7 @@ export function CalendarView({ schedules }: CalendarViewProps) {
                   >
                     {/* Doctor Info Column */}
                     <div className="p-4 border-r border-border bg-muted/20 flex items-center gap-3 sticky left-0 z-10 backdrop-blur-sm">
-                      {schedule.doctorInfo.image ? (
+                      {schedule.doctorInfo?.image ? (
                         <Image
                           src={schedule.doctorInfo.image}
                           alt={schedule.doctorInfo.name}
@@ -123,21 +125,21 @@ export function CalendarView({ schedules }: CalendarViewProps) {
                       ) : (
                         <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-accent flex items-center justify-center border-2 border-primary/20 shadow-sm shrink-0">
                           <span className="text-white font-bold text-xs">
-                            {schedule.doctorInfo.name
+                            {schedule.doctorInfo?.name
                               .split(" ")
                               .map((n) => n[0])
                               .join("")
                               .toUpperCase()
-                              .slice(0, 2)}
+                              .slice(0, 2) ?? "DR"}
                           </span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm text-foreground truncate">
-                          {schedule.doctorInfo.name}
+                          {schedule.doctorInfo?.name ?? "Unknown Doctor"}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {schedule.doctorInfo.specialization}
+                          {schedule.doctorInfo?.specialization ?? "General"}
                         </p>
                       </div>
                     </div>
@@ -161,7 +163,8 @@ export function CalendarView({ schedules }: CalendarViewProps) {
                                 <div className="flex items-center gap-1.5">
                                   <Clock className="w-3.5 h-3.5 shrink-0" />
                                   <span className="text-xs font-bold">
-                                    {daySchedule.startTime} - {daySchedule.endTime}
+                                    {daySchedule.startTime} -{" "}
+                                    {daySchedule.endTime}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -198,9 +201,11 @@ export function CalendarView({ schedules }: CalendarViewProps) {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="w-4 h-4 text-primary" />
           <span>
-            Each colored block represents a doctor&apos;s available schedule for that day. 
+            Each colored block represents a doctor&apos;s available schedule for
+            that day.
             <span className="font-semibold text-foreground ml-1">
-              {schedules.length} doctor{schedules.length !== 1 ? "s" : ""} scheduled
+              {schedules.length} doctor{schedules.length !== 1 ? "s" : ""}{" "}
+              scheduled
             </span>
           </span>
         </div>

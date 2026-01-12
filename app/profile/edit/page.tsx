@@ -1,23 +1,33 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { Navigation } from "@/components/navigation"
-import { ProtectedRoute } from "@/components/protected-route"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { User, Mail, Phone, Camera, Save, ArrowLeft, Calendar, MapPin, UserCircle } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
-import { apiFetch } from "@/lib/api"
-import { ProfileUser } from "@/types/userTypes"
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Navigation } from "@/components/navigation";
+import { ProtectedRoute } from "@/components/protected-route";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  User,
+  Mail,
+  Phone,
+  Camera,
+  Save,
+  ArrowLeft,
+  Calendar,
+  MapPin,
+  UserCircle,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api";
+import { ProfileUser } from "@/types/userTypes";
 
 export default function EditProfilePage() {
-  const router = useRouter()
-  const { user: authUser } = useAuth()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter();
+  const { user: authUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -25,76 +35,76 @@ export default function EditProfilePage() {
     dateOfBirth: "",
     gender: "" as "male" | "female" | "",
     address: "",
-  })
-  const [profileImage, setProfileImage] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  });
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        setIsLoading(true)
-        const data = await apiFetch<{ user: ProfileUser }>("/api/profile")
+        setIsLoading(true);
+        const data = await apiFetch<{ user: ProfileUser }>("/api/profile");
         setFormData({
           fullName: data.user.fullName,
           phoneNumber: data.user.phoneNumber || "",
           dateOfBirth: data.user.dateOfBirth || "",
           gender: data.user.gender || "",
           address: data.user.address || "",
-        })
-        setProfileImage(data.user.photoUrl)
-        setError(null)
+        });
+        setProfileImage(data.user.photoUrl ?? null);
+        setError(null);
       } catch (err) {
-        console.error("Error fetching profile:", err)
-        setError(err instanceof Error ? err.message : "Failed to load profile")
+        console.error("Error fetching profile:", err);
+        setError(err instanceof Error ? err.message : "Failed to load profile");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
     if (authUser) {
-      fetchProfile()
+      fetchProfile();
     }
-  }, [authUser])
+  }, [authUser]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    
+    const file = e.target.files?.[0];
+
     // Jika tidak ada file, return
     if (!file) {
-      return
+      return;
     }
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      setError("Please select an image file")
-      return
+      setError("Please select an image file");
+      return;
     }
 
     // Set uploading state
-    setIsUploading(true)
-    setError(null)
-    setSuccessMessage(null)
+    setIsUploading(true);
+    setError(null);
+    setSuccessMessage(null);
 
     // Create preview immediately
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onloadend = () => {
-      setProfileImage(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+      setProfileImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
 
     try {
-      const token = localStorage.getItem("medqueue_token")
+      const token = localStorage.getItem("medqueue_token");
       if (!token) {
-        throw new Error("No authentication token found")
+        throw new Error("No authentication token found");
       }
 
       // Create FormData and append file
-      const formDataToSend = new FormData()
-      formDataToSend.append("file", file)
+      const formDataToSend = new FormData();
+      formDataToSend.append("file", file);
 
       // Upload to /api/profile/photo
       const response = await fetch("/api/profile/photo", {
@@ -103,135 +113,138 @@ export default function EditProfilePage() {
           Authorization: `Bearer ${token}`,
         },
         body: formDataToSend,
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to upload photo")
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to upload photo");
       }
 
-      const data = await response.json() as { user: ProfileUser }
+      const data = (await response.json()) as { user: ProfileUser };
 
       // Update preview avatar dengan photoUrl dari response
-      setProfileImage(data.user.photoUrl)
+      setProfileImage(data.user.photoUrl ?? null);
 
       // Update localStorage "medqueue_user" agar navbar/avatar ikut berubah
-      const savedUser = localStorage.getItem("medqueue_user")
+      const savedUser = localStorage.getItem("medqueue_user");
       if (savedUser) {
         try {
-          const userData = JSON.parse(savedUser)
+          const userData = JSON.parse(savedUser);
           const updatedUser = {
             ...userData,
             name: data.user.fullName,
             fullName: data.user.fullName,
             photoUrl: data.user.photoUrl,
-          }
-          localStorage.setItem("medqueue_user", JSON.stringify(updatedUser))
-          
+          };
+          localStorage.setItem("medqueue_user", JSON.stringify(updatedUser));
+
           // Trigger custom event to update auth context
-          window.dispatchEvent(new Event("medqueue_user_updated"))
+          window.dispatchEvent(new Event("medqueue_user_updated"));
         } catch (e) {
-          console.error("Error updating localStorage:", e)
+          console.error("Error updating localStorage:", e);
         }
       }
 
-      setSuccessMessage("Photo uploaded successfully!")
-      setTimeout(() => setSuccessMessage(null), 3000)
+      setSuccessMessage("Photo uploaded successfully!");
+      setTimeout(() => setSuccessMessage(null), 3000);
 
       // Reset file input untuk allow re-select same file
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+        fileInputRef.current.value = "";
       }
     } catch (err) {
-      console.error("Upload photo error:", err)
-      setError(err instanceof Error ? err.message : "Failed to upload photo")
+      console.error("Upload photo error:", err);
+      setError(err instanceof Error ? err.message : "Failed to upload photo");
       // Reset preview jika error
-      setProfileImage(null)
+      setProfileImage(null);
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSaving(true)
-    setError(null)
-    setSuccessMessage(null)
+    e.preventDefault();
+    setIsSaving(true);
+    setError(null);
+    setSuccessMessage(null);
 
     try {
       const updateData: Record<string, unknown> = {
         fullName: formData.fullName.trim(),
-      }
+      };
 
       // Phone number
       if (formData.phoneNumber.trim()) {
-        updateData.phoneNumber = formData.phoneNumber.trim()
+        updateData.phoneNumber = formData.phoneNumber.trim();
       } else {
-        updateData.phoneNumber = null
+        updateData.phoneNumber = null;
       }
 
       // Date of birth
       if (formData.dateOfBirth && formData.dateOfBirth.trim()) {
-        updateData.dateOfBirth = formData.dateOfBirth
+        updateData.dateOfBirth = formData.dateOfBirth;
       } else {
-        updateData.dateOfBirth = null
+        updateData.dateOfBirth = null;
       }
 
       // Gender
-      if (formData.gender && (formData.gender === "male" || formData.gender === "female")) {
-        updateData.gender = formData.gender
+      if (
+        formData.gender &&
+        (formData.gender === "male" || formData.gender === "female")
+      ) {
+        updateData.gender = formData.gender;
       } else {
-        updateData.gender = null
+        updateData.gender = null;
       }
 
       // Address
       if (formData.address.trim()) {
-        updateData.address = formData.address.trim()
+        updateData.address = formData.address.trim();
       } else {
-        updateData.address = null
+        updateData.address = null;
       }
 
-      console.log("Sending update data:", updateData)
+      console.log("Sending update data:", updateData);
 
       const data = await apiFetch<{ user: ProfileUser }>("/api/profile", {
         method: "PATCH",
         body: updateData,
-      })
+      });
 
-      console.log("Update response:", data)
+      console.log("Update response:", data);
 
       // Update localStorage medqueue_user
-      const savedUser = localStorage.getItem("medqueue_user")
+      const savedUser = localStorage.getItem("medqueue_user");
       if (savedUser) {
         try {
-          const userData = JSON.parse(savedUser)
+          const userData = JSON.parse(savedUser);
           const updatedUser = {
             ...userData,
             name: data.user.fullName,
             fullName: data.user.fullName,
             photoUrl: data.user.photoUrl,
             phoneNumber: data.user.phoneNumber,
-          }
-          localStorage.setItem("medqueue_user", JSON.stringify(updatedUser))
-          
+          };
+          localStorage.setItem("medqueue_user", JSON.stringify(updatedUser));
+
           // Trigger custom event to update auth context
-          window.dispatchEvent(new Event("medqueue_user_updated"))
+          window.dispatchEvent(new Event("medqueue_user_updated"));
         } catch (e) {
-          console.error("Error updating localStorage:", e)
+          console.error("Error updating localStorage:", e);
         }
       }
 
-      setSuccessMessage("Profile updated successfully!")
+      setSuccessMessage("Profile updated successfully!");
       setTimeout(() => {
-        router.push("/profile")
-      }, 1500)
+        router.push("/profile");
+      }, 1500);
     } catch (err) {
-      console.error("Update error:", err)
-      setError(err instanceof Error ? err.message : "Failed to update profile")
+      console.error("Update error:", err);
+      setError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -243,7 +256,7 @@ export default function EditProfilePage() {
           </div>
         </div>
       </ProtectedRoute>
-    )
+    );
   }
 
   const initials = formData.fullName
@@ -251,7 +264,7 @@ export default function EditProfilePage() {
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2)
+    .slice(0, 2);
 
   return (
     <ProtectedRoute>
@@ -274,8 +287,12 @@ export default function EditProfilePage() {
                 <User className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-bold text-foreground">Edit Profile</h1>
-                <p className="text-muted-foreground text-base">Update your personal information</p>
+                <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
+                  Edit Profile
+                </h1>
+                <p className="text-muted-foreground text-base">
+                  Update your personal information
+                </p>
               </div>
             </div>
           </div>
@@ -283,21 +300,27 @@ export default function EditProfilePage() {
           {/* Error Message */}
           {error && (
             <Card className="p-4 mb-6 bg-red-50 dark:bg-red-950/50 border-2 border-red-200 dark:border-red-800">
-              <p className="text-red-700 dark:text-red-300 font-semibold">{error}</p>
+              <p className="text-red-700 dark:text-red-300 font-semibold">
+                {error}
+              </p>
             </Card>
           )}
 
           {/* Success Message */}
           {successMessage && (
             <Card className="p-4 mb-6 bg-green-50 dark:bg-green-950/50 border-2 border-green-200 dark:border-green-800">
-              <p className="text-green-700 dark:text-green-300 font-semibold">{successMessage}</p>
+              <p className="text-green-700 dark:text-green-300 font-semibold">
+                {successMessage}
+              </p>
             </Card>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Profile Photo Section */}
             <Card className="p-6 lg:p-8 border-2 shadow-lg">
-              <h2 className="text-xl font-bold text-foreground mb-6">Profile Photo</h2>
+              <h2 className="text-xl font-bold text-foreground mb-6">
+                Profile Photo
+              </h2>
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="relative">
                   <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent overflow-hidden shadow-lg">
@@ -351,8 +374,8 @@ export default function EditProfilePage() {
                       )}
                     </Button>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {isUploading 
-                        ? "Uploading your photo..." 
+                      {isUploading
+                        ? "Uploading your photo..."
                         : "Select an image file to upload automatically"}
                     </p>
                   </div>
@@ -362,7 +385,9 @@ export default function EditProfilePage() {
 
             {/* Personal Information */}
             <Card className="p-6 lg:p-8 border-2 shadow-lg">
-              <h2 className="text-xl font-bold text-foreground mb-6">Personal Information</h2>
+              <h2 className="text-xl font-bold text-foreground mb-6">
+                Personal Information
+              </h2>
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
@@ -372,7 +397,9 @@ export default function EditProfilePage() {
                   <Input
                     type="text"
                     value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fullName: e.target.value })
+                    }
                     className="h-12 border-2 focus:border-primary transition-colors"
                     required
                     disabled={isSaving}
@@ -391,7 +418,9 @@ export default function EditProfilePage() {
                     disabled
                     readOnly
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Email cannot be changed
+                  </p>
                 </div>
 
                 <div>
@@ -402,7 +431,9 @@ export default function EditProfilePage() {
                   <Input
                     type="tel"
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phoneNumber: e.target.value })
+                    }
                     placeholder="+1 (555) 123-4567"
                     className="h-12 border-2 focus:border-primary transition-colors"
                     disabled={isSaving}
@@ -417,7 +448,9 @@ export default function EditProfilePage() {
                   <Input
                     type="date"
                     value={formData.dateOfBirth}
-                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dateOfBirth: e.target.value })
+                    }
                     className="h-12 border-2 focus:border-primary transition-colors"
                     disabled={isSaving}
                   />
@@ -430,7 +463,12 @@ export default function EditProfilePage() {
                   </label>
                   <select
                     value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as "male" | "female" | "" })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        gender: e.target.value as "male" | "female" | "",
+                      })
+                    }
                     className="flex h-12 w-full rounded-md border-2 border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-primary focus-visible:ring-primary/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                     disabled={isSaving}
                   >
@@ -447,13 +485,14 @@ export default function EditProfilePage() {
                   </label>
                   <Textarea
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
                     placeholder="Enter your address"
                     className="min-h-24 border-2 focus:border-primary transition-colors"
                     disabled={isSaving}
                   />
                 </div>
-
               </div>
             </Card>
 
@@ -490,5 +529,5 @@ export default function EditProfilePage() {
         </main>
       </div>
     </ProtectedRoute>
-  )
+  );
 }

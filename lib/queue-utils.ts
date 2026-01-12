@@ -1,7 +1,7 @@
 import { getDb } from "@/db/config/mongodb";
 import { ObjectId } from "mongodb";
 import DoctorModel from "@/db/models/Doctor";
-import DoctorScheduleModel from "@/db/models/DoctorSchedule";
+import DoctorScheduleModel, { DayOfWeek } from "@/db/models/DoctorSchedule";
 
 /**
  * Calculate estimated call time based on patients ahead and average service time
@@ -24,7 +24,9 @@ export function calculateEstimatedCallTime(
   if (actualSessionStartTime) {
     // Calculate call time: actualSessionStartTime + (patientsAhead * averageServiceTime)
     const totalWaitMinutes = patientsAhead * averageServiceTime;
-    const callTime = new Date(actualSessionStartTime.getTime() + totalWaitMinutes * 60 * 1000);
+    const callTime = new Date(
+      actualSessionStartTime.getTime() + totalWaitMinutes * 60 * 1000
+    );
 
     const hours = callTime.getHours();
     const minutes = callTime.getMinutes();
@@ -32,8 +34,11 @@ export function calculateEstimatedCallTime(
     const displayMinutes = minutes.toString().padStart(2, "0");
 
     const currentTime = new Date();
-    const minutesUntil = Math.max(0, Math.ceil((callTime.getTime() - currentTime.getTime()) / (60 * 1000)));
-    
+    const minutesUntil = Math.max(
+      0,
+      Math.ceil((callTime.getTime() - currentTime.getTime()) / (60 * 1000))
+    );
+
     let formatted: string;
     if (minutesUntil <= 1) {
       formatted = "Any moment now";
@@ -49,20 +54,20 @@ export function calculateEstimatedCallTime(
       estimatedTime: totalWaitMinutes,
       estimatedCallTime: `${displayHours}:${displayMinutes}`,
       estimatedCallTimeTimestamp: callTime,
-      estimatedCallTimeFormatted: formatted
+      estimatedCallTimeFormatted: formatted,
     };
   }
 
   // Parse schedule startTime (used when doctor hasn't started yet)
   let startTime: Date;
-  
+
   if (scheduleStartTime) {
     if (scheduleStartTime instanceof Date) {
       startTime = scheduleStartTime;
     } else if (typeof scheduleStartTime === "string") {
       // Parse "09:00" format
       const [hours, minutes] = scheduleStartTime.split(":").map(Number);
-      
+
       // ✅ FIX: Use scheduleDate properly, ensuring correct date handling
       let baseDate: Date;
       if (scheduleDate) {
@@ -81,9 +86,13 @@ export function calculateEstimatedCallTime(
       } else {
         // Use today's date if scheduleDate not provided
         const today = new Date();
-        baseDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        baseDate = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate()
+        );
       }
-      
+
       // Create startTime with correct date and time (local timezone)
       startTime = new Date(
         baseDate.getFullYear(),
@@ -97,14 +106,23 @@ export function calculateEstimatedCallTime(
     } else {
       // Invalid scheduleStartTime format, use today with default 09:00
       const today = new Date();
-      startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0, 0, 0);
+      startTime = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        9,
+        0,
+        0,
+        0
+      );
     }
   } else {
     // ✅ FIX: If no scheduleStartTime, use scheduleDate with default 09:00 instead of current time
     if (scheduleDate) {
-      const baseDate = typeof scheduleDate === "string" 
-        ? new Date(scheduleDate) 
-        : new Date(scheduleDate);
+      const baseDate =
+        typeof scheduleDate === "string"
+          ? new Date(scheduleDate)
+          : new Date(scheduleDate);
       // Use 09:00 as default start time
       startTime = new Date(
         baseDate.getFullYear(),
@@ -118,7 +136,15 @@ export function calculateEstimatedCallTime(
     } else {
       // Last resort: use today at 09:00
       const today = new Date();
-      startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0, 0, 0);
+      startTime = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        9,
+        0,
+        0,
+        0
+      );
     }
   }
 
@@ -132,8 +158,11 @@ export function calculateEstimatedCallTime(
   const displayMinutes = minutes.toString().padStart(2, "0");
 
   const currentTime = new Date();
-  const minutesUntil = Math.max(0, Math.ceil((callTime.getTime() - currentTime.getTime()) / (60 * 1000)));
-  
+  const minutesUntil = Math.max(
+    0,
+    Math.ceil((callTime.getTime() - currentTime.getTime()) / (60 * 1000))
+  );
+
   let formatted: string;
   if (minutesUntil <= 1) {
     formatted = "Any moment now";
@@ -149,7 +178,7 @@ export function calculateEstimatedCallTime(
     estimatedTime: totalWaitMinutes,
     estimatedCallTime: `${displayHours}:${displayMinutes}`,
     estimatedCallTimeTimestamp: callTime,
-    estimatedCallTimeFormatted: formatted
+    estimatedCallTimeFormatted: formatted,
   };
 }
 
@@ -185,8 +214,8 @@ export async function calculateClinicTraffic(
     status: { $in: ["confirmed", "in-progress"] },
     appointmentTime: {
       $gte: todayStart,
-      $lt: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
-    }
+      $lt: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000),
+    },
   });
 
   const percentage = maxPatients > 0 ? (totalBookings / maxPatients) * 100 : 0;
@@ -206,7 +235,7 @@ export async function calculateClinicTraffic(
     clinicTraffic,
     clinicTrafficPercentage: Math.round(percentage),
     totalBookings,
-    maxPatients
+    maxPatients,
   };
 }
 
@@ -226,7 +255,7 @@ export async function calculateScheduleStatus(
     return {
       scheduleStatus: "on-schedule",
       scheduleDelay: 0,
-      isOnTime: true
+      isOnTime: true,
     };
   }
 
@@ -235,26 +264,38 @@ export async function calculateScheduleStatus(
     return {
       scheduleStatus: "on-schedule",
       scheduleDelay: 0,
-      isOnTime: true
+      isOnTime: true,
     };
   }
 
   // Get today's schedule
   const today = new Date();
-  const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  const dayNames = [
+    "Minggu",
+    "Senin",
+    "Selasa",
+    "Rabu",
+    "Kamis",
+    "Jumat",
+    "Sabtu",
+  ];
   const todayName = dayNames[today.getDay()];
-  
-  const todaySchedule = schedule.dayOfWeek.find(day => day.hari === todayName);
+
+  const todaySchedule = schedule.dayOfWeek.find(
+    (day: DayOfWeek) => day.hari === todayName
+  );
   if (!todaySchedule || !todaySchedule.availabel) {
     return {
       scheduleStatus: "on-schedule",
       scheduleDelay: 0,
-      isOnTime: true
+      isOnTime: true,
     };
   }
 
   // Parse start time
-  const [startHour, startMinute] = todaySchedule.startTime.split(":").map(Number);
+  const [startHour, startMinute] = todaySchedule.startTime
+    .split(":")
+    .map(Number);
   const scheduledStartTime = new Date(today);
   scheduledStartTime.setHours(startHour, startMinute, 0, 0);
 
@@ -274,7 +315,7 @@ export async function calculateScheduleStatus(
   return {
     scheduleStatus,
     scheduleDelay: Math.max(0, delayMinutes),
-    isOnTime: delayMinutes <= 5
+    isOnTime: delayMinutes <= 5,
   };
 }
 
@@ -300,7 +341,7 @@ export async function generateInsights(
   };
 }> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!openaiApiKey) {
     // Fallback insights without AI
     return generateFallbackInsights(
@@ -323,10 +364,18 @@ export async function generateInsights(
     if (callTimeDate < new Date()) {
       callTimeDate.setDate(callTimeDate.getDate() + 1);
     }
-    
+
     const bufferMinutes = 5; // Arrive 5 minutes before
-    const arrivalTimeDate = new Date(callTimeDate.getTime() - bufferMinutes * 60 * 1000);
-    const arrivalTimeStr = `${arrivalTimeDate.getHours().toString().padStart(2, "0")}:${arrivalTimeDate.getMinutes().toString().padStart(2, "0")}`;
+    const arrivalTimeDate = new Date(
+      callTimeDate.getTime() - bufferMinutes * 60 * 1000
+    );
+    const arrivalTimeStr = `${arrivalTimeDate
+      .getHours()
+      .toString()
+      .padStart(2, "0")}:${arrivalTimeDate
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
 
     // Build context string with actual data
     let scheduleStatusDesc = "";
@@ -350,20 +399,58 @@ export async function generateInsights(
     }
 
     // Generate varied examples based on the situation
-    const queueVariations = patientsAhead === 0 
-      ? ["You're up next - almost your turn!", "Great news, you're first in line!", "You're next - no waiting!", "It's your turn soon!", "You're at the front of the queue!"]
-      : [`Just ${patientsAhead} ${patientsAhead === 1 ? 'person' : 'people'} ahead of you`, `Only ${patientsAhead} ${patientsAhead === 1 ? 'patient' : 'patients'} before you`, `There are ${patientsAhead} ${patientsAhead === 1 ? 'person' : 'people'} in front of you`, `You've got ${patientsAhead} ${patientsAhead === 1 ? 'person' : 'people'} ahead`];
-    
-    const trafficVariations = clinicTraffic === "low"
-      ? ["super quiet", "really quiet", "pretty empty", "not busy at all", "very quiet", "hardly anyone there"]
-      : clinicTraffic === "normal"
-      ? ["normal busyness", "moderately busy", "average traffic", "typical day", "regular pace"]
-      : ["quite busy", "pretty packed", "getting crowded", "busy day"];
+    const queueVariations =
+      patientsAhead === 0
+        ? [
+            "You're up next - almost your turn!",
+            "Great news, you're first in line!",
+            "You're next - no waiting!",
+            "It's your turn soon!",
+            "You're at the front of the queue!",
+          ]
+        : [
+            `Just ${patientsAhead} ${
+              patientsAhead === 1 ? "person" : "people"
+            } ahead of you`,
+            `Only ${patientsAhead} ${
+              patientsAhead === 1 ? "patient" : "patients"
+            } before you`,
+            `There are ${patientsAhead} ${
+              patientsAhead === 1 ? "person" : "people"
+            } in front of you`,
+            `You've got ${patientsAhead} ${
+              patientsAhead === 1 ? "person" : "people"
+            } ahead`,
+          ];
+
+    const trafficVariations =
+      clinicTraffic === "low"
+        ? [
+            "super quiet",
+            "really quiet",
+            "pretty empty",
+            "not busy at all",
+            "very quiet",
+            "hardly anyone there",
+          ]
+        : clinicTraffic === "normal"
+        ? [
+            "normal busyness",
+            "moderately busy",
+            "average traffic",
+            "typical day",
+            "regular pace",
+          ]
+        : ["quite busy", "pretty packed", "getting crowded", "busy day"];
 
     const prompt = `You are a friendly healthcare assistant. Write like you're texting a friend - casual, warm, and varied. NEVER use the same phrases twice. Be creative and use different expressions every time.
 
 Current situation:
-- Queue: ${patientsAhead === 0 ? "You're next!" : `${patientsAhead} ${patientsAhead === 1 ? 'person' : 'people'} ahead`}
+- Queue: ${
+      patientsAhead === 0
+        ? "You're next!"
+        : `${patientsAhead} ${patientsAhead === 1 ? "person" : "people"} ahead`
+    }
 - Schedule: ${scheduleStatusDesc}
 - Clinic: ${trafficDesc}
 - Visit time: ${averageServiceTime} minutes average
@@ -413,7 +500,11 @@ VARY YOUR LANGUAGE - don't repeat patterns. Make each response unique and fresh!
 Return JSON:
 {
   "insights": ["detailed insight 1 (2-3 sentences)", "detailed insight 2 (2-3 sentences)", "detailed insight 3 (2-3 sentences)", "detailed insight 4 (optional, 2-3 sentences)", "detailed insight 5 (optional, 2-3 sentences)"],
-  "warnings": ${scheduleDelay > 15 || clinicTrafficPercentage > 80 ? '["warning if needed"]' : '[]'},
+  "warnings": ${
+    scheduleDelay > 15 || clinicTrafficPercentage > 80
+      ? '["warning if needed"]'
+      : "[]"
+  },
   "smartSuggestion": {
     "arrivalTime": "${arrivalTimeStr}",
     "reason": "LONG, DETAILED suggestion (3-5 sentences minimum) explaining why arriving at ${arrivalTimeStr} is beneficial, what to do during wait, how it helps, and any tips - must include ${arrivalTimeStr} and ${estimatedCallTime}"
@@ -435,39 +526,40 @@ IMPORTANT: Make insights LONGER and MORE DETAILED. Each insight should be 2-3 se
       scheduleDelay,
       clinicTraffic,
       clinicTrafficPercentage,
-      estimatedCallTime
+      estimatedCallTime,
     });
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiApiKey}`
+        Authorization: `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
         model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "You are a creative, friendly healthcare assistant. Write like you're texting a friend - casual, warm, and ALWAYS use different expressions. Never repeat the same phrases. Be creative, varied, and natural. Vary your language style every time. Always respond with valid JSON only."
+            content:
+              "You are a creative, friendly healthcare assistant. Write like you're texting a friend - casual, warm, and ALWAYS use different expressions. Never repeat the same phrases. Be creative, varied, and natural. Vary your language style every time. Always respond with valid JSON only.",
           },
           {
             role: "user",
-            content: prompt
-          }
+            content: prompt,
+          },
         ],
         temperature: 1.0, // Maximum creativity for varied responses
         top_p: 0.95, // Nucleus sampling for more diverse outputs
         frequency_penalty: 0.7, // Penalize repetition to encourage variety
         presence_penalty: 0.6, // Encourage new topics/phrases
-        max_tokens: 1200 // Much more tokens for longer, detailed responses
-      })
+        max_tokens: 1200, // Much more tokens for longer, detailed responses
+      }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("❌ OpenAI API error:", response.status, errorText);
-      
+
       // Handle specific error types
       if (response.status === 401) {
         console.error("❌ Invalid OpenAI API key");
@@ -476,24 +568,24 @@ IMPORTANT: Make insights LONGER and MORE DETAILED. Each insight should be 2-3 se
       } else if (response.status >= 500) {
         console.error("❌ OpenAI API server error");
       }
-      
+
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content;
-    
+
     if (!content) {
       console.warn("⚠️ OpenAI returned empty content, using fallback");
       throw new Error("OpenAI returned empty content");
     }
 
     console.log("✅ OpenAI API response received");
-    
+
     try {
       // Try to parse JSON response
       let parsed = JSON.parse(content);
-      
+
       // Validate structure
       if (!parsed.insights || !Array.isArray(parsed.insights)) {
         throw new Error("Invalid insights structure");
@@ -501,9 +593,11 @@ IMPORTANT: Make insights LONGER and MORE DETAILED. Each insight should be 2-3 se
       if (!parsed.smartSuggestion || !parsed.smartSuggestion.arrivalTime) {
         throw new Error("Invalid smartSuggestion structure");
       }
-      
+
       // Validate and calculate arrival time timestamp
-      const [hours, minutes] = parsed.smartSuggestion.arrivalTime.split(":").map(Number);
+      const [hours, minutes] = parsed.smartSuggestion.arrivalTime
+        .split(":")
+        .map(Number);
       const arrivalTime = new Date();
       arrivalTime.setHours(hours, minutes, 0, 0);
       if (arrivalTime < new Date()) {
@@ -518,8 +612,9 @@ IMPORTANT: Make insights LONGER and MORE DETAILED. Each insight should be 2-3 se
         estimatedTime.setDate(estimatedTime.getDate() + 1);
       }
 
-      const diffMinutes = (estimatedTime.getTime() - arrivalTime.getTime()) / (60 * 1000);
-      
+      const diffMinutes =
+        (estimatedTime.getTime() - arrivalTime.getTime()) / (60 * 1000);
+
       // If arrival time is not within 5-10 minutes range, adjust it
       let finalArrivalTime = arrivalTime;
       if (diffMinutes < 5 || diffMinutes > 10) {
@@ -527,22 +622,24 @@ IMPORTANT: Make insights LONGER and MORE DETAILED. Each insight should be 2-3 se
         finalArrivalTime = new Date(estimatedTime.getTime() - 7 * 60 * 1000);
         const finalHours = finalArrivalTime.getHours();
         const finalMins = finalArrivalTime.getMinutes();
-        parsed.smartSuggestion.arrivalTime = `${finalHours.toString().padStart(2, "0")}:${finalMins.toString().padStart(2, "0")}`;
+        parsed.smartSuggestion.arrivalTime = `${finalHours
+          .toString()
+          .padStart(2, "0")}:${finalMins.toString().padStart(2, "0")}`;
       }
 
       // Validate and ensure reason is not empty
       const expectedReason = `Plan to arrive around ${parsed.smartSuggestion.arrivalTime} to ensure you're ready when your turn comes at ${estimatedCallTime}, while avoiding unnecessary waiting time.`;
-      
+
       console.log("✅ Successfully generated insights using OpenAI API");
-      
+
       return {
         insights: Array.isArray(parsed.insights) ? parsed.insights : [],
         warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
         smartSuggestion: {
           arrivalTime: parsed.smartSuggestion.arrivalTime, // Always use validated arrival time
           arrivalTimeTimestamp: finalArrivalTime,
-          reason: parsed.smartSuggestion.reason || expectedReason // Use validated reason
-        }
+          reason: parsed.smartSuggestion.reason || expectedReason, // Use validated reason
+        },
       };
     } catch (parseError) {
       console.error("❌ Failed to parse OpenAI JSON response:", parseError);
@@ -593,9 +690,13 @@ function generateFallbackInsights(
 
   // Generate insights (patient-friendly, calm, reassuring)
   if (scheduleStatus === "on-schedule") {
-    insights.push(`The doctor is running on schedule with an average service time of ${averageServiceTime} minutes per patient.`);
+    insights.push(
+      `The doctor is running on schedule with an average service time of ${averageServiceTime} minutes per patient.`
+    );
   } else if (scheduleStatus === "delayed") {
-    insights.push(`The schedule is running ${scheduleDelay} minutes behind, which may slightly affect your estimated call time.`);
+    insights.push(
+      `The schedule is running ${scheduleDelay} minutes behind, which may slightly affect your estimated call time.`
+    );
     // Only add warning if delay > 15 minutes
     if (scheduleDelay > 15) {
       warnings.push(`Schedule delay: ${scheduleDelay} minutes`);
@@ -603,19 +704,31 @@ function generateFallbackInsights(
   }
 
   if (clinicTraffic === "low") {
-    insights.push(`Clinic traffic is low today (${clinicTrafficPercentage}% capacity), which means shorter wait times.`);
+    insights.push(
+      `Clinic traffic is low today (${clinicTrafficPercentage}% capacity), which means shorter wait times.`
+    );
   } else if (clinicTraffic === "normal") {
-    insights.push(`Clinic traffic is normal (${clinicTrafficPercentage}% capacity), so wait times should be as expected.`);
+    insights.push(
+      `Clinic traffic is normal (${clinicTrafficPercentage}% capacity), so wait times should be as expected.`
+    );
   } else if (clinicTraffic === "high" || clinicTraffic === "very-high") {
-    insights.push(`Clinic traffic is ${clinicTraffic} (${clinicTrafficPercentage}% capacity), so you may experience slightly longer wait times.`);
+    insights.push(
+      `Clinic traffic is ${clinicTraffic} (${clinicTrafficPercentage}% capacity), so you may experience slightly longer wait times.`
+    );
     // Only add warning if traffic > 80%
     if (clinicTrafficPercentage > 80) {
-      warnings.push(`High clinic traffic: ${clinicTrafficPercentage}% capacity`);
+      warnings.push(
+        `High clinic traffic: ${clinicTrafficPercentage}% capacity`
+      );
     }
   }
 
   if (patientsAhead > 0) {
-    insights.push(`With ${patientsAhead} patient${patientsAhead !== 1 ? 's' : ''} ahead of you, your estimated call time is ${estimatedCallTime} (${estimatedCallTimeFormatted}).`);
+    insights.push(
+      `With ${patientsAhead} patient${
+        patientsAhead !== 1 ? "s" : ""
+      } ahead of you, your estimated call time is ${estimatedCallTime} (${estimatedCallTimeFormatted}).`
+    );
   } else {
     insights.push("You're next in line! Be ready for your appointment.");
   }
@@ -629,7 +742,10 @@ function generateFallbackInsights(
   }
 
   const arrivalTime = new Date(estimatedTime.getTime() - 7 * 60 * 1000); // 7 minutes before (middle of 5-10 range)
-  const arrivalTimeStr = `${arrivalTime.getHours().toString().padStart(2, "0")}:${arrivalTime.getMinutes().toString().padStart(2, "0")}`;
+  const arrivalTimeStr = `${arrivalTime
+    .getHours()
+    .toString()
+    .padStart(2, "0")}:${arrivalTime.getMinutes().toString().padStart(2, "0")}`;
 
   return {
     insights,
@@ -637,8 +753,7 @@ function generateFallbackInsights(
     smartSuggestion: {
       arrivalTime: arrivalTimeStr,
       arrivalTimeTimestamp: arrivalTime,
-      reason: `Plan to arrive around ${arrivalTimeStr} to ensure you're ready when your turn comes, while avoiding unnecessary waiting time.`
-    }
+      reason: `Plan to arrive around ${arrivalTimeStr} to ensure you're ready when your turn comes, while avoiding unnecessary waiting time.`,
+    },
   };
 }
-

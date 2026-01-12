@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "../config/mongodb";
+import { DoctorWithSchedule } from "@/types/scheduleTypes";
 
 export interface DayOfWeek {
   hari: string; // "Senin", "Selasa", "Minggu", etc.
@@ -52,6 +53,14 @@ export default class DoctorScheduleModel {
     return collection.findOne({ _id: new ObjectId(scheduleId) });
   }
 
+  static async getScheduleByDoctorId(doctorId: string) {
+    const collection = await this.collection();
+    const scheduleByDoctor = collection.findOne({
+      doctorId: new ObjectId(doctorId),
+    });
+    return scheduleByDoctor;
+  }
+
   static async getByDoctorId(doctorId: string) {
     const collection = await this.collection();
     // Support both ObjectId and string doctorId
@@ -59,7 +68,8 @@ export default class DoctorScheduleModel {
       $or: [{ doctorId: new ObjectId(doctorId) }, { doctorId: doctorId }],
       isAvailable: true,
     };
-    return collection.find(query).sort({ createdAt: 1 }).toArray();
+    const schedule = collection.find(query).sort({ createdAt: 1 }).toArray();
+    return schedule;
   }
 
   static async getDefaultSchedule(doctorId: string) {

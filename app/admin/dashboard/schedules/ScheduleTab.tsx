@@ -72,7 +72,8 @@ export function ScheduleTab({
             No Schedules Found
           </h3>
           <p className="text-muted-foreground max-w-md">
-            There are no doctor schedules available. Click "Add Schedule" to create a new schedule.
+            There are no doctor schedules available. Click &quot;Add
+            Schedule&quot; to create a new schedule.
           </p>
         </div>
       </Card>
@@ -87,8 +88,12 @@ export function ScheduleTab({
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {schedules.map((schedule) => {
-            const availableDays = schedule.dayOfWeek.filter((day) => day.available);
-            const initials = getInitials(schedule.doctorInfo.name);
+            const availableDays = schedule.dayOfWeek.filter(
+              (day) => day.available
+            );
+            const initials = getInitials(
+              schedule.doctorInfo?.name ?? "Unknown Doctor"
+            );
 
             return (
               <Card
@@ -98,7 +103,7 @@ export function ScheduleTab({
                 {/* Doctor Header */}
                 <div className="flex items-start gap-4 mb-5 pb-5 border-b-2 border-border">
                   <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-primary/20 shrink-0 shadow-md">
-                    {schedule.doctorInfo.image ? (
+                    {schedule.doctorInfo?.image ? (
                       <>
                         <Image
                           src={schedule.doctorInfo.image}
@@ -130,18 +135,18 @@ export function ScheduleTab({
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-foreground text-lg mb-1 truncate">
-                      {schedule.doctorInfo.name}
+                      {schedule.doctorInfo?.name}
                     </h3>
                     <div className="flex items-center gap-1.5 mb-1">
                       <Stethoscope className="w-3.5 h-3.5 text-primary shrink-0" />
                       <p className="text-sm text-muted-foreground font-medium truncate">
-                        {schedule.doctorInfo.specialization}
+                        {schedule.doctorInfo?.specialization}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <p className="text-xs text-muted-foreground truncate">
-                        {schedule.doctorInfo.clinic}
+                        {schedule.doctorInfo?.clinic}
                       </p>
                     </div>
                   </div>

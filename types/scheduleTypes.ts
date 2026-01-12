@@ -23,13 +23,13 @@ export type DoctorWithSchedule = {
   _id: string;
   doctorId: string;
   dayOfWeek: DaySchedule[];
-  timeRange: string;
+  timeRange?: string;
   isAvailable: boolean;
   firstCallTime: string | null;
   maxPatients: number;
   isOnTime: boolean;
   delayMinutes: number;
-  doctorInfo: {
+  doctorInfo?: {
     name: string;
     specialization: string;
     clinic: string;

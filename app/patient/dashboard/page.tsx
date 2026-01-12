@@ -744,7 +744,7 @@ export default function PatientDashboardPage() {
                         <Button
                           variant="outline"
                           onClick={() => {
-                            if (dashboardData.pendingInvoice.bookingId) {
+                            if (dashboardData.pendingInvoice?.bookingId) {
                               router.push(
                                 `/patient/invoices?bookingId=${dashboardData.pendingInvoice.bookingId}&status=${dashboardData.pendingInvoice.status}`
                               );

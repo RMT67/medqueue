@@ -1,106 +1,126 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Navigation } from "@/components/navigation"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useAuth } from "@/lib/auth-context"
-import { Calendar, Clock, MapPin, Stethoscope, Star, CheckCircle2, XCircle, Hourglass, ArrowLeft, MessageSquare, FileText, Receipt, Trash2 } from "lucide-react"
-import Image from "next/image"
-import { ProtectedRoute } from "@/components/protected-route"
-import { FadeIn, StaggerChildren } from "@/components/animations"
-import { ReviewDoctorModal } from "@/components/review-doctor-modal"
-import Swal from "sweetalert2"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Navigation } from "@/components/navigation";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Stethoscope,
+  Star,
+  CheckCircle2,
+  XCircle,
+  Hourglass,
+  ArrowLeft,
+  MessageSquare,
+  FileText,
+  Receipt,
+  Trash2,
+} from "lucide-react";
+import Image from "next/image";
+import { ProtectedRoute } from "@/components/protected-route";
+import { FadeIn, StaggerChildren } from "@/components/animations";
+import { ReviewDoctorModal } from "@/components/review-doctor-modal";
+import Swal from "sweetalert2";
 
 interface Appointment {
-  bookingId: string
-  bookingNumber: string
-  date: string
-  formattedDate: string
-  time: string
-  appointmentTime: string
-  status: string
-  statusDisplay: "upcoming" | "completed" | "cancelled"
+  bookingId: string;
+  bookingNumber: string;
+  date: string;
+  formattedDate: string;
+  time: string;
+  appointmentTime: string;
+  status: string;
+  statusDisplay: "upcoming" | "completed" | "cancelled";
   doctor: {
-    doctorId: string
-    name: string
-    specialization: string
-    clinic: string
-    rating: number
-    totalReviews: number
-    image: string
-  } | null
+    doctorId: string;
+    name: string;
+    specialization: string;
+    clinic: string;
+    rating: number;
+    totalReviews: number;
+    image: string;
+  } | null;
   service: {
-    serviceId: string
-    name: string
-    category: string
-    price: number
-  } | null
-  complaint: string
-  queueNumber: string | null
-  hasReview: boolean
+    serviceId: string;
+    name: string;
+    category: string;
+    price: number;
+  } | null;
+  complaint: string;
+  queueNumber: string | null;
+  hasReview: boolean;
   review: {
-    reviewId: string
-    rating: number
-    comment: string
-    createdAt: string
-  } | null
-  hasMedicalRecord: boolean
-  hasInvoice: boolean
-  invoiceId: string | null
+    reviewId: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+  } | null;
+  hasMedicalRecord: boolean;
+  hasInvoice: boolean;
+  invoiceId: string | null;
   invoice: {
-    _id: string
-    status: string
-    invoiceNumber: string
-    total: number
-  } | null
+    _id: string;
+    status: string;
+    invoiceNumber: string;
+    total: number;
+  } | null;
 }
 
 export default function MyAppointmentsPage() {
-  const router = useRouter()
-  const { user, logout } = useAuth()
-  const [filter, setFilter] = useState<"all" | "upcoming" | "completed" | "cancelled">("all")
-  const [showReviewModal, setShowReviewModal] = useState(false)
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const [filter, setFilter] = useState<
+    "all" | "upcoming" | "completed" | "cancelled"
+  >("all");
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   // ✅ Fetch appointments from API
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        const token = localStorage.getItem("medqueue_token")
+        const token = localStorage.getItem("medqueue_token");
         if (!token) {
-          setIsLoading(false)
-          return
+          setIsLoading(false);
+          return;
         }
 
-        const params = new URLSearchParams()
-        if (filter !== "all") params.append("status", filter)
+        const params = new URLSearchParams();
+        if (filter !== "all") params.append("status", filter);
 
-        const response = await fetch(`/api/patient/appointments?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        const response = await fetch(
+          `/api/patient/appointments?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (response.ok) {
-          const data = await response.json()
-          setAppointments(data.appointments || [])
+          const data = await response.json();
+          setAppointments(data.appointments || []);
         } else {
-          console.error("Failed to fetch appointments")
+          console.error("Failed to fetch appointments");
         }
       } catch (error) {
-        console.error("Error fetching appointments:", error)
+        console.error("Error fetching appointments:", error);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchAppointments()
-  }, [filter])
+    fetchAppointments();
+  }, [filter]);
 
   const handleCancelAppointment = async (bookingId: string) => {
     const result = await Swal.fire({
@@ -119,8 +139,8 @@ export default function MyAppointmentsPage() {
     }
 
     try {
-      setCancellingId(bookingId)
-      const token = localStorage.getItem("medqueue_token")
+      setCancellingId(bookingId);
+      const token = localStorage.getItem("medqueue_token");
       if (!token) {
         await Swal.fire({
           icon: "warning",
@@ -128,7 +148,7 @@ export default function MyAppointmentsPage() {
           text: "Please login to cancel appointment",
           confirmButtonColor: "#3b82f6",
         });
-        return
+        return;
       }
 
       const response = await fetch(`/api/patient/queue/${bookingId}/cancel`, {
@@ -138,22 +158,25 @@ export default function MyAppointmentsPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          cancelReason: "Cancelled by patient from appointments page"
+          cancelReason: "Cancelled by patient from appointments page",
         }),
-      })
+      });
 
       if (response.ok) {
         // Refresh appointments
-        const params = new URLSearchParams()
-        if (filter !== "all") params.append("status", filter)
-        const refreshResponse = await fetch(`/api/patient/appointments?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        const params = new URLSearchParams();
+        if (filter !== "all") params.append("status", filter);
+        const refreshResponse = await fetch(
+          `/api/patient/appointments?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (refreshResponse.ok) {
-          const data = await refreshResponse.json()
-          setAppointments(data.appointments || [])
+          const data = await refreshResponse.json();
+          setAppointments(data.appointments || []);
         }
         await Swal.fire({
           icon: "success",
@@ -162,7 +185,7 @@ export default function MyAppointmentsPage() {
           confirmButtonColor: "#10b981",
         });
       } else {
-        const error = await response.json()
+        const error = await response.json();
         await Swal.fire({
           icon: "error",
           title: "Cancellation Failed",
@@ -171,7 +194,7 @@ export default function MyAppointmentsPage() {
         });
       }
     } catch (error) {
-      console.error("Error cancelling appointment:", error)
+      console.error("Error cancelling appointment:", error);
       await Swal.fire({
         icon: "error",
         title: "Error",
@@ -179,9 +202,9 @@ export default function MyAppointmentsPage() {
         confirmButtonColor: "#ef4444",
       });
     } finally {
-      setCancellingId(null)
+      setCancellingId(null);
     }
-  }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -191,30 +214,35 @@ export default function MyAppointmentsPage() {
             <CheckCircle2 className="w-4 h-4" />
             Completed
           </div>
-        )
+        );
       case "upcoming":
         return (
           <div className="flex items-center gap-2 px-4 py-2 bg-amber-50/80 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-200/50 dark:border-amber-800/50 shadow-sm ring-1 ring-amber-200/50">
             <Hourglass className="w-4 h-4" />
             Upcoming
           </div>
-        )
+        );
       case "cancelled":
         return (
           <div className="flex items-center gap-2 px-4 py-2 bg-red-50/80 dark:bg-red-950/30 text-red-700 dark:text-red-300 rounded-xl text-xs font-semibold border border-red-200/50 dark:border-red-800/50 shadow-sm ring-1 ring-red-200/50">
             <XCircle className="w-4 h-4" />
             Cancelled
           </div>
-        )
+        );
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   return (
     <ProtectedRoute allowedRoles={["patient"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <Navigation isAuthenticated={true} userRole="patient" userName={user?.name} onLogout={logout} />
+        <Navigation
+          isAuthenticated={true}
+          userRole="patient"
+          userName={user?.name}
+          onLogout={logout}
+        />
 
         {/* Hero Header */}
         <section className="relative bg-gradient-to-br from-primary/5 via-background to-accent/5 py-12 lg:py-16 border-b border-border/50 overflow-hidden">
@@ -314,8 +342,12 @@ export default function MyAppointmentsPage() {
                   <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
                     <Calendar className="w-12 h-12 text-muted-foreground animate-pulse" />
                   </div>
-                  <h3 className="text-3xl font-bold text-foreground mb-4">Loading...</h3>
-                  <p className="text-muted-foreground">Fetching your appointments</p>
+                  <h3 className="text-3xl font-bold text-foreground mb-4">
+                    Loading...
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Fetching your appointments
+                  </p>
                 </div>
               </Card>
             </FadeIn>
@@ -329,7 +361,7 @@ export default function MyAppointmentsPage() {
                         .map((n) => n[0])
                         .join("")
                         .toUpperCase()
-                    : "DR"
+                    : "DR";
 
                   return (
                     <Card
@@ -344,7 +376,9 @@ export default function MyAppointmentsPage() {
                               {appointment.formattedDate.split(" ")[0]}
                             </span>
                             <span className="text-3xl font-bold">
-                              {appointment.formattedDate.split(" ")[1].replace(",", "")}
+                              {appointment.formattedDate
+                                .split(" ")[1]
+                                .replace(",", "")}
                             </span>
                           </div>
                           <div>
@@ -352,9 +386,13 @@ export default function MyAppointmentsPage() {
                               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
                                 <Clock className="w-4 h-4 text-primary" />
                               </div>
-                              <span className="font-semibold">{appointment.time}</span>
+                              <span className="font-semibold">
+                                {appointment.time}
+                              </span>
                             </div>
-                            <div className="text-xs text-muted-foreground font-medium">{appointment.formattedDate}</div>
+                            <div className="text-xs text-muted-foreground font-medium">
+                              {appointment.formattedDate}
+                            </div>
                           </div>
                         </div>
 
@@ -371,12 +409,15 @@ export default function MyAppointmentsPage() {
                                   unoptimized
                                   className="object-cover group-hover:scale-110 transition-transform duration-500"
                                   onError={(e) => {
-                                    const target = e.target as HTMLImageElement
-                                    target.style.display = 'none'
-                                    const parent = target.parentElement
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                    const parent = target.parentElement;
                                     if (parent) {
-                                      const fallback = parent.querySelector('.image-fallback') as HTMLElement
-                                      if (fallback) fallback.style.display = 'flex'
+                                      const fallback = parent.querySelector(
+                                        ".image-fallback"
+                                      ) as HTMLElement;
+                                      if (fallback)
+                                        fallback.style.display = "flex";
                                     }
                                   }}
                                 />
@@ -416,61 +457,78 @@ export default function MyAppointmentsPage() {
                             {/* Complaint */}
                             {appointment.complaint && (
                               <div className="pt-4 border-t border-border/50">
-                                <p className="text-sm text-muted-foreground mb-1 font-semibold">Symptoms / Concerns:</p>
-                                <p className="text-sm text-foreground">{appointment.complaint}</p>
+                                <p className="text-sm text-muted-foreground mb-1 font-semibold">
+                                  Symptoms / Concerns:
+                                </p>
+                                <p className="text-sm text-foreground">
+                                  {appointment.complaint}
+                                </p>
                               </div>
                             )}
 
                             {/* Rating and Review Display */}
-                            {appointment.statusDisplay === "completed" && appointment.hasReview && appointment.review && (
-                              <div className="pt-4 border-t border-border/50">
-                                <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-base font-bold text-foreground">
-                                      Your Rating: {appointment.review.rating}/5
-                                    </span>
-                                  </div>
-                                  {appointment.review.comment && (
-                                    <div className="mt-2">
-                                      <p className="text-sm font-semibold text-muted-foreground mb-1">Your Review:</p>
-                                      <p className="text-sm text-foreground">{appointment.review.comment}</p>
+                            {appointment.statusDisplay === "completed" &&
+                              appointment.hasReview &&
+                              appointment.review && (
+                                <div className="pt-4 border-t border-border/50">
+                                  <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                      <span className="text-base font-bold text-foreground">
+                                        Your Rating: {appointment.review.rating}
+                                        /5
+                                      </span>
                                     </div>
-                                  )}
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    Reviewed on {new Date(appointment.review.createdAt).toLocaleDateString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric"
-                                    })}
-                                  </p>
+                                    {appointment.review.comment && (
+                                      <div className="mt-2">
+                                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                                          Your Review:
+                                        </p>
+                                        <p className="text-sm text-foreground">
+                                          {appointment.review.comment}
+                                        </p>
+                                      </div>
+                                    )}
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                      Reviewed on{" "}
+                                      {new Date(
+                                        appointment.review.createdAt
+                                      ).toLocaleDateString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      })}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
                             {/* Action Buttons */}
                             <div className="pt-4 border-t border-border/50 flex flex-wrap items-center gap-3">
                               {/* Rating and Review for completed appointments */}
                               {appointment.statusDisplay === "completed" && (
                                 <>
-                                  {appointment.doctor && appointment.doctor.rating > 0 && !appointment.hasReview && (
-                                    <div className="flex items-center gap-1.5">
-                                      <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                                      <span className="text-base font-bold text-foreground">
-                                        {appointment.doctor.rating.toFixed(1)}
-                                      </span>
-                                      {appointment.doctor.totalReviews > 0 && (
-                                        <span className="text-sm text-muted-foreground">
-                                          ({appointment.doctor.totalReviews})
+                                  {appointment.doctor &&
+                                    appointment.doctor.rating > 0 &&
+                                    !appointment.hasReview && (
+                                      <div className="flex items-center gap-1.5">
+                                        <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                        <span className="text-base font-bold text-foreground">
+                                          {appointment.doctor.rating.toFixed(1)}
                                         </span>
-                                      )}
-                                    </div>
-                                  )}
+                                        {appointment.doctor.totalReviews >
+                                          0 && (
+                                          <span className="text-sm text-muted-foreground">
+                                            ({appointment.doctor.totalReviews})
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   {!appointment.hasReview && (
                                     <Button
                                       onClick={() => {
-                                        setSelectedAppointment(appointment)
-                                        setShowReviewModal(true)
+                                        setSelectedAppointment(appointment);
+                                        setShowReviewModal(true);
                                       }}
                                       variant="outline"
                                       size="sm"
@@ -482,7 +540,9 @@ export default function MyAppointmentsPage() {
                                   )}
                                   {appointment.hasMedicalRecord && (
                                     <Button
-                                      onClick={() => router.push("/patient/medical-record")}
+                                      onClick={() =>
+                                        router.push("/patient/medical-record")
+                                      }
                                       variant="outline"
                                       size="sm"
                                       className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
@@ -491,27 +551,38 @@ export default function MyAppointmentsPage() {
                                       View Medical Record
                                     </Button>
                                   )}
-                                  {appointment.hasInvoice && appointment.invoice && (
-                                    <Button
-                                      onClick={() => router.push(`/patient/invoices?bookingId=${appointment.bookingId}&status=${appointment.invoice.status}`)}
-                                      variant="outline"
-                                      size="sm"
-                                      className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
-                                    >
-                                      <Receipt className="w-4 h-4" />
-                                      View Details Invoice
-                                    </Button>
-                                  )}
+                                  {appointment.hasInvoice &&
+                                    appointment.invoice && (
+                                      <Button
+                                        onClick={() =>
+                                          router.push(
+                                            `/patient/invoices?bookingId=${appointment.bookingId}&status=${appointment.invoice?.status}`
+                                          )
+                                        }
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-2 border-border/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 font-semibold gap-2"
+                                      >
+                                        <Receipt className="w-4 h-4" />
+                                        View Details Invoice
+                                      </Button>
+                                    )}
                                 </>
                               )}
 
                               {/* Cancel button for upcoming appointments */}
                               {appointment.statusDisplay === "upcoming" && (
                                 <Button
-                                  onClick={() => handleCancelAppointment(appointment.bookingId)}
+                                  onClick={() =>
+                                    handleCancelAppointment(
+                                      appointment.bookingId
+                                    )
+                                  }
                                   variant="outline"
                                   size="sm"
-                                  disabled={cancellingId === appointment.bookingId}
+                                  disabled={
+                                    cancellingId === appointment.bookingId
+                                  }
                                   className="border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 hover:border-red-300 dark:hover:border-red-700 transition-all duration-300 font-semibold gap-2"
                                 >
                                   {cancellingId === appointment.bookingId ? (
@@ -532,7 +603,7 @@ export default function MyAppointmentsPage() {
                         </div>
                       </div>
                     </Card>
-                  )
+                  );
                 })}
               </div>
             </StaggerChildren>
@@ -543,7 +614,9 @@ export default function MyAppointmentsPage() {
                   <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg ring-4 ring-primary/10">
                     <Calendar className="w-12 h-12 text-muted-foreground" />
                   </div>
-                  <h3 className="text-3xl font-bold text-foreground mb-4">No appointments found</h3>
+                  <h3 className="text-3xl font-bold text-foreground mb-4">
+                    No appointments found
+                  </h3>
                   <p className="text-muted-foreground mb-8 leading-relaxed text-base">
                     {filter === "upcoming"
                       ? "You don't have any upcoming appointments. Book one now!"
@@ -572,16 +645,16 @@ export default function MyAppointmentsPage() {
             <ReviewDoctorModal
               isOpen={showReviewModal}
               onClose={() => {
-                setShowReviewModal(false)
-                setSelectedAppointment(null)
+                setShowReviewModal(false);
+                setSelectedAppointment(null);
               }}
               doctorName={selectedAppointment.doctor.name}
               onSubmit={async (rating, feedback) => {
                 try {
-                  const token = localStorage.getItem("medqueue_token")
+                  const token = localStorage.getItem("medqueue_token");
                   if (!token) {
-                    console.error("No token found")
-                    return
+                    console.error("No token found");
+                    return;
                   }
 
                   const response = await fetch("/api/patient/reviews", {
@@ -592,30 +665,33 @@ export default function MyAppointmentsPage() {
                     },
                     body: JSON.stringify({
                       bookingId: selectedAppointment.bookingId,
-                      doctorId: selectedAppointment.doctor.doctorId,
+                      doctorId: selectedAppointment.doctor?.doctorId,
                       rating: rating,
                       comment: feedback || "",
                     }),
-                  })
+                  });
 
                   if (response.ok) {
                     // Refresh appointments to show updated review status
-                    const params = new URLSearchParams()
-                    if (filter !== "all") params.append("status", filter)
-                    const refreshResponse = await fetch(`/api/patient/appointments?${params.toString()}`, {
-                      headers: {
-                        Authorization: `Bearer ${token}`,
-                      },
-                    })
+                    const params = new URLSearchParams();
+                    if (filter !== "all") params.append("status", filter);
+                    const refreshResponse = await fetch(
+                      `/api/patient/appointments?${params.toString()}`,
+                      {
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                        },
+                      }
+                    );
                     if (refreshResponse.ok) {
-                      const data = await refreshResponse.json()
-                      setAppointments(data.appointments || [])
+                      const data = await refreshResponse.json();
+                      setAppointments(data.appointments || []);
                     }
-                    setShowReviewModal(false)
-                    setSelectedAppointment(null)
+                    setShowReviewModal(false);
+                    setSelectedAppointment(null);
                   } else {
-                    const error = await response.json()
-                    console.error("Failed to submit review:", error)
+                    const error = await response.json();
+                    console.error("Failed to submit review:", error);
                     await Swal.fire({
                       icon: "error",
                       title: "Review Failed",
@@ -624,7 +700,7 @@ export default function MyAppointmentsPage() {
                     });
                   }
                 } catch (error) {
-                  console.error("Error submitting review:", error)
+                  console.error("Error submitting review:", error);
                   await Swal.fire({
                     icon: "error",
                     title: "Error",
@@ -638,6 +714,5 @@ export default function MyAppointmentsPage() {
         </main>
       </div>
     </ProtectedRoute>
-  )
+  );
 }
-
