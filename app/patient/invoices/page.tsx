@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { Card } from "@/components/ui/card";
@@ -53,7 +53,8 @@ interface InvoiceData {
   paidAt: string | null;
 }
 
-export default function InvoiceDetailPage() {
+// Komponen yang menggunakan useSearchParams harus dibungkus dengan Suspense
+function InvoiceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -173,7 +174,7 @@ export default function InvoiceDetailPage() {
           window.snap.pay(snapToken, {
             onSuccess: async (result: any) => {
               console.log("Payment success:", result);
-              
+
               // Wait a bit for webhook to process, then retry fetching invoice
               const fetchUpdatedInvoice = async (retries = 5) => {
                 for (let i = 0; i < retries; i++) {
@@ -201,7 +202,7 @@ export default function InvoiceDetailPage() {
 
                   // If not found with paid status, try with pending (webhook might not have processed yet)
                   if (i < retries - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                    await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
                   }
                 }
 
@@ -597,5 +598,25 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+// Main page component dengan Suspense wrapper
+export default function InvoiceDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+          <Navigation />
+          <div className="container mx-auto px-4 py-8 max-w-5xl">
+            <Card className="p-8 text-center border border-border/50 shadow-sm">
+              <p className="text-muted-foreground">Loading invoice...</p>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <InvoiceContent />
+    </Suspense>
   );
 }
