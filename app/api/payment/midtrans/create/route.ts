@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId, role } = verifyToken(authHeader);
+    const { userId, role } = verifyToken(authHeader.split(" ")[1]);
     if (role !== "patient") {
       return NextResponse.json(
         { error: "Forbidden - Patient access only" },
@@ -98,12 +98,21 @@ export async function POST(req: Request) {
         order_id: `INV-${invoice.invoiceNumber}-${Date.now()}`,
         gross_amount: invoice.total,
       },
-      item_details: invoice.items.map((item: { type: string; unitPrice: number; quantity: number; name?: string; serviceName?: string; medicineName?: string }) => ({
-        id: item.type,
-        price: item.unitPrice,
-        quantity: item.quantity,
-        name: item.name || item.serviceName || item.medicineName || item.type,
-      })),
+      item_details: invoice.items.map(
+        (item: {
+          type: string;
+          unitPrice: number;
+          quantity: number;
+          name?: string;
+          serviceName?: string;
+          medicineName?: string;
+        }) => ({
+          id: item.type,
+          price: item.unitPrice,
+          quantity: item.quantity,
+          name: item.name || item.serviceName || item.medicineName || item.type,
+        })
+      ),
       customer_details: {
         first_name: patient.fullName || "Patient",
         last_name: "",
@@ -145,7 +154,10 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error("Error creating Midtrans payment:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create payment" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to create payment",
+      },
       { status: 500 }
     );
   }

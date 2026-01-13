@@ -9,14 +9,11 @@ export async function GET(req: Request) {
   try {
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId, role } = verifyToken(authHeader);
+    const { userId, role } = verifyToken(authHeader.split(" ")[1]);
     if (role !== "patient") {
       return NextResponse.json(
         { error: "Forbidden - Patient access only" },
@@ -46,7 +43,7 @@ export async function GET(req: Request) {
     let invoice = await invoicesCollection.findOne({
       bookingId: new ObjectId(bookingId),
       patientId: patientObjectId,
-      status: status
+      status: status,
     });
 
     // If not found and status is "paid", try to find with any status (webhook might not have updated yet)
@@ -58,24 +55,27 @@ export async function GET(req: Request) {
     }
 
     if (!invoice) {
-      return NextResponse.json(
-        { error: "Invoice not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
     // ✅ 4. Get medical record for medication receipt
     let medicationReceipt = null;
     if (invoice.medicalRecordId) {
-      const medicalRecord = await MedicalRecordModel.getById(invoice.medicalRecordId.toString());
-      if (medicalRecord && medicalRecord.prescriptions && medicalRecord.prescriptions.length > 0) {
+      const medicalRecord = await MedicalRecordModel.getById(
+        invoice.medicalRecordId.toString()
+      );
+      if (
+        medicalRecord &&
+        medicalRecord.prescriptions &&
+        medicalRecord.prescriptions.length > 0
+      ) {
         medicationReceipt = {
           medicines: medicalRecord.prescriptions.map((prescription: any) => ({
             name: prescription.medicineName,
             dosage: prescription.dosage || "",
             quantity: prescription.quantity,
-            price: prescription.unitPrice * prescription.quantity
-          }))
+            price: prescription.unitPrice * prescription.quantity,
+          })),
         };
       }
     }
@@ -85,7 +85,7 @@ export async function GET(req: Request) {
     const formattedDate = invoiceDate.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      year: "numeric"
+      year: "numeric",
     });
 
     // ✅ 6. Return response
@@ -101,7 +101,7 @@ export async function GET(req: Request) {
       medicationReceipt: medicationReceipt,
       dueDate: invoice.dueDate,
       paymentMethod: invoice.paymentMethod || null,
-      paidAt: invoice.paidAt || null
+      paidAt: invoice.paidAt || null,
     });
   } catch (error) {
     console.error("Error fetching invoice:", error);
@@ -111,4 +111,3 @@ export async function GET(req: Request) {
     );
   }
 }
-

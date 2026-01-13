@@ -13,14 +13,11 @@ export async function GET(req: Request) {
   try {
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId, role } = verifyToken(authHeader);
+    const { userId, role } = verifyToken(authHeader.split(" ")[1]);
     if (role !== "patient") {
       return NextResponse.json(
         { error: "Forbidden - Patient access only" },
@@ -48,7 +45,7 @@ export async function GET(req: Request) {
         const now = new Date();
         query.$or = [
           { status: "confirmed", appointmentTime: { $gte: now } },
-          { status: "in-progress" }
+          { status: "in-progress" },
         ];
       } else {
         query.status = status;
@@ -72,21 +69,23 @@ export async function GET(req: Request) {
     const bookings = await bookingsQuery.toArray();
 
     // ✅ 5. Get summary counts
-    const allCount = await bookingsCollection.countDocuments({ patientId: patientObjectId });
+    const allCount = await bookingsCollection.countDocuments({
+      patientId: patientObjectId,
+    });
     const upcomingCount = await bookingsCollection.countDocuments({
       patientId: patientObjectId,
       $or: [
         { status: "confirmed", appointmentTime: { $gte: new Date() } },
-        { status: "in-progress" }
-      ]
+        { status: "in-progress" },
+      ],
     });
     const completedCount = await bookingsCollection.countDocuments({
       patientId: patientObjectId,
-      status: "completed"
+      status: "completed",
     });
     const cancelledCount = await bookingsCollection.countDocuments({
       patientId: patientObjectId,
-      status: "cancelled"
+      status: "cancelled",
     });
 
     // ✅ 6. Enrich bookings with doctor, service, review, medical record, invoice info
@@ -99,7 +98,7 @@ export async function GET(req: Request) {
       bookings.map(async (booking) => {
         // Get doctor info
         const doctor = await doctorsCollection.findOne({
-          _id: new ObjectId(booking.doctorId)
+          _id: new ObjectId(booking.doctorId),
         });
 
         // Get service info (if serviceId exists in booking)
@@ -110,23 +109,23 @@ export async function GET(req: Request) {
           serviceInfo = {
             serviceId: booking.serviceId,
             name: booking.serviceName || "Medical Service",
-            price: booking.servicePrice || 0
+            price: booking.servicePrice || 0,
           };
         }
 
         // Get review
         const review = await reviewsCollection.findOne({
-          bookingId: new ObjectId(booking._id)
+          bookingId: new ObjectId(booking._id),
         });
 
         // Get medical record
         const medicalRecord = await medicalRecordsCollection.findOne({
-          bookingId: new ObjectId(booking._id)
+          bookingId: new ObjectId(booking._id),
         });
 
         // Get invoice
         const invoice = await invoicesCollection.findOne({
-          bookingId: new ObjectId(booking._id)
+          bookingId: new ObjectId(booking._id),
         });
 
         // Map status for UI
@@ -144,14 +143,14 @@ export async function GET(req: Request) {
         const formattedDate = appointmentDate.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
-          year: "numeric"
+          year: "numeric",
         });
 
         // Format time
         const time = appointmentDate.toLocaleTimeString("en-US", {
           hour: "numeric",
           minute: "2-digit",
-          hour12: true
+          hour12: true,
         });
 
         return {
@@ -163,25 +162,29 @@ export async function GET(req: Request) {
           appointmentTime: booking.appointmentTime,
           status: booking.status,
           statusDisplay: statusDisplay,
-          doctor: doctor ? {
-            doctorId: doctor._id.toString(),
-            name: doctor.name,
-            specialization: doctor.specialization,
-            clinic: doctor.clinic,
-            rating: doctor.averageRating || 0,
-            totalReviews: doctor.totalReviews || 0,
-            image: doctor.image
-          } : null,
+          doctor: doctor
+            ? {
+                doctorId: doctor._id.toString(),
+                name: doctor.name,
+                specialization: doctor.specialization,
+                clinic: doctor.clinic,
+                rating: doctor.averageRating || 0,
+                totalReviews: doctor.totalReviews || 0,
+                image: doctor.image,
+              }
+            : null,
           service: serviceInfo,
           complaint: booking.complaint || "",
           queueNumber: booking.queueNumber || null,
           hasReview: !!review,
-          review: review ? {
-            reviewId: review._id.toString(),
-            rating: review.rating,
-            comment: review.comment || "",
-            createdAt: review.createdAt
-          } : null,
+          review: review
+            ? {
+                reviewId: review._id.toString(),
+                rating: review.rating,
+                comment: review.comment || "",
+                createdAt: review.createdAt,
+              }
+            : null,
           hasMedicalRecord: !!medicalRecord,
           hasInvoice: !!invoice,
           invoiceId: invoice ? invoice._id.toString() : null,
@@ -206,8 +209,8 @@ export async function GET(req: Request) {
         all: allCount,
         upcoming: upcomingCount,
         completed: completedCount,
-        cancelled: cancelledCount
-      }
+        cancelled: cancelledCount,
+      },
     });
   } catch (error) {
     console.error("Error fetching appointments:", error);
@@ -217,4 +220,3 @@ export async function GET(req: Request) {
     );
   }
 }
-

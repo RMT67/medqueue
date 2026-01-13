@@ -16,14 +16,11 @@ export async function POST(req: Request) {
   try {
     // ✅ 1. Authentication
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId, role } = verifyToken(authHeader);
+    const { userId, role } = verifyToken(authHeader.split(" ")[1]);
     if (role !== "patient") {
       return NextResponse.json(
         { error: "Forbidden - Patient access only" },
@@ -56,7 +53,7 @@ export async function POST(req: Request) {
     const bookingsCollection = db.collection("bookings");
     const booking = await bookingsCollection.findOne({
       _id: new ObjectId(bookingId),
-      patientId: new ObjectId(userId)
+      patientId: new ObjectId(userId),
     });
 
     if (!booking) {
@@ -89,22 +86,24 @@ export async function POST(req: Request) {
       patientId: new ObjectId(userId),
       doctorId: doctorId,
       rating: rating,
-      comment: comment || ""
+      comment: comment || "",
     });
 
     // ✅ 9. Update doctor's average rating and total reviews
     const doctor = await DoctorModel.getDoctorById(doctorId);
     if (doctor) {
       const reviewsCollection = db.collection("reviews");
-      const allReviews = await reviewsCollection.find({ doctorId: doctorId }).toArray();
-      
+      const allReviews = await reviewsCollection
+        .find({ doctorId: doctorId })
+        .toArray();
+
       const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
       const averageRating = totalRating / allReviews.length;
       const totalReviews = allReviews.length;
 
       await DoctorModel.update(doctorId, {
         averageRating: averageRating,
-        totalReviews: totalReviews
+        totalReviews: totalReviews,
       });
     }
 
@@ -119,8 +118,8 @@ export async function POST(req: Request) {
           patientId: userId,
           rating: review.rating,
           comment: review.comment,
-          createdAt: review.createdAt
-        }
+          createdAt: review.createdAt,
+        },
       },
       { status: 201 }
     );
@@ -132,4 +131,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
